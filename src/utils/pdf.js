@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { EXTRAS_POR_DEFECTO } from "../data/precios";
 import { getNextQuoteNumber } from "./quoteNumber";
-
+import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 // Formato de moneda colombiano
 function formatearPesos(valor) {
   return valor.toLocaleString("es-CO", {
@@ -11,7 +11,6 @@ function formatearPesos(valor) {
     minimumFractionDigits: 0
   });
 }
-
 // Arma la tabla igual a la preview
 function construirFilasPDF(productos) {
   const filas = [];
@@ -120,6 +119,7 @@ export function generarPDF(cotizacion) {
   const doc = new jsPDF();
   const cotizacionNum = getNextQuoteNumber();
   const fecha = new Date().toLocaleDateString("es-CO");
+  guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
 
   // Encabezado
   doc.setFontSize(18);
