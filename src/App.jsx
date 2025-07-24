@@ -53,24 +53,23 @@ function crearProductoInicial() {
 }
 
 export default function App() {
-  const { setQuoteData } = useQuote();
+  const { quoteData, setQuoteData } = useQuote();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Inicialización inteligente para editar cotización previa
-  const [productos, setProductos] = useState(() => {
-    if (location.state?.quoteData?.productos) {
-      return location.state.quoteData.productos;
-    }
-    return [crearProductoInicial()];
-  });
+  const [productos, setProductos] = useState([crearProductoInicial()]);
+  const [cliente, setCliente] = useState("");
 
-  const [cliente, setCliente] = useState(() => {
-    if (location.state?.quoteData?.cliente) {
-      return location.state.quoteData.cliente;
+  useEffect(() => {
+    if (quoteData && quoteData.productos?.length > 0) {
+      setProductos(quoteData.productos);
+      setCliente(quoteData.cliente || "");
+      setAjusteTotalTipo(quoteData.ajusteTotalTipo || "Incremento");
+      setAjusteTotalValor(quoteData.ajusteTotalValor || 0);
     }
-    return "";
-  });
+  }, []);
+
 
   const [extraInput, setExtraInput] = useState("");
   const [extraPrecioInput, setExtraPrecioInput] = useState("");

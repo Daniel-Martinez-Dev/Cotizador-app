@@ -102,7 +102,7 @@ export const EXTRAS_POR_DEFECTO = {
     { nombre: "PLATINAS + REATAS", precio: 200000 },
     { nombre: "DIVISION CON 3 PANELES", precio: 80000 },
     { nombre: "PUERTA", precio: 400000 },
-    { nombre: "VENTILADOR", precio: 200000 }
+    { nombre: "VENTILADOR", precio: 450000 }
   ]
 };
 
