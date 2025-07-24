@@ -4,12 +4,18 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
+import { FaSortUp, FaSortDown } from "react-icons/fa";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function HistorialPage() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroNumero, setFiltroNumero] = useState("");
-  const [filtroFecha, setFiltroFecha] = useState("");
+  const [fechaInicio, setFechaInicio] = useState(null);
+  const [fechaFin, setFechaFin] = useState(null);
+  const [ordenCampo, setOrdenCampo] = useState("timestamp");
+  const [ordenAscendente, setOrdenAscendente] = useState(false);
   const navigate = useNavigate();
   const { setQuoteData } = useQuote();
 
@@ -25,22 +31,38 @@ export default function HistorialPage() {
     fetchData();
   }, []);
 
-  const cotizacionesFiltradas = cotizaciones.filter(c => {
-    const coincideCliente = c.cliente
-      .toLowerCase()
-      .includes(filtroCliente.toLowerCase());
-    const coincideNumero = c.numero
-      ?.toString()
-      .toLowerCase()
-      .includes(filtroNumero.toLowerCase());
-    const coincideFecha = filtroFecha
-    ? (
-        cot.timestamp?.toDate?.() &&
-        cot.timestamp.toDate().toLocaleDateString("es-CO") === filtroFecha
-        )
-    : true;
-    return coincideCliente && coincideNumero && coincideFecha;
-  });
+  const iconoOrden = (campo) => {
+    if (ordenCampo !== campo) return null;
+    return ordenAscendente ? <FaSortUp /> : <FaSortDown />;
+  };
+
+    const cotizacionesFiltradas = cotizaciones.filter((c) => {
+    const coincideCliente = c.cliente?.toLowerCase().includes(filtroCliente.toLowerCase());
+    const coincideNumero = c.numero?.toString().includes(filtroNumero);
+
+    let coincideRangoFecha = true;
+    if (fechaInicio || fechaFin) {
+        const fechaCot = c.timestamp?.toDate?.();
+        if (!fechaCot) return false;
+        coincideRangoFecha =
+        (!fechaInicio || fechaCot >= fechaInicio) &&
+        (!fechaFin || fechaCot <= fechaFin);
+    }
+
+    return coincideCliente && coincideNumero && coincideRangoFecha;
+    })
+    .sort((a, b) => {
+      const valorA =
+        ordenCampo === "timestamp"
+          ? a.timestamp?.toDate()?.getTime() || 0
+          : a.numero || 0;
+      const valorB =
+        ordenCampo === "timestamp"
+          ? b.timestamp?.toDate()?.getTime() || 0
+          : b.numero || 0;
+
+      return ordenAscendente ? valorA - valorB : valorB - valorA;
+    });
 
   const manejarVer = (cotizacion) => {
     setQuoteData(cotizacion);
@@ -66,13 +88,29 @@ export default function HistorialPage() {
           onChange={(e) => setFiltroNumero(e.target.value)}
           className="border p-2 rounded"
         />
-        <input
-          type="text"
-          placeholder="Filtrar por fecha (dd/mm/aaaa)"
-          value={filtroFecha}
-          onChange={(e) => setFiltroFecha(e.target.value)}
-          className="border p-2 rounded"
+        <div className="flex items-center gap-2">
+        <DatePicker
+            selected={fechaInicio}
+            onChange={(date) => setFechaInicio(date)}
+            selectsStart
+            startDate={fechaInicio}
+            endDate={fechaFin}
+            placeholderText="Fecha inicio"
+            className="border p-2 rounded"
+            dateFormat="dd/MM/yyyy"
         />
+        <DatePicker
+            selected={fechaFin}
+            onChange={(date) => setFechaFin(date)}
+            selectsEnd
+            startDate={fechaInicio}
+            endDate={fechaFin}
+            minDate={fechaInicio}
+            placeholderText="Fecha fin"
+            className="border p-2 rounded"
+            dateFormat="dd/MM/yyyy"
+        />
+        </div>
       </div>
 
       {cotizacionesFiltradas.length === 0 ? (
@@ -80,22 +118,48 @@ export default function HistorialPage() {
       ) : (
         <table className="w-full table-auto border">
           <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-4 py-2">#</th>
+            <tr className="text-left">
+              <th
+                className="border px-4 py-2 cursor-pointer"
+                onClick={() => {
+                  setOrdenCampo("numero");
+                  setOrdenAscendente((prev) =>
+                    ordenCampo === "numero" ? !prev : true
+                  );
+                }}
+              >
+                #
+                {iconoOrden("numero")}
+              </th>
               <th className="border px-4 py-2">Cliente</th>
-              <th className="border px-4 py-2">Fecha</th>
+              <th
+                className="border px-4 py-2 cursor-pointer"
+                onClick={() => {
+                  setOrdenCampo("timestamp");
+                  setOrdenAscendente((prev) =>
+                    ordenCampo === "timestamp" ? !prev : true
+                  );
+                }}
+              >
+                Fecha
+                {iconoOrden("timestamp")}
+              </th>
               <th className="border px-4 py-2">Total</th>
               <th className="border px-4 py-2">Ver</th>
             </tr>
           </thead>
           <tbody>
-            {cotizacionesFiltradas.map((cot, index) => (
+            {cotizacionesFiltradas.map((cot) => (
               <tr key={cot.id} className="text-center">
                 <td className="border px-4 py-2">{cot.numero}</td>
                 <td className="border px-4 py-2">{cot.cliente}</td>
                 <td className="border px-4 py-2">
-                    {cot.timestamp && typeof cot.timestamp.toDate === "function"
-                    ? cot.timestamp.toDate().toLocaleDateString("es-CO")
+                  {cot.timestamp?.toDate
+                    ? cot.timestamp.toDate().toLocaleDateString("es-CO", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric"
+                      })
                     : "Sin fecha"}
                 </td>
                 <td className="border px-4 py-2">
