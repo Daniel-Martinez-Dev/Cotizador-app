@@ -9,6 +9,8 @@ import {
   matrizPanamericana
 } from "./data/precios";
 import { useQuote } from "./context/QuoteContext";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "./firebase"; // ajusta la ruta si es diferente
 
 // Redondea al múltiplo de $5.000 más cercano
 function redondear5000(valor) {
