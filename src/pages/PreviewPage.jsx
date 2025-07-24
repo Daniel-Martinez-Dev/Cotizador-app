@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { EXTRAS_POR_DEFECTO } from "../data/precios";
 import { generarPDF } from "../utils/pdf";
 
+
 function formatearPesos(valor) {
   return valor.toLocaleString("es-CO", {
     style: "currency",
@@ -201,6 +202,12 @@ export default function PreviewPage() {
           Descargar PDF
         </button>
       </div>
+        <button
+          onClick={() => navigate("/historial")}
+          className="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+        >
+          Ver Historial
+        </button>
     </div>
   );
 }
