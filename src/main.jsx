@@ -6,16 +6,14 @@ import "./index.css"; // << asegúrate de tener esta línea
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import PreviewPage from "./pages/PreviewPage.jsx";
 import { QuoteProvider } from "./context/QuoteContext.jsx";
+import { Toaster } from "react-hot-toast";
+import Router from './Router';
+<Toaster position="top-right" />
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QuoteProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/preview" element={<PreviewPage />} />
-        </Routes>
-      </BrowserRouter>
+      <Router />
     </QuoteProvider>
   </React.StrictMode>
 );

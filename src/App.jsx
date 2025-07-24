@@ -11,6 +11,8 @@ import {
 import { useQuote } from "./context/QuoteContext";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase"; // ajusta la ruta si es diferente
+import HistorialPage from "./pages/HistorialPage";
+
 
 // Redondea al múltiplo de $5.000 más cercano
 function redondear5000(valor) {

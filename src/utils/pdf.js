@@ -1,8 +1,9 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { EXTRAS_POR_DEFECTO } from "../data/precios";
-import { getNextQuoteNumber } from "./quoteNumber";
+import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
+import toast from "react-hot-toast";
 // Formato de moneda colombiano
 function formatearPesos(valor) {
   return valor.toLocaleString("es-CO", {
@@ -106,7 +107,7 @@ function construirDescripcionPDF(prod) {
   return desc;
 }
 
-export function generarPDF(cotizacion) {
+export async function generarPDF(cotizacion) {
   const {
     nombreCliente,
     cliente,
@@ -116,11 +117,29 @@ export function generarPDF(cotizacion) {
     total,
   } = cotizacion;
 
-  const doc = new jsPDF();
-  const cotizacionNum = getNextQuoteNumber();
+  // 1. Obtener número de cotización
+  const cotizacionNum = await getNextQuoteNumber();
   const fecha = new Date().toLocaleDateString("es-CO");
-  guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
 
+  // 2. Guardar en Firebase
+  try {
+    await guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
+    toast.success(`Cotización #${cotizacionNum} guardada`);
+  } catch (error) {
+    toast.error("Error al guardar la cotización");
+  }
+
+  // 3. Generar PDF
+  const doc = new jsPDF();
+
+  // Encabezado
+  doc.setFontSize(18);
+  doc.setTextColor(26, 51, 87);
+  doc.text(`Cotización #${cotizacionNum}`, 14, 18);
+  doc.setFontSize(12);
+  doc.setTextColor(40, 40, 40);
+  doc.text(`Cliente: ${nombreCliente || cliente}`, 14, 28);
+  doc.text(`Fecha: ${fecha}`, 14, 35);
   // Encabezado
   doc.setFontSize(18);
   doc.setTextColor(26, 51, 87);
