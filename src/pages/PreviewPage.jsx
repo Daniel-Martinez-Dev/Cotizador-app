@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { generarSeccionesHTML } from "../utils/htmlSections";
 import { generarPDF } from "../utils/pdf";
 import EditableSection from "../components/EditableSection";
+import parse from "html-react-parser";
 
 export default function PreviewPage() {
   const { quoteData } = useQuote();
@@ -54,6 +55,7 @@ export default function PreviewPage() {
         html={descripcionHTML}
         openByDefault={false}
         onChange={setDescripcionHTML}
+        displayContent={parse(descripcionHTML)}
       />
 
       <EditableSection
@@ -61,6 +63,7 @@ export default function PreviewPage() {
         html={especificacionesHTML}
         openByDefault={false}
         onChange={setEspecificacionesHTML}
+        displayContent={parse(especificacionesHTML)}
       />
 
       <EditableSection
@@ -68,6 +71,7 @@ export default function PreviewPage() {
         html={tablaHTML}
         openByDefault={true}
         onChange={setTablaHTML}
+        displayContent={parse(tablaHTML)}
       />
 
       <EditableSection
@@ -75,6 +79,7 @@ export default function PreviewPage() {
         html={condicionesHTML}
         openByDefault={false}
         onChange={setCondicionesHTML}
+        displayContent={parse(condicionesHTML)}
       />
 
       <EditableSection
@@ -82,6 +87,7 @@ export default function PreviewPage() {
         html={terminosHTML}
         openByDefault={false}
         onChange={setTerminosHTML}
+        displayContent={parse(terminosHTML)}
       />
 
       <div className="flex gap-4 mt-6">
