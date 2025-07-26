@@ -8,8 +8,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.16",
     "date-fns": "^4.1.0",
     "firebase": "^12.0.0",
+    "html-react-parser": "^5.2.6",
     "html2pdf.js": "^0.10.3",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
