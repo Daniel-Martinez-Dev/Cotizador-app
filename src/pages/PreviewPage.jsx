@@ -1,54 +1,11 @@
-import React from "react";
+// src/pages/PreviewPage.jsx
+
+import React, { useState } from "react";
 import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
-import { EXTRAS_POR_DEFECTO } from "../data/precios";
+import { generarSeccionesHTML } from "../utils/htmlSections";
 import { generarPDF } from "../utils/pdf";
-
-
-function formatearPesos(valor) {
-  return valor.toLocaleString("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0
-  });
-}
-
-function construirDescripcion(prod) {
-  let desc = prod.tipo;
-  if (prod.ancho && prod.alto) desc += ` (${prod.ancho} x ${prod.alto} mm)`;
-  if (
-    prod.cliente &&
-    prod.cliente !== "Distribuidor" &&
-    prod.cliente !== "Carrocerías Panamericana"
-  )
-    desc += ` / Cliente: ${prod.cliente}`;
-  if (prod.cliente === "Carrocerías Panamericana") desc += " / Panamericana";
-  if (
-    prod.tipo === "Sello de Andén" &&
-    prod.componentes &&
-    prod.componentes.length > 0
-  ) {
-    desc += "\nComponentes: ";
-    desc += prod.componentes
-      .map((comp) => comp.charAt(0).toUpperCase() + comp.slice(1))
-      .join(", ");
-  }
-  // Solo mostrar descuento
-  if (
-    prod.ajusteTipo === "Descuento" &&
-    prod.ajusteValor &&
-    Number(prod.ajusteValor) !== 0
-  ) {
-    desc += `\nAjuste Descuento: ${prod.ajusteValor}%`;
-  }
-  if (prod.precioManual)
-    desc += `\nPrecio manual: ${formatearPesos(parseInt(prod.precioManual))}`;
-  else if (prod.precioEditado)
-    desc += `\nPrecio fuera de rango: ${formatearPesos(
-      parseInt(prod.precioEditado)
-    )}`;
-  return desc;
-}
+import EditableSection from "../components/EditableSection";
 
 export default function PreviewPage() {
   const { quoteData } = useQuote();
@@ -68,127 +25,66 @@ export default function PreviewPage() {
     );
   }
 
-  const { productos, cliente, subtotal, iva, total } = quoteData;
+  // Generar HTML por secciones
+  const secciones = generarSeccionesHTML(quoteData);
 
-  // Para cada producto, construye un arreglo de subitems: [producto principal, ...extras]
-  const filas = [];
-  productos.forEach((prod, idx) => {
-    const itemNum = idx + 1;
-    // Producto principal
-    filas.push({
-      key: `${itemNum}`,
-      isExtra: false,
-      item: `${itemNum}`,
-      descripcion: construirDescripcion(prod),
-      cantidad: parseInt(prod.cantidad) || 1,
-      precioUnit: prod.precioCalculado || 0,
-      subtotal:
-        (prod.precioCalculado || 0) * (parseInt(prod.cantidad) || 1),
+  const [descripcionHTML, setDescripcionHTML] = useState(secciones.descripcionHTML);
+  const [especificacionesHTML, setEspecificacionesHTML] = useState(secciones.especificacionesHTML);
+  const [tablaHTML, setTablaHTML] = useState(secciones.tablaHTML);
+  const [condicionesHTML, setCondicionesHTML] = useState(secciones.condicionesHTML);
+  const [terminosHTML, setTerminosHTML] = useState(secciones.terminosHTML);
+
+  const handleDescargarPDF = () => {
+    generarPDF({
+      ...quoteData,
+      descripcionHTML,
+      especificacionesHTML,
+      tablaHTML,
+      condicionesHTML,
+      terminosHTML
     });
-    // Extras por defecto seleccionados
-    let subIdx = 1;
-    if (prod.extras && prod.extras.length > 0) {
-      prod.extras.forEach((e) => {
-        const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
-        let precioExtraUnit = 0;
-        const encontrado = listaExtras.find((ex) => ex.nombre === e);
-        if (encontrado) {
-          if (encontrado.precio !== undefined) {
-            precioExtraUnit = encontrado.precio;
-          } else if (prod.cliente === "Distribuidor") {
-            precioExtraUnit = encontrado.precioDistribuidor || 0;
-          } else {
-            precioExtraUnit = encontrado.precioCliente || 0;
-          }
-        }
-        const cant = prod.extrasCantidades?.[e] || 1;
-        filas.push({
-          key: `${itemNum}.${subIdx}`,
-          isExtra: true,
-          item: `${itemNum}.${subIdx}`,
-          descripcion: e,
-          cantidad: cant,
-          precioUnit: precioExtraUnit,
-          subtotal: precioExtraUnit * cant,
-        });
-        subIdx++;
-      });
-    }
-    // Extras personalizados
-    if (prod.extrasPersonalizados && prod.extrasPersonalizados.length > 0) {
-      prod.extrasPersonalizados.forEach((ex, j) => {
-        const cant = prod.extrasPersonalizadosCant?.[j] || 1;
-        filas.push({
-          key: `${itemNum}.${subIdx}`,
-          isExtra: true,
-          item: `${itemNum}.${subIdx}`,
-          descripcion: ex.nombre,
-          cantidad: cant,
-          precioUnit: ex.precio,
-          subtotal: ex.precio * cant,
-        });
-        subIdx++;
-      });
-    }
-  });
+  };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 bg-white rounded-lg shadow-lg">
+    <div className="max-w-5xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Vista previa de la cotización</h1>
-      <div className="mb-4">
-        <span className="font-semibold">Cliente:</span> {cliente}
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-300 mb-6">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-3 py-2 border-b">Ítem #</th>
-              <th className="px-3 py-2 border-b">Descripción</th>
-              <th className="px-3 py-2 border-b">Cantidad</th>
-              <th className="px-3 py-2 border-b">Precio unitario</th>
-              <th className="px-3 py-2 border-b">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filas.map((fila) => (
-              <tr
-                key={fila.key}
-                className={
-                  fila.isExtra
-                    ? "bg-blue-50 text-sm"
-                    : "border-b font-semibold"
-                }
-              >
-                <td className="px-3 py-2 align-top text-center">{fila.item}</td>
-                <td className="px-3 py-2 align-top whitespace-pre-line">{fila.descripcion}</td>
-                <td className="px-3 py-2 align-top text-center">{fila.cantidad}</td>
-                <td className="px-3 py-2 align-top text-right">
-                  {formatearPesos(fila.precioUnit)}
-                </td>
-                <td className="px-3 py-2 align-top text-right">
-                  {formatearPesos(fila.subtotal)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      <div className="text-right mr-3 mb-2">
-        <div>
-          <span className="font-semibold">Subtotal: </span>
-          {formatearPesos(subtotal)}
-        </div>
-        <div>
-          <span className="font-semibold">IVA (19%): </span>
-          {formatearPesos(iva)}
-        </div>
-        <div className="text-lg font-bold">
-          Total: {formatearPesos(total)}
-        </div>
-      </div>
+      <EditableSection
+        title="1. Descripción General"
+        html={descripcionHTML}
+        openByDefault={false}
+        onChange={setDescripcionHTML}
+      />
 
-      <div className="flex gap-4">
+      <EditableSection
+        title="2. Especificaciones Técnicas"
+        html={especificacionesHTML}
+        openByDefault={false}
+        onChange={setEspecificacionesHTML}
+      />
+
+      <EditableSection
+        title="3. Detalle de Precios"
+        html={tablaHTML}
+        openByDefault={true}
+        onChange={setTablaHTML}
+      />
+
+      <EditableSection
+        title="4. Condiciones Comerciales"
+        html={condicionesHTML}
+        openByDefault={false}
+        onChange={setCondicionesHTML}
+      />
+
+      <EditableSection
+        title="5. Términos y Condiciones Generales"
+        html={terminosHTML}
+        openByDefault={false}
+        onChange={setTerminosHTML}
+      />
+
+      <div className="flex gap-4 mt-6">
         <button
           className="bg-blue-500 text-white px-4 py-2 rounded"
           onClick={() => navigate("/")}
@@ -197,17 +93,17 @@ export default function PreviewPage() {
         </button>
         <button
           className="bg-green-700 text-white px-4 py-2 rounded"
-          onClick={() => generarPDF(quoteData)}
+          onClick={handleDescargarPDF}
         >
           Descargar PDF
         </button>
-      </div>
         <button
           onClick={() => navigate("/historial")}
-          className="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
         >
           Ver Historial
         </button>
+      </div>
     </div>
   );
 }
