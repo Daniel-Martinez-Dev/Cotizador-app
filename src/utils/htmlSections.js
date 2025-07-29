@@ -102,19 +102,40 @@ function generarTablaPrecios(cot) {
     html += `<tr><td>${prod.tipo} (${prod.ancho}x${prod.alto})</td><td>${cantidad}</td><td>${formatearPesos(precio)}</td><td>${formatearPesos(subtotal)}</td></tr>`;
 
     const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
-    if (prod.extras) {
-      prod.extras.forEach((ex) => {
-        const encontrado = listaExtras.find((e) => e.nombre === ex);
-        const precioExtra = prod.cliente === "Distribuidor" ? encontrado?.precioDistribuidor : encontrado?.precioCliente;
-        const cantidadExtra = prod.extrasCantidades?.[ex] || 1;
-        html += `<tr><td>${ex}</td><td>${cantidadExtra}</td><td>${formatearPesos(precioExtra)}</td><td>${formatearPesos(precioExtra * cantidadExtra)}</td></tr>`;
+
+    // 🔹 Extras predefinidos
+    if (Array.isArray(prod.extras)) {
+      prod.extras.forEach((nombreExtra) => {
+        const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
+        if (encontrado) {
+          const cantidadExtra = prod.extrasCantidades?.[nombreExtra] || 1;
+
+          let precioExtra = 0;
+          if (typeof encontrado.precio !== "undefined") {
+            precioExtra = encontrado.precio;
+          } else if (
+            cot.cliente === "Distribuidor" &&
+            typeof encontrado.precioDistribuidor !== "undefined"
+          ) {
+            precioExtra = encontrado.precioDistribuidor;
+          } else if (
+            typeof encontrado.precioCliente !== "undefined"
+          ) {
+            precioExtra = encontrado.precioCliente;
+          }
+
+          html += `<tr><td>${nombreExtra}</td><td>${cantidadExtra}</td><td>${formatearPesos(precioExtra)}</td><td>${formatearPesos(precioExtra * cantidadExtra)}</td></tr>`;
+        }
       });
     }
 
-    if (prod.extrasPersonalizados) {
-      prod.extrasPersonalizados.forEach((ex, i) => {
-        const cantidadExtra = prod.extrasPersonalizadosCant?.[i] || 1;
-        html += `<tr><td>${ex.nombre}</td><td>${cantidadExtra}</td><td>${formatearPesos(ex.precio)}</td><td>${formatearPesos(ex.precio * cantidadExtra)}</td></tr>`;
+    // 🔹 Extras personalizados
+    if (Array.isArray(prod.extrasPersonalizados)) {
+      prod.extrasPersonalizados.forEach((extra, idx) => {
+        const cantidadExtra = prod.extrasPersonalizadosCant?.[idx] || 1;
+        if (extra?.nombre && !isNaN(extra.precio)) {
+          html += `<tr><td>${extra.nombre}</td><td>${cantidadExtra}</td><td>${formatearPesos(extra.precio)}</td><td>${formatearPesos(extra.precio * cantidadExtra)}</td></tr>`;
+        }
       });
     }
   });
@@ -123,8 +144,12 @@ function generarTablaPrecios(cot) {
   html += `<tr><td colspan="3"><strong>IVA (19%)</strong></td><td>${formatearPesos(cot.iva)}</td></tr>`;
   html += `<tr><td colspan="3"><strong>Total</strong></td><td><strong>${formatearPesos(cot.total)}</strong></td></tr>`;
   html += `</tbody></table>`;
+
   return html;
 }
+
+
+
 
 function generarCondicionesComerciales(cot) {
   return `<p><strong>Forma de pago:</strong> ${cot.formaPago || "50% de anticipo contra orden de compra y 50% para retiro en planta."}<br />
