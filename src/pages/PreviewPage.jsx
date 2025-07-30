@@ -17,6 +17,7 @@ export default function PreviewPage() {
 
   useEffect(() => {
     if (quoteData?.productos) {
+      console.log("Productos recibidos en PreviewPage:", quoteData.productos); // 👈 AÑADE ESTO
       try {
         const generadas = generarSeccionesHTML(quoteData);
         setSecciones([generadas]);
