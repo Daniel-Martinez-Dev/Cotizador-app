@@ -4,26 +4,32 @@ import html2pdf from "html2pdf.js";
 import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import toast from "react-hot-toast";
+import { generarSeccionesHTML } from "./htmlSections"; // ✅ con llaves
 
 export async function generarPDF(cotizacion) {
   const {
-    productos, // ← Esto es lo que falta
+    productos,
     nombreCliente,
     cliente,
-    descripcionHTML,
-    especificacionesHTML,
-    tablaHTML,
-    condicionesHTML,
-    terminosHTML
+    secciones = [],
+    subtotal,
+    iva,
+    total
   } = cotizacion;
 
+  // 👇 obtenemos la primera (y única) sección editada
+  const {
+    descripcionHTML = "",
+    especificacionesHTML = "",
+    tablaHTML = "",
+    condicionesHTML = "",
+    terminosHTML = ""
+  } = secciones[0] || {};
 
-  // 1. Obtener número de cotización
   const cotizacionNum = await getNextQuoteNumber();
   const fecha = new Date().toLocaleDateString("es-CO").replace(/\//g, "-");
   const nombreArchivo = `Cotizacion#${cotizacionNum}_${(nombreCliente || cliente || "Cliente").replace(/\s/g, "_")}_${fecha}.pdf`;
 
-  // 2. Guardar en Firebase
   try {
     await guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
     toast.success(`Cotización #${cotizacionNum} guardada`);
@@ -31,13 +37,11 @@ export async function generarPDF(cotizacion) {
     toast.error("Error al guardar la cotización");
   }
 
-  // 3. Crear contenedor HTML para generar el PDF
   const container = document.createElement("div");
   container.style.padding = "30px";
   container.style.fontFamily = "Arial, sans-serif";
   container.innerHTML = `
     <div style="font-family:'Segoe UI', sans-serif; max-width:800px; margin:0 auto; font-size:14px; color:#333;">
-      
       <div style="text-align:right; font-size:12px;">
         <strong>Fecha:</strong> ${fecha}<br/>
         <strong>Cotización No.:</strong> ${cotizacionNum}
@@ -81,12 +85,9 @@ export async function generarPDF(cotizacion) {
         Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.<br/>
         www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
       </div>
-
     </div>
   `;
 
-
-  // 4. Generar PDF usando html2pdf.js
   html2pdf()
     .from(container)
     .set({
@@ -98,3 +99,4 @@ export async function generarPDF(cotizacion) {
     })
     .save();
 }
+

@@ -1,16 +1,31 @@
 // src/pages/PreviewPage.jsx
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
-import { generarSeccionesHTML } from "../utils/htmlSections";
 import { generarPDF } from "../utils/pdf";
-import EditableSection from "../components/EditableSection";
-import parse from "html-react-parser";
+import { generarSeccionesHTML } from "../utils/htmlSections";
+import ReactQuill from "react-quill";
+import 'react-quill/dist/quill.snow.css';
 
 export default function PreviewPage() {
   const { quoteData } = useQuote();
   const navigate = useNavigate();
+  const [secciones, setSecciones] = useState([]);
+  const [editando, setEditando] = useState(null);
+  const [ediciones, setEdiciones] = useState({});
+
+  useEffect(() => {
+    if (quoteData?.productos) {
+      try {
+        const generadas = generarSeccionesHTML(quoteData);
+        setSecciones([generadas]);
+        setEdiciones(generadas);
+      } catch (error) {
+        console.error("Error generando secciones HTML:", error);
+      }
+    }
+  }, [quoteData]);
 
   if (!quoteData || !quoteData.productos) {
     return (
@@ -26,71 +41,92 @@ export default function PreviewPage() {
     );
   }
 
-  // Generar HTML por secciones
-  const secciones = generarSeccionesHTML(quoteData);
+  const { cliente, subtotal, iva, total, nombreCliente } = quoteData;
 
-  const [descripcionHTML, setDescripcionHTML] = useState(secciones.descripcionHTML);
-  const [especificacionesHTML, setEspecificacionesHTML] = useState(secciones.especificacionesHTML);
-  const [tablaHTML, setTablaHTML] = useState(secciones.tablaHTML);
-  const [condicionesHTML, setCondicionesHTML] = useState(secciones.condicionesHTML);
-  const [terminosHTML, setTerminosHTML] = useState(secciones.terminosHTML);
-
-  const handleDescargarPDF = () => {
-    generarPDF({
-      ...quoteData,
-      descripcionHTML,
-      especificacionesHTML,
-      tablaHTML,
-      condicionesHTML,
-      terminosHTML
-    });
+  const handleEditar = (campo) => {
+    setEditando(campo);
   };
 
+  const handleGuardar = () => {
+    setEditando(null);
+  };
+
+  const renderCampo = (label, campo) => (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-blue-900 mb-4 border-b pb-2 uppercase">{label}</h2>
+      {editando === campo ? (
+        <>
+          <ReactQuill
+            theme="snow"
+            value={ediciones[campo] || ""}
+            onChange={(value) => setEdiciones({ ...ediciones, [campo]: value })}
+            modules={{
+              toolbar: [
+                [{ header: [1, 2, 3, false] }],
+                ["bold", "italic", "underline"],
+                [{ list: "ordered" }, { list: "bullet" }],
+                ["link"],
+                ["clean"]
+              ]
+            }}
+            formats={[
+              "header",
+              "bold",
+              "italic",
+              "underline",
+              "list",
+              "bullet",
+              "link"
+            ]}
+          />
+          <button
+            className="mt-2 bg-green-600 text-white px-4 py-1 rounded"
+            onClick={handleGuardar}
+          >Guardar</button>
+        </>
+      ) : (
+        <div className="mb-4 whitespace-pre-wrap">
+          <div dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }} />
+          <button
+            className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
+            onClick={() => handleEditar(campo)}
+          >Editar</button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-8 bg-white rounded-lg shadow-lg">
       <h1 className="text-2xl font-bold mb-6">Vista previa de la cotización</h1>
+      <div className="mb-4">
+        <span className="font-semibold">Cliente:</span> {nombreCliente || cliente}
+      </div>
 
-      <EditableSection
-        title="1. Descripción General"
-        html={descripcionHTML}
-        openByDefault={false}
-        onChange={setDescripcionHTML}
-        displayContent={parse(descripcionHTML)}
-      />
+      {renderCampo("Descripción", "descripcionHTML")}
+      {renderCampo("Especificaciones", "especificacionesHTML")}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-blue-900 mb-4 border-b pb-2 uppercase">Detalle de precios</h2>
+        <div dangerouslySetInnerHTML={{ __html: ediciones.tablaHTML }} />
+      </div>
+      {renderCampo("Condiciones Comerciales", "condicionesHTML")}
+      {renderCampo("Términos Generales", "terminosHTML")}
 
-      <EditableSection
-        title="2. Especificaciones Técnicas"
-        html={especificacionesHTML}
-        openByDefault={false}
-        onChange={setEspecificacionesHTML}
-        displayContent={parse(especificacionesHTML)}
-      />
+      <div className="text-right mr-3 mb-6">
+        <div>
+          <span className="font-semibold">Subtotal: </span>
+          {(subtotal || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
+        <div>
+          <span className="font-semibold">IVA (19%): </span>
+          {(iva || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
+        <div className="text-lg font-bold">
+          Total: {(total || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
+      </div>
 
-      <EditableSection
-        title="3. Detalle de Precios"
-        html={tablaHTML}
-        openByDefault={true}
-        onChange={setTablaHTML}
-        displayContent={parse(tablaHTML)}
-      />
-
-      <EditableSection
-        title="4. Condiciones Comerciales"
-        html={condicionesHTML}
-        openByDefault={false}
-        onChange={setCondicionesHTML}
-        displayContent={parse(condicionesHTML)}
-      />
-
-      <EditableSection
-        title="5. Términos y Condiciones Generales"
-        html={terminosHTML}
-        openByDefault={false}
-        onChange={setTerminosHTML}
-        displayContent={parse(terminosHTML)}
-      />
-
-      <div className="flex gap-4 mt-6">
+      <div className="flex flex-wrap gap-4">
         <button
           className="bg-blue-500 text-white px-4 py-2 rounded"
           onClick={() => navigate("/")}
@@ -99,7 +135,7 @@ export default function PreviewPage() {
         </button>
         <button
           className="bg-green-700 text-white px-4 py-2 rounded"
-          onClick={handleDescargarPDF}
+          onClick={() => generarPDF({ ...quoteData, secciones: [ediciones] })}
         >
           Descargar PDF
         </button>
