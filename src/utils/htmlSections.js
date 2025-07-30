@@ -93,60 +93,101 @@ function generarEspecificaciones(cot) {
 }
 
 function generarTablaPrecios(cot) {
-  let html = `<table><thead><tr><th>Producto</th><th>Cantidad</th><th>Precio Unitario</th><th>Subtotal</th></tr></thead><tbody>`;
+  let html = `
+    <table style="width:100%; border-collapse: collapse; font-size: 14px;">
+      <thead>
+        <tr style="background-color: #f2f2f2;">
+          <th style="border: 1px solid #ccc; padding: 8px; text-align:left;">Producto</th>
+          <th style="border: 1px solid #ccc; padding: 8px; text-align:center;">Cantidad</th>
+          <th style="border: 1px solid #ccc; padding: 8px; text-align:right;">Precio Unitario</th>
+          <th style="border: 1px solid #ccc; padding: 8px; text-align:right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
 
-  cot.productos.forEach((prod) => {
-    const cantidad = parseInt(prod.cantidad) || 1;
-    const precio = prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
-    const subtotal = cantidad * precio;
-    html += `<tr><td>${prod.tipo} (${prod.ancho}x${prod.alto})</td><td>${cantidad}</td><td>${formatearPesos(precio)}</td><td>${formatearPesos(subtotal)}</td></tr>`;
+    cot.productos.forEach((prod) => {
+      const cantidad = parseInt(prod.cantidad) || 1;
+      const precio = prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
+      const subtotal = cantidad * precio;
 
-    const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
+      html += `
+        <tr>
+          <td style="border: 1px solid #ccc; padding: 8px;">${prod.tipo} (${prod.ancho}x${prod.alto})</td>
+          <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
+          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
+          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
+        </tr>
+      `;
 
-    // 🔹 Extras predefinidos
-    if (Array.isArray(prod.extras)) {
-      prod.extras.forEach((nombreExtra) => {
-        const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
-        if (encontrado) {
-          const cantidadExtra = prod.extrasCantidades?.[nombreExtra] || 1;
+      // === Extras por defecto ===
+      const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
+      if (Array.isArray(prod.extras)) {
+        prod.extras.forEach((nombreExtra) => {
+          const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
+          if (encontrado) {
+            const cantidadExtra = parseInt(prod.extrasCantidades?.[nombreExtra]) || 1;
+            let precioExtra = 0;
+            if (encontrado.precioDistribuidor != null && encontrado.precioCliente != null) {
+              precioExtra = cot.cliente === "Distribuidor" ? encontrado.precioDistribuidor : encontrado.precioCliente;
+            } else {
+              precioExtra = encontrado.precio;
+            }
+            const totalExtra = precioExtra * cantidadExtra;
 
-          let precioExtra = 0;
-          if (typeof encontrado.precio !== "undefined") {
-            precioExtra = encontrado.precio;
-          } else if (
-            cot.cliente === "Distribuidor" &&
-            typeof encontrado.precioDistribuidor !== "undefined"
-          ) {
-            precioExtra = encontrado.precioDistribuidor;
-          } else if (
-            typeof encontrado.precioCliente !== "undefined"
-          ) {
-            precioExtra = encontrado.precioCliente;
+            if (!isNaN(precioExtra)) {
+              html += `
+                <tr style="background-color:#f9f9f9;">
+                  <td style="border: 1px solid #ccc; padding: 8px;">↳ ${nombreExtra}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
+                </tr>
+              `;
+            }
           }
+        });
+      }
 
-          html += `<tr><td>${nombreExtra}</td><td>${cantidadExtra}</td><td>${formatearPesos(precioExtra)}</td><td>${formatearPesos(precioExtra * cantidadExtra)}</td></tr>`;
-        }
-      });
-    }
+      // === Extras personalizados ===
+      if (Array.isArray(prod.extrasPersonalizados)) {
+        prod.extrasPersonalizados.forEach((extra, idx) => {
+          const cantidadExtra = parseInt(prod.extrasPersonalizadosCant?.[idx]) || 1;
+          const totalExtra = extra.precio * cantidadExtra;
 
-    // 🔹 Extras personalizados
-    if (Array.isArray(prod.extrasPersonalizados)) {
-      prod.extrasPersonalizados.forEach((extra, idx) => {
-        const cantidadExtra = prod.extrasPersonalizadosCant?.[idx] || 1;
-        if (extra?.nombre && !isNaN(extra.precio)) {
-          html += `<tr><td>${extra.nombre}</td><td>${cantidadExtra}</td><td>${formatearPesos(extra.precio)}</td><td>${formatearPesos(extra.precio * cantidadExtra)}</td></tr>`;
-        }
-      });
-    }
-  });
+          if (extra?.nombre && !isNaN(extra.precio)) {
+            html += `
+              <tr style="background-color:#f4f4f4;">
+                <td style="border: 1px solid #ccc; padding: 8px;">↳ ${extra.nombre} (Personalizado)</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
+              </tr>
+            `;
+          }
+        });
+      }
+    });
 
-  html += `<tr><td colspan="3"><strong>Subtotal</strong></td><td>${formatearPesos(cot.subtotal)}</td></tr>`;
-  html += `<tr><td colspan="3"><strong>IVA (19%)</strong></td><td>${formatearPesos(cot.iva)}</td></tr>`;
-  html += `<tr><td colspan="3"><strong>Total</strong></td><td><strong>${formatearPesos(cot.total)}</strong></td></tr>`;
-  html += `</tbody></table>`;
+  html += `
+      <tr style="font-weight:bold;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">Subtotal</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
+      </tr>
+      <tr style="font-weight:bold;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">IVA (19%)</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(cot.iva)}</td>
+      </tr>
+      <tr style="font-weight:bold; background-color: #e6f7ff;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">Total</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
+      </tr>
+    </tbody>
+  </table>`;
 
   return html;
 }
+
 
 
 
