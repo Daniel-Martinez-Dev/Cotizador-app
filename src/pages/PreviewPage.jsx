@@ -17,7 +17,7 @@ export default function PreviewPage() {
 
   useEffect(() => {
     if (quoteData?.productos) {
-      console.log("Productos recibidos en PreviewPage:", quoteData.productos); // 👈 AÑADE ESTO
+      console.log("Productos recibidos en PreviewPage:", quoteData.productos);
       try {
         const generadas = generarSeccionesHTML(quoteData);
         setSecciones([generadas]);
@@ -53,8 +53,8 @@ export default function PreviewPage() {
   };
 
   const renderCampo = (label, campo) => (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-blue-900 mb-4 border-b pb-2 uppercase">{label}</h2>
+    <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200">
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">{label}</h2>
       {editando === campo ? (
         <>
           <ReactQuill
@@ -81,15 +81,15 @@ export default function PreviewPage() {
             ]}
           />
           <button
-            className="mt-2 bg-green-600 text-white px-4 py-1 rounded"
+            className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
             onClick={handleGuardar}
           >Guardar</button>
         </>
       ) : (
-        <div className="mb-4 whitespace-pre-wrap">
-          <div dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }} />
+        <div>
+          <div className="mb-2 prose max-w-none" dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }} />
           <button
-            className="mt-2 bg-blue-500 text-white px-4 py-1 rounded"
+            className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
             onClick={() => handleEditar(campo)}
           >Editar</button>
         </div>
@@ -98,22 +98,26 @@ export default function PreviewPage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto p-8 bg-white rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold mb-6">Vista previa de la cotización</h1>
-      <div className="mb-4">
-        <span className="font-semibold">Cliente:</span> {nombreCliente || cliente}
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200">
+        <h1 className="text-2xl font-bold mb-4">Vista previa de la cotización</h1>
+        <div>
+          <span className="font-semibold">Cliente:</span> {nombreCliente || cliente}
+        </div>
       </div>
 
-      {renderCampo("Descripción", "descripcionHTML")}
-      {renderCampo("Especificaciones", "especificacionesHTML")}
-      <div className="mb-10">
-        <h2 className="text-xl font-bold text-blue-900 mb-4 border-b pb-2 uppercase">Detalle de precios</h2>
+      {renderCampo("Descripción del Producto", "descripcionHTML")}
+      {renderCampo("Especificaciones Técnicas", "especificacionesHTML")}
+
+      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 overflow-x-auto">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Detalle de Precios</h2>
         <div dangerouslySetInnerHTML={{ __html: ediciones.tablaHTML }} />
       </div>
-      {renderCampo("Condiciones Comerciales", "condicionesHTML")}
-      {renderCampo("Términos Generales", "terminosHTML")}
 
-      <div className="text-right mr-3 mb-6">
+      {renderCampo("Condiciones Comerciales", "condicionesHTML")}
+      {renderCampo("Términos y Condiciones Generales", "terminosHTML")}
+
+      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-right">
         <div>
           <span className="font-semibold">Subtotal: </span>
           {(subtotal || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
