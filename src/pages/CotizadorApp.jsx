@@ -38,7 +38,7 @@ function getRangoIndex(ranges, valor) {
 function crearProductoInicial() {
   return {
     tipo: "Divisiones Térmicas",
-    cliente: "Distribuidor",
+    cliente: "Cliente Final Contado",
     ancho: "",
     alto: "",
     cantidad: 1,
@@ -50,7 +50,7 @@ function crearProductoInicial() {
     componentes: [],
     mostrarAlerta: false,
     precioEditado: "",
-    ajusteTipo: "Incremento",
+    ajusteTipo: "Descuento",
     ajusteValor: 0
   };
 }
