@@ -92,15 +92,15 @@ function generarEspecificaciones(cot) {
   }
 }
 
-function generarTablaPrecios(cot) {
+function generarTablaPrecios(cot) { 
   let html = `
-    <table style="width:100%; border-collapse: collapse; font-size: 14px;">
+    <table style="width:100%; border-collapse: collapse; font-size: 13px;">
       <thead>
-        <tr style="background-color: #f2f2f2;">
-          <th style="border: 1px solid #ccc; padding: 8px; text-align:left;">Producto</th>
-          <th style="border: 1px solid #ccc; padding: 8px; text-align:center;">Cantidad</th>
-          <th style="border: 1px solid #ccc; padding: 8px; text-align:right;">Precio Unitario</th>
-          <th style="border: 1px solid #ccc; padding: 8px; text-align:right;">Subtotal</th>
+        <tr style="background-color: #1a3357; color: white;">
+          <th style="border: 1px solid #ccc; padding: 10px; text-align:left;">Producto</th>
+          <th style="border: 1px solid #ccc; padding: 10px; text-align:center;">Cantidad</th>
+          <th style="border: 1px solid #ccc; padding: 10px; text-align:right;">Precio Unitario</th>
+          <th style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</th>
         </tr>
       </thead>
       <tbody>
@@ -108,11 +108,11 @@ function generarTablaPrecios(cot) {
 
     cot.productos.forEach((prod) => {
       const cantidad = parseInt(prod.cantidad) || 1;
-      const precio = prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
+      const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
       const subtotal = cantidad * precio;
 
       html += `
-        <tr>
+        <tr style="font-weight: bold;">
           <td style="border: 1px solid #ccc; padding: 8px;">
             ${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") 
               ? `${prod.nombrePersonalizado || prod.tipo}` 
@@ -142,7 +142,7 @@ function generarTablaPrecios(cot) {
             if (!isNaN(precioExtra)) {
               html += `
                 <tr style="background-color:#f9f9f9;">
-                  <td style="border: 1px solid #ccc; padding: 8px;">↳ ${nombreExtra}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
                   <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
                   <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
                   <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
@@ -161,8 +161,8 @@ function generarTablaPrecios(cot) {
 
           if (extra?.nombre && !isNaN(extra.precio)) {
             html += `
-              <tr style="background-color:#f4f4f4;">
-                <td style="border: 1px solid #ccc; padding: 8px;">↳ ${extra.nombre} (Personalizado)</td>
+              <tr style="background-color:#eaeaea;">
+                <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre} (Personalizado)</td>
                 <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
                 <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
                 <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
@@ -174,17 +174,17 @@ function generarTablaPrecios(cot) {
     });
 
   html += `
-      <tr style="font-weight:bold;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">Subtotal</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
+      <tr style="font-weight:bold; background-color:#f2f2f2;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</td>
+        <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
       </tr>
-      <tr style="font-weight:bold;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">IVA (19%)</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(cot.iva)}</td>
+      <tr style="font-weight:bold; background-color:#f2f2f2;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">IVA (19%)</td>
+        <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
       </tr>
-      <tr style="font-weight:bold; background-color: #e6f7ff;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">Total</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
+      <tr style="font-weight:bold; background-color: #d7ecff;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 12px; text-align:right;">Total</td>
+        <td style="border: 1px solid #ccc; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
       </tr>
     </tbody>
   </table>`;
