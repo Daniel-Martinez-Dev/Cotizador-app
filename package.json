@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.3.0",
     "@tailwindcss/typography": "^0.5.16",
     "date-fns": "^4.1.0",
     "firebase": "^12.0.0",

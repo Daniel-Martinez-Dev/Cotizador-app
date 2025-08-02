@@ -60,8 +60,17 @@ export default function HistorialPage() {
     return valorA < valorB ? 1 : -1;
   });
 
+  const manejarEditar = (cotizacion) => {
+    setQuoteData({
+      ...cotizacion,
+      modoEdicion: true,
+      idDocumentoFirebase: cotizacion.id
+    });
+    navigate("/preview");
+  };
   const manejarVer = (cotizacion) => {
-    setQuoteData(cotizacion);
+    const { id, ...datos } = cotizacion;
+    setQuoteData(datos); // sin modoEdicion
     navigate("/preview");
   };
   const manejarEliminar = async (cotizacion) => {
