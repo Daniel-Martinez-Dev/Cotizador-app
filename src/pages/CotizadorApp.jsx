@@ -48,6 +48,7 @@ function crearProductoInicial() {
     extrasPersonalizados: [],
     extrasPersonalizadosCant: {},
     componentes: [],
+    nombrePersonalizado: "", // 👈 LÍNEA NUEVA
     mostrarAlerta: false,
     precioEditado: "",
     ajusteTipo: "Descuento",
@@ -213,6 +214,10 @@ export default function CotizadorApp() {
       if (componentes.includes("travesaño")) total += precios.travesano[rangoAlto] || 0;
     }
     const factor = CLIENTE_FACTORES[cliente] || 1;
+    if (tipo === "Repuestos") {}
+  // ⚠️ Por ahora no hay lógica definida para Repuestos
+  // En el futuro aquí se buscará el precio en la matriz según nombrePersonalizado, medidas, etc.
+
     return redondear5000(Math.round(total * factor));
   }
 
@@ -332,12 +337,48 @@ export default function CotizadorApp() {
                 onChange={(e) => handleChangeProducto(i, "tipo", e.target.value)}
                 className="w-full border p-2 rounded"
               >
-                {Object.keys(priceMatrices).map((tipo) => (
-                  <option key={tipo} value={tipo}>
-                    {tipo}
-                  </option>
+                {[...Object.keys(priceMatrices), "Productos Personalizados", "Repuestos"].map((tipo) => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
                 ))}
               </select>
+                {(producto.tipo === "Productos Personalizados" || producto.tipo === "Repuestos") && (
+                  <p className="text-sm text-yellow-600 mt-1">Este producto no tiene precio automático. Ingrese el precio manualmente.</p>
+                )} 
+              {producto.tipo === "Productos Personalizados" && (
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700">Nombre del Producto Personalizado:</label>
+                  <input
+                    type="text"
+                    value={producto.nombrePersonalizado || ""}
+                    onChange={(e) => {
+                      const nuevosProductos = [...productos];
+                      nuevosProductos[i].nombrePersonalizado = e.target.value;
+                      setProductos(nuevosProductos);
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    placeholder="Ej: Cortina flexible con refuerzo lateral"
+                  />
+                </div>
+              )}
+              {producto.tipo === "Repuestos" && (
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700">Nombre del Repuesto:</label>
+                  <input
+                    type="text"
+                    value={producto.nombrePersonalizado || ""}
+                    onChange={(e) => {
+                      const nuevosProductos = [...productos];
+                      nuevosProductos[i].nombrePersonalizado = e.target.value;
+                      setProductos(nuevosProductos);
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    placeholder="Ej: Motor 0.75kW, sensor óptico, etc."
+                  />
+                  <p className="text-sm text-gray-500 mt-1 italic">
+                    Cuando las matrices estén disponibles, el precio se calculará automáticamente.
+                  </p>
+                </div>
+              )}                                             
             </div>
             <div>
               <label className="block font-medium">Tipo de Cliente:</label>

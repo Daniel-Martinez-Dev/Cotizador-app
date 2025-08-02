@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
-import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -64,7 +64,18 @@ export default function HistorialPage() {
     setQuoteData(cotizacion);
     navigate("/preview");
   };
+  const manejarEliminar = async (cotizacion) => {
+    if (!window.confirm(`¿Eliminar la cotización #${cotizacion.numero}?`)) return;
 
+    try {
+      await deleteDoc(doc(db, "cotizaciones", cotizacion.id));
+      setCotizaciones(prev => prev.filter(c => c.id !== cotizacion.id));
+      alert("Cotización eliminada correctamente.");
+    } catch (error) {
+      console.error("Error al eliminar cotización:", error);
+      alert("Ocurrió un error al eliminar la cotización.");
+    }
+  };
   const iconoOrden = (campo) => {
     if (ordenarPor !== campo) return null;
     return ordenAscendente ? <FaSortUp className="inline" /> : <FaSortDown className="inline" />;
@@ -134,7 +145,8 @@ export default function HistorialPage() {
                 {iconoOrden("fecha")}
               </th>
               <th className="border px-4 py-2">Total</th>
-              <th className="border px-4 py-2">Ver</th>
+              <th className="border px-4 py-2">Interacción</th>
+
             </tr>
           </thead>
           <tbody>
@@ -154,14 +166,29 @@ export default function HistorialPage() {
                     minimumFractionDigits: 0
                   })}
                 </td>
-                <td className="border px-4 py-2">
+                <td className="border px-4 py-2 space-x-2">
                   <button
                     onClick={() => manejarVer(cot)}
-                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Ver"
                   >
-                    Ver
+                    <FaEye />
                   </button>
-                </td>
+                  <button
+                    onClick={() => manejarEditar(cot)}
+                    className="text-yellow-500 hover:text-yellow-600"
+                    title="Editar"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    onClick={() => manejarEliminar(cot)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Eliminar"
+                  >
+                    <FaTrash />
+                  </button>
+                </td>                
               </tr>
             ))}
           </tbody>
@@ -174,6 +201,7 @@ export default function HistorialPage() {
       >
         ← Volver al Cotizador
       </button>
+    
     </div>
   );
 }
