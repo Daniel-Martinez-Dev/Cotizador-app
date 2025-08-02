@@ -5,6 +5,7 @@ import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import toast from "react-hot-toast";
 import { generarSeccionesHTML } from "./htmlSections"; // ✅ con llaves
+import { getDocs, query, collection, where } from "firebase/firestore"; // ya debes tener importado db
 
 export async function generarPDF(cotizacion) {
   const {
@@ -31,11 +32,20 @@ export async function generarPDF(cotizacion) {
   const nombreArchivo = `Cotizacion#${cotizacionNum}_${(nombreCliente || cliente || "Cliente").replace(/\s/g, "_")}_${fecha}.pdf`;
 
   try {
-    await guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
-    toast.success(`Cotización #${cotizacionNum} guardada`);
+    // Verificar si ya existe una cotización con ese número
+    const existe = await getDocs(
+      query(collection(db, "cotizaciones"), where("numero", "==", cotizacionNum))
+    );
+
+    if (!existe.empty) {
+      toast.error(`Ya existe la cotización #${cotizacionNum}. No se guardó duplicado.`);
+    } else {
+      await guardarCotizacionEnFirebase(cotizacion, cotizacionNum);
+      toast.success(`Cotización #${cotizacionNum} guardada`);
+    }
   } catch (error) {
     toast.error("Error al guardar la cotización");
-  }
+  } 
 
   const container = document.createElement("div");
   container.style.padding = "30px";

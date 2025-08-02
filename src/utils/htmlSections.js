@@ -113,7 +113,11 @@ function generarTablaPrecios(cot) {
 
       html += `
         <tr>
-          <td style="border: 1px solid #ccc; padding: 8px;">${prod.tipo} (${prod.ancho}x${prod.alto})</td>
+          <td style="border: 1px solid #ccc; padding: 8px;">
+            ${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") 
+              ? `${prod.nombrePersonalizado || prod.tipo}` 
+              : prod.tipo} (${prod.ancho}x${prod.alto})
+          </td>
           <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
           <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
           <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
