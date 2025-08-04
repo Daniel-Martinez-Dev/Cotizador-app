@@ -14,6 +14,7 @@ import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
 import toast from "react-hot-toast";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser"; // ✅ no cambies la extensión aquí
+import imagenesPorProducto from "../data/imagenesPorProducto";
 
 Font.register({ family: 'Helvetica' });
 
@@ -90,7 +91,8 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
     condicionesHTML = "",
     terminosHTML = ""
   } = secciones[0] || {};
-
+  const nombreImagen = producto?.imagen || ""; // nombre clave
+  const imagenSeleccionada = imagenesPorProducto[nombreImagen];
   return (
     <Document>
       {/* Página 1 - Encabezado, descripción, especificaciones */}
@@ -108,7 +110,12 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
         <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
         <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
-
+        {imagenSeleccionada && (
+          <Image
+            src={imagenSeleccionada}
+            style={{ width: "100%", maxHeight: 200, marginVertical: 12 }}
+          />
+        )}
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
           www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co

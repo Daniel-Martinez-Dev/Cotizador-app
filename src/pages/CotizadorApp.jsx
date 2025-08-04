@@ -198,7 +198,7 @@ export default function CotizadorApp() {
 
   // NUEVA lógica para Sello de Andén
   function calcularPrecioSellos(producto) {
-    const { ancho, alto, componentes = [], cliente } = producto;
+    const { ancho, alto, componentes = [], cliente, tipo } = producto;
     if (!ancho && !alto) return 0;
     const matriz = priceMatrices["Sello de Andén"];
     const rangoAncho = getRangoIndex(matriz.medidaRanges, parseInt(ancho));
