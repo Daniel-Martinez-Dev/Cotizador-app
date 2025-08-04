@@ -6,16 +6,27 @@ import { EXTRAS_POR_DEFECTO } from "../data/precios";
 export function generarSeccionesHTML(cotizacion) {
   const descripcionHTML = generarDescripcion(cotizacion);
   const especificacionesHTML = generarEspecificaciones(cotizacion);
-  const tablaHTML = generarTablaPrecios(cotizacion);
+
+  // Inserta salto de página antes de la tabla
+  const tablaHTML = `
+    <div style="page-break-before: always;"></div>
+    ${generarTablaPrecios(cotizacion)}
+  `;
+
   const condicionesHTML = generarCondicionesComerciales(cotizacion);
-  const terminosHTML = generarTerminosGenerales(cotizacion);
+
+  // Inserta salto de página antes de los términos generales
+  const terminosHTML = `
+    <div style="page-break-before: always;"></div>
+    ${generarTerminosGenerales(cotizacion)}
+  `;
 
   return {
     descripcionHTML,
     especificacionesHTML,
     tablaHTML,
     condicionesHTML,
-    terminosHTML
+    terminosHTML,
   };
 }
 
@@ -189,7 +200,8 @@ function generarTablaPrecios(cot) {
     </tbody>
   </table>`;
 
-  return html;
+  return `<div style="page-break-before: always;">${html}</div>`;
+
 }
 
 
@@ -204,7 +216,11 @@ function generarCondicionesComerciales(cot) {
 }
 
 function generarTerminosGenerales(cot) {
-  return cot.terminosTexto || `<p><strong>Instalación:</strong> Opcional. No incluye obras civiles, eléctricas, ni personal SISO. El cliente debe informar con antelación cualquier requisito de ingreso especial o capacitación. El incumplimiento implicará costos adicionales.</p>
-  <p><strong>Garantía:</strong> No aplica si el producto es manipulado por terceros, sufre daños eléctricos, no se realiza mantenimiento o se modifica sin autorización. Requiere mantenimiento por personal autorizado.</p>
-  <p><strong>Obligaciones del cliente:</strong> Tener área de instalación lista, conexión eléctrica adecuada, acceso libre y firmar acta de entrega incluso sin conexión.</p>`;
+  return `<div style="page-break-before: always;">${
+    cot.terminosTexto || `
+      <p><strong>Instalación:</strong> Opcional. No incluye obras civiles, eléctricas, ni personal SISO. El cliente debe informar con antelación cualquier requisito de ingreso especial o capacitación. El incumplimiento implicará costos adicionales.</p>
+      <p><strong>Garantía:</strong> No aplica si el producto es manipulado por terceros, sufre daños eléctricos, no se realiza mantenimiento o se modifica sin autorización. Requiere mantenimiento por personal autorizado.</p>
+      <p><strong>Obligaciones del cliente:</strong> Tener área de instalación lista, conexión eléctrica adecuada, acceso libre y firmar acta de entrega incluso sin conexión.</p>`
+  }</div>`;
+
 }
