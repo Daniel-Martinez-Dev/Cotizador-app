@@ -13,6 +13,7 @@ import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
 import toast from "react-hot-toast";
+import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser"; // ✅ no cambies la extensión aquí
 
 Font.register({ family: 'Helvetica' });
 
@@ -64,7 +65,7 @@ function SeccionHTML({ titulo, contenido }) {
     <View wrap={false}>
       <Text style={styles.sectionTitle}>{titulo}</Text>
       <View style={styles.htmlContent}>
-        <Text>{contenido.replace(/<[^>]+>/g, "")}</Text>
+        {parseHtmlToPDFComponents(contenido)}
       </View>
     </View>
   );
@@ -92,6 +93,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
   return (
     <Document>
+      {/* Página 1 - Encabezado, descripción, especificaciones */}
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.header}>
           <Text>Fecha: {fecha}</Text>
@@ -106,9 +108,28 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
         <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
         <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
+
+        <Text style={styles.footer} fixed>
+          Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
+          www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
+        </Text>
+      </Page>
+
+      {/* Página 2 - Tabla de precios y condiciones */}
+      <Page size="A4" style={styles.page} wrap>
         <Text style={styles.sectionTitle}>Detalle de Precios</Text>
         {convertirTablaHTMLaComponentes(tablaHTML)}
+
         <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
+
+        <Text style={styles.footer} fixed>
+          Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
+          www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
+        </Text>
+      </Page>
+
+      {/* Página 3 - Términos y condiciones generales */}
+      <Page size="A4" style={styles.page} wrap>
         <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
 
         <Text style={styles.footer} fixed>
