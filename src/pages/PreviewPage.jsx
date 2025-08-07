@@ -1,12 +1,11 @@
 // src/pages/PreviewPage.jsx
-
 import React, { useEffect, useState } from "react";
 import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
 import { generarPDFReact } from "../utils/pdfReact";
 import { generarSeccionesHTML } from "../utils/htmlSections";
 import ReactQuill from "react-quill";
-import 'react-quill/dist/quill.snow.css';
+import "react-quill/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 
 export default function PreviewPage() {
@@ -15,7 +14,8 @@ export default function PreviewPage() {
   const [secciones, setSecciones] = useState([]);
   const [editando, setEditando] = useState(null);
   const [ediciones, setEdiciones] = useState({});
-  const [imagenSeleccionada, setImagenSeleccionada] = useState("");
+const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
+  const [imagenBase64, setImagenBase64] = useState("");
 
   const producto = quoteData?.productos?.[0];
   const nombreProducto = producto?.nombreSeleccionado || producto?.tipo || "";
@@ -33,10 +33,19 @@ export default function PreviewPage() {
         console.error("Error generando secciones HTML:", error);
       }
     }
+
     if (imagenesDisponibles.length > 0) {
-      setImagenSeleccionada(imagenesDisponibles[0][0]);
+      const primera = imagenesDisponibles[0][0];
+      setImagenSeleccionada(primera);
+      cargarImagen(primera);
     }
   }, [quoteData]);
+
+  const cargarImagen = async (clave) => {
+    const promesa = imagenesPorProducto[clave];
+    const base64 = await promesa;
+    setImagenBase64(base64);
+  };
 
   const estaEditando = quoteData?.modoEdicion === true;
   const { cliente, subtotal, iva, total, nombreCliente } = quoteData;
@@ -58,23 +67,31 @@ export default function PreviewPage() {
                 [{ header: [1, 2, 3, false] }],
                 ["bold", "italic", "underline"],
                 [{ list: "ordered" }, { list: "bullet" }],
-                ["link"], ["clean"]
-              ]
+                ["link"],
+                ["clean"],
+              ],
             }}
             formats={["header", "bold", "italic", "underline", "list", "bullet", "link"]}
           />
           <button
             className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
             onClick={handleGuardar}
-          >Guardar</button>
+          >
+            Guardar
+          </button>
         </>
       ) : (
         <div>
-          <div className="mb-2 prose max-w-none" dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }} />
+          <div
+            className="mb-2 prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }}
+          />
           <button
             className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
             onClick={() => handleEditar(campo)}
-          >Editar</button>
+          >
+            Editar
+          </button>
         </div>
       )}
     </div>
@@ -84,7 +101,9 @@ export default function PreviewPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {estaEditando && (
         <div className="bg-yellow-100 border-l-4 border-yellow-600 text-yellow-800 px-4 py-3 mb-4 rounded shadow">
-          <strong>Modo edición:</strong> Estás editando la cotización <span className="font-bold">#{quoteData.numero}</span>. Los cambios se sobrescribirán al generar el PDF.
+          <strong>Modo edición:</strong> Estás editando la cotización{" "}
+          <span className="font-bold">#{quoteData.numero}</span>. Los cambios se sobrescribirán
+          al generar el PDF.
         </div>
       )}
 
@@ -103,21 +122,28 @@ export default function PreviewPage() {
           <label className="block mb-2 font-medium text-gray-700">Selecciona una imagen:</label>
           <select
             value={imagenSeleccionada}
-            onChange={(e) => setImagenSeleccionada(e.target.value)}
+            onChange={(e) => {
+              setImagenSeleccionada(e.target.value);
+              cargarImagen(e.target.value);
+            }}
             className="mb-4 px-4 py-2 border rounded"
           >
             {imagenesDisponibles.map(([key]) => (
-              <option key={key} value={key}>{key}</option>
+              <option key={key} value={key}>
+                {key}
+              </option>
             ))}
           </select>
-          <div>
-            <img
-              src={imagenesPorProducto[imagenSeleccionada]}
-              alt="Producto"
-              className="max-w-xs mx-auto border rounded"
-            />
-            <p className="mt-2 text-sm text-gray-500">Imagen referencial del producto</p>
-          </div>
+          {imagenBase64 && (
+            <div>
+              <img
+                src={imagenBase64}
+                alt="Producto"
+                className="max-w-xs mx-auto border rounded"
+              />
+              <p className="mt-2 text-sm text-gray-500">Imagen referencial del producto</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -130,9 +156,17 @@ export default function PreviewPage() {
       {renderCampo("Términos y Condiciones Generales", "terminosHTML")}
 
       <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-right">
-        <div><span className="font-semibold">Subtotal: </span>{(subtotal || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}</div>
-        <div><span className="font-semibold">IVA (19%): </span>{(iva || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}</div>
-        <div className="text-lg font-bold">Total: {(total || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}</div>
+        <div>
+          <span className="font-semibold">Subtotal: </span>
+          {(subtotal || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
+        <div>
+          <span className="font-semibold">IVA (19%): </span>
+          {(iva || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
+        <div className="text-lg font-bold">
+          Total: {(total || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4">
@@ -144,7 +178,12 @@ export default function PreviewPage() {
         </button>
         <button
           className="bg-green-700 text-white px-4 py-2 rounded"
-          onClick={() => generarPDFReact({ ...quoteData, secciones: [ediciones], imagenSeleccionada }, estaEditando)}
+          onClick={() =>
+            generarPDFReact(
+              { ...quoteData, secciones: [ediciones], imagenSeleccionada },
+              estaEditando
+            )
+          }
         >
           Descargar PDF
         </button>

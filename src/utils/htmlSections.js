@@ -217,7 +217,6 @@ function generarCondicionesComerciales(cot) {
 
 function generarTerminosGenerales(cot) {
   return `
-  <h3>TÉRMINOS Y CONDICIONES GENERALES</h3>
   <p>Esta oferta se basa en la información suministrada por el cliente. Para concretar un acuerdo, es indispensable contar con planos y fotografías proporcionadas por el cliente. No se podrá iniciar el diseño o fabricación de equipos sin la aprobación previa de los planos o dibujos enviados por el cliente y firmados.</p>
 
   <p><strong>INSTALACIÓN:</strong> El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br />

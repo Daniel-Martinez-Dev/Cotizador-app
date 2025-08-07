@@ -7,13 +7,14 @@ import {
   View,
   StyleSheet,
   Font,
-  pdf
+  pdf,
+  Image
 } from "@react-pdf/renderer";
 import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
 import toast from "react-hot-toast";
-import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser"; // ✅ no cambies la extensión aquí
+import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 
 Font.register({ family: 'Helvetica' });
@@ -63,7 +64,7 @@ const styles = StyleSheet.create({
 
 function SeccionHTML({ titulo, contenido }) {
   return (
-    <View wrap={false}>
+    <View>
       <Text style={styles.sectionTitle}>{titulo}</Text>
       <View style={styles.htmlContent}>
         {parseHtmlToPDFComponents(contenido)}
@@ -72,12 +73,13 @@ function SeccionHTML({ titulo, contenido }) {
   );
 }
 
-function PDFCotizacion({ cotizacion, numeroCotizacion }) {
+async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   const {
     nombreCliente,
     cliente,
     productos,
     secciones = [],
+    imagenSeleccionada: imagenSeleccionadaPorUsuario
   } = cotizacion;
 
   const producto = productos?.[0];
@@ -91,11 +93,12 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
     condicionesHTML = "",
     terminosHTML = ""
   } = secciones[0] || {};
-  const nombreImagen = producto?.imagen || ""; // nombre clave
-  const imagenSeleccionada = imagenesPorProducto[nombreImagen];
+
+  const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
+  const imagenSeleccionada = imagenesPorProducto[nombreImagen] || null;
+
   return (
     <Document>
-      {/* Página 1 - Encabezado, descripción, especificaciones */}
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.header}>
           <Text>Fecha: {fecha}</Text>
@@ -110,23 +113,29 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
         <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
         <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
+
         {imagenSeleccionada && (
           <Image
             src={imagenSeleccionada}
-            style={{ width: "100%", maxHeight: 200, marginVertical: 12 }}
+            style={{
+              width: "100%",
+              maxHeight: 250,
+              objectFit: "contain",
+              marginVertical: 12,
+              border: "1 solid #ccc"
+            }}
           />
         )}
+
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
           www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
         </Text>
       </Page>
 
-      {/* Página 2 - Tabla de precios y condiciones */}
       <Page size="A4" style={styles.page} wrap>
         <Text style={styles.sectionTitle}>Detalle de Precios</Text>
         {convertirTablaHTMLaComponentes(tablaHTML)}
-
         <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
 
         <Text style={styles.footer} fixed>
@@ -135,10 +144,8 @@ function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         </Text>
       </Page>
 
-      {/* Página 3 - Términos y condiciones generales */}
       <Page size="A4" style={styles.page} wrap>
         <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
-
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
           www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
@@ -162,7 +169,7 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     }
   }
 
-  const doc = <PDFCotizacion cotizacion={cotizacion} numeroCotizacion={numeroCotizacion} />;
+  const doc = await PDFCotizacion({ cotizacion, numeroCotizacion });
   const asPdf = pdf();
   asPdf.updateContainer(doc);
   const blob = await asPdf.toBlob();
