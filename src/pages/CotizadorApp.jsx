@@ -53,6 +53,7 @@ function crearProductoInicial() {
     precioEditado: "",
     ajusteTipo: "Descuento",
     ajusteValor: 0
+    
   };
 }
 export default function CotizadorApp() {

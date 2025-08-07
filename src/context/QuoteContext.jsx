@@ -10,8 +10,17 @@ export function useQuote() {
 
 export function QuoteProvider({ children }) {
   const [quoteData, setQuoteData] = useState({});
+  const [imagenSeleccionada, setImagenSeleccionada] = useState(null); // ✅ nueva línea
+
   return (
-    <QuoteContext.Provider value={{ quoteData, setQuoteData }}>
+    <QuoteContext.Provider
+      value={{
+        quoteData,
+        setQuoteData,
+        imagenSeleccionada,        // ✅ nueva línea
+        setImagenSeleccionada      // ✅ nueva línea
+      }}
+    >
       {children}
     </QuoteContext.Provider>
   );
