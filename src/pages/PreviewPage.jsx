@@ -121,7 +121,7 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
         <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-center">
           <label className="block mb-2 font-medium text-gray-700">Selecciona una imagen:</label>
           <select
-            value={imagenSeleccionada}
+            value={imagenSeleccionada || ""}
             onChange={(e) => {
               setImagenSeleccionada(e.target.value);
               cargarImagen(e.target.value);

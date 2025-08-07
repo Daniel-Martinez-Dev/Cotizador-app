@@ -114,18 +114,21 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
         <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
 
-        {imagenSeleccionada && (
-          <Image
-            src={imagenSeleccionada}
-            style={{
-              width: "100%",
-              maxHeight: 250,
-              objectFit: "contain",
-              marginVertical: 12,
-              border: "1 solid #ccc"
-            }}
-          />
+        {imagenSeleccionada &&
+          (imagenSeleccionada.startsWith("data:image/jpeg") ||
+          imagenSeleccionada.startsWith("data:image/png")) && (
+            <Image
+              src={imagenSeleccionada}
+              style={{
+                width: "100%",
+                maxHeight: 250,
+                objectFit: "contain",
+                marginVertical: 12,
+                border: "1 solid #ccc"
+              }}
+            />
         )}
+
 
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
