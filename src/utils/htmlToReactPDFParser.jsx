@@ -4,17 +4,18 @@ import { Text, View, StyleSheet } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
   paragraph: {
-    marginBottom: 6,
+    marginBottom: 2, // antes 0, ahora un poco más de espacio
+    lineHeight: 1, // aumenta el interlineado
   },
   bold: {
     fontWeight: 'bold',
   },
   list: {
-    marginBottom: 6,
+    marginBottom: 0.5, // antes 1
     paddingLeft: 10,
   },
   listItem: {
-    marginBottom: 2,
+    marginBottom: 0.2, // antes 0.5
     flexDirection: "row",
   },
   bullet: {
@@ -34,8 +35,12 @@ export function parseHtmlToPDFComponents(html) {
   const processNode = (node, index) => {
     switch (node.nodeName.toLowerCase()) {
       case "p":
+        const isStrong = node.firstChild && node.firstChild.nodeName.toLowerCase() === "strong";
         return (
-          <Text key={index} style={styles.paragraph}>
+          <Text
+            key={index}
+            style={isStrong ? { ...styles.paragraph, marginBottom: 0 } : styles.paragraph}
+          >
             {parseChildren(node)}
           </Text>
         );
@@ -68,9 +73,15 @@ export function parseHtmlToPDFComponents(html) {
   };
 
   const parseChildren = (node) => {
-    return [...node.childNodes].map((child, i) =>
-      child.nodeType === 3 ? child.textContent : processNode(child, i)
-    );
+    return [...node.childNodes]
+      .filter(
+        (child) =>
+          // Si es texto, solo si no es vacío o solo espacios
+          !(child.nodeType === 3 && (!child.textContent || !child.textContent.trim()))
+      )
+      .map((child, i) =>
+        child.nodeType === 3 ? child.textContent : processNode(child, i)
+      );
   };
 
   return [...root.childNodes].map((node, i) => processNode(node, i));

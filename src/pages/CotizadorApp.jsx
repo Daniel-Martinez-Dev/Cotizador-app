@@ -20,8 +20,8 @@ function redondear5000(valor) {
 
 function aplicarAjuste(valor, tipo, porcentaje) {
   if (!porcentaje || porcentaje === 0) return valor;
+  if (tipo === "Descuento") return Math.round(valor * (1 - porcentaje / 100));  
   if (tipo === "Incremento") return Math.round(valor * (1 + porcentaje / 100));
-  if (tipo === "Descuento") return Math.round(valor * (1 - porcentaje / 100));
   return valor;
 }
 
@@ -51,7 +51,7 @@ function crearProductoInicial() {
     nombrePersonalizado: "", // 👈 LÍNEA NUEVA
     mostrarAlerta: false,
     precioEditado: "",
-    ajusteTipo: "Descuento",
+    ajusteTipo: "Incremento",
     ajusteValor: 0
     
   };
@@ -78,7 +78,7 @@ export default function CotizadorApp() {
   const [extraInput, setExtraInput] = useState("");
   const [extraPrecioInput, setExtraPrecioInput] = useState("");
   const [alertas, setAlertas] = useState([]);
-  const [ajusteTotalTipo, setAjusteTotalTipo] = useState("Incremento");
+  const [ajusteTotalTipo, setAjusteTotalTipo] = useState("Descuento");
   const [ajusteTotalValor, setAjusteTotalValor] = useState(0);
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function CotizadorApp() {
       nuevos[index].precioManual = "";
       nuevos[index].precioEditado = "";
       nuevos[index].componentes = [];
-      nuevos[index].cliente = "Distribuidor";
+      nuevos[index].cliente = "Cliente Final Contado";
     }
     if (campo === "cliente") {
       nuevos[index].precioManual = "";
@@ -305,9 +305,12 @@ export default function CotizadorApp() {
       subtotal,
       iva,
       total,
-      ajusteTotalTipo,
-      ajusteTotalValor
+      ajusteGeneral: {
+        tipo: ajusteTotalTipo,
+        porcentaje: parseFloat(ajusteTotalValor) || 0
+      }
     };
+
     setQuoteData(cotizacion);
     navigate("/preview");
   };
@@ -602,8 +605,8 @@ export default function CotizadorApp() {
             onChange={e => setAjusteTotalTipo(e.target.value)}
             className="border p-1 rounded"
           >
-            <option value="Incremento">Incremento</option>
             <option value="Descuento">Descuento</option>
+            <option value="Incremento">Incremento</option>
           </select>
           <input
             type="number"

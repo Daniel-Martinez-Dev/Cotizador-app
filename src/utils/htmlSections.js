@@ -103,7 +103,7 @@ function generarEspecificaciones(cot) {
   }
 }
 
-function generarTablaPrecios(cot) { 
+function generarTablaPrecios(cot) {
   let html = `
     <table style="width:100%; border-collapse: collapse; font-size: 13px;">
       <thead>
@@ -117,73 +117,109 @@ function generarTablaPrecios(cot) {
       <tbody>
   `;
 
-    cot.productos.forEach((prod) => {
-      const cantidad = parseInt(prod.cantidad) || 1;
-      const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
-      const subtotal = cantidad * precio;
+  cot.productos.forEach((prod) => {
+    const cantidad = parseInt(prod.cantidad) || 1;
+    const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
+    const subtotal = cantidad * precio;
+
+    html += `
+      <tr style="font-weight: bold;">
+        <td style="border: 1px solid #ccc; padding: 8px;">
+          ${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos")
+            ? `${prod.nombrePersonalizado || prod.tipo}`
+            : prod.tipo} (${prod.ancho}x${prod.alto})
+        </td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
+      </tr>
+    `;
+
+    // === Mostrar solo si es un DESCUENTO ===
+    if (prod.ajuste && prod.ajuste.tipo === "Descuento") {
+      const porcentaje = parseFloat(prod.ajuste.porcentaje) || 0;
+      const valorDescuento = subtotal * (porcentaje / 100);
 
       html += `
-        <tr style="font-weight: bold;">
-          <td style="border: 1px solid #ccc; padding: 8px;">
-            ${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") 
-              ? `${prod.nombrePersonalizado || prod.tipo}` 
-              : prod.tipo} (${prod.ancho}x${prod.alto})
-          </td>
-          <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
-          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
-          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
+        <tr style="background-color:#fff4f4; color: #c00;">
+          <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">- Descuento del ${porcentaje}%</td>
+          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">- ${formatearPesos(valorDescuento)}</td>
         </tr>
       `;
+    }
 
-      // === Extras por defecto ===
-      const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
-      if (Array.isArray(prod.extras)) {
-        prod.extras.forEach((nombreExtra) => {
-          const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
-          if (encontrado) {
-            const cantidadExtra = parseInt(prod.extrasCantidades?.[nombreExtra]) || 1;
-            let precioExtra = 0;
-            if (encontrado.precioDistribuidor != null && encontrado.precioCliente != null) {
-              precioExtra = cot.cliente === "Distribuidor" ? encontrado.precioDistribuidor : encontrado.precioCliente;
-            } else {
-              precioExtra = encontrado.precio;
-            }
-            const totalExtra = precioExtra * cantidadExtra;
-
-            if (!isNaN(precioExtra)) {
-              html += `
-                <tr style="background-color:#f9f9f9;">
-                  <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
-                  <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
-                  <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
-                  <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
-                </tr>
-              `;
-            }
+    // === Extras por defecto ===
+    const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
+    if (Array.isArray(prod.extras)) {
+      prod.extras.forEach((nombreExtra) => {
+        const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
+        if (encontrado) {
+          const cantidadExtra = parseInt(prod.extrasCantidades?.[nombreExtra]) || 1;
+          let precioExtra = 0;
+          if (encontrado.precioDistribuidor != null && encontrado.precioCliente != null) {
+            precioExtra = cot.cliente === "Distribuidor" ? encontrado.precioDistribuidor : encontrado.precioCliente;
+          } else {
+            precioExtra = encontrado.precio;
           }
-        });
-      }
+          const totalExtra = precioExtra * cantidadExtra;
 
-      // === Extras personalizados ===
-      if (Array.isArray(prod.extrasPersonalizados)) {
-        prod.extrasPersonalizados.forEach((extra, idx) => {
-          const cantidadExtra = parseInt(prod.extrasPersonalizadosCant?.[idx]) || 1;
-          const totalExtra = extra.precio * cantidadExtra;
-
-          if (extra?.nombre && !isNaN(extra.precio)) {
+          if (!isNaN(precioExtra)) {
             html += `
-              <tr style="background-color:#eaeaea;">
-                <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre} (Personalizado)</td>
+              <tr style="background-color:#f9f9f9;">
+                <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
                 <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
                 <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
               </tr>
             `;
           }
-        });
-      }
-    });
+        }
+      });
+    }
 
+    // === Extras personalizados ===
+    if (Array.isArray(prod.extrasPersonalizados)) {
+      prod.extrasPersonalizados.forEach((extra, idx) => {
+        const cantidadExtra = parseInt(prod.extrasPersonalizadosCant?.[idx]) || 1;
+        const totalExtra = extra.precio * cantidadExtra;
+
+        if (extra?.nombre && !isNaN(extra.precio)) {
+          html += `
+            <tr style="background-color:#eaeaea;">
+              <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre} (Personalizado)</td>
+              <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
+              <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
+              <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
+            </tr>
+          `;
+        }
+      });
+    }
+  });
+
+  // === Mostrar descuento general si existe ===
+  if (cot.ajusteGeneral && cot.ajusteGeneral.tipo === "Descuento") {
+    const porcentaje = parseFloat(cot.ajusteGeneral.porcentaje) || 0;
+    const subtotalBruto = cot.productos.reduce((acc, prod) => {
+      const cantidad = parseInt(prod.cantidad) || 1;
+      const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
+      return acc + cantidad * precio;
+    }, 0);
+    const valorDescuento = subtotalBruto * (porcentaje / 100);
+
+    html += `
+      <tr style="background-color:#fff4f4; color: #c00;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">
+          Descuento general del ${porcentaje}%
+        </td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">
+          - ${formatearPesos(valorDescuento)}
+        </td>
+      </tr>
+    `;
+  }
+
+  // === Subtotal, IVA y Total ===
   html += `
       <tr style="font-weight:bold; background-color:#f2f2f2;">
         <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</td>
@@ -200,11 +236,10 @@ function generarTablaPrecios(cot) {
     </tbody>
   </table>`;
 
+  html = html.replace(/(<br\s*\/?>\s*){2,}/gi, '<br />');
+
   return `<div style="page-break-before: always;">${html}</div>`;
-
 }
-
-
 
 
 
@@ -217,25 +252,28 @@ function generarCondicionesComerciales(cot) {
 
 function generarTerminosGenerales(cot) {
   return `
-  <p>Esta oferta se basa en la información suministrada por el cliente. Para concretar un acuerdo, es indispensable contar con planos y fotografías proporcionadas por el cliente. No se podrá iniciar el diseño o fabricación de equipos sin la aprobación previa de los planos o dibujos enviados por el cliente y firmados.</p>
-
-  <p><strong>INSTALACIÓN:</strong> El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br />
-  <strong>NO INCLUYE:</strong> Acondicionamientos de vano, obras civiles o eléctricas, acometidas eléctricas u otros trabajos ajenos, suministro de SISO o personal de seguridad.</p>
-
-  <p><strong>TIEMPO DE ENTREGA:</strong> Sujeto a disponibilidad de planta, previa aprobación de las condiciones, recibido de anticipo y diligenciamiento de formato. No se incluyen demoras por fuerza mayor, paros, derrumbes, escasez de materiales o transporte.</p>
-
-  <p><strong>GARANTÍA:</strong> Los equipos cuentan con garantía limitada cubriendo defectos de fabricación bajo condiciones normales de uso. No cubre daños por instalación deficiente, manipulación indebida, descargas eléctricas, picos de voltaje o mal uso. Tampoco cubre partes eléctricas, tarjetas, controles inalámbricos, motores o componentes electrónicos, a menos que se indique expresamente. COLD CHAIN SERVICES SAS no se hace responsable de cambios de elementos de nuestros productos por parte del cliente sin previa autorización.</p>
-
-  <p><strong>MANTENIMIENTO Y PERIODICIDAD:</strong> Los mantenimientos deben ser realizados por personal calificado. Durante el período de garantía, el cliente debe garantizar al menos una visita anual. Si se incumple, se invalida la garantía. En caso de falla, el cliente deberá presentar soportes, informes o reportes técnicos válidos.</p>
-
-  <p><strong>OBLIGACIONES DEL CONTRATANTE:</strong> Aplica cuando se incluye instalación del producto, por tanto, el contratante deberá:</p>
-  <ul>
-    <li>Informar con antelación los requisitos de ingreso a la obra, tanto para el personal técnico como para la entrega del producto.</li>
-    <li>Asegurarse que el área de instalación esté completamente despejada, libre de obstáculos y con acceso habilitado para el ingreso de equipos y personal.</li>
-    <li>Garantizar que los pisos, techos y estructuras de la obra estén completamente terminados antes de la instalación, con el fin de permitir una instalación segura y válida para efectos de garantía.</li>
-    <li>Suministrar una acometida eléctrica definitiva que cumpla con el voltaje indicado en la cotización emitida por COLD CHAIN SERVICES SAS.</li>
-    <li>En caso de no contar con acometida definitiva, esto no será motivo válido para rechazar la recepción del producto ni la firma del acta de entrega. El cliente u obra será el único responsable de garantizar la estabilidad del voltaje requerido.</li>
-    <li>Si se presentan daños en los motores o accesorios eléctricos debido a variaciones de voltaje, COLD CHAIN SERVICES SAS no asumirá responsabilidad alguna y los costos de reparación serán asumidos por el cliente.</li>
-  </ul>
+    <p>
+      Esta oferta se basa en la información suministrada por el cliente. Para concretar un acuerdo, es indispensable contar con planos y fotografías proporcionadas por el cliente. No se podrá iniciar el diseño o fabricación de equipos sin la aprobación previa de los planos o dibujos enviados por el cliente y firmados.<br>
+      <strong>INSTALACIÓN:</strong> 
+      El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br>
+      <strong>NO INCLUYE:</strong> 
+      Acondicionamientos de vano, obras civiles o eléctricas, acometidas eléctricas u otros trabajos ajenos, suministro de SISO o personal de seguridad.<br>
+      <strong>TIEMPO DE ENTREGA:</strong> 
+      Sujeto a disponibilidad de planta, previa aprobación de las condiciones, recibido de anticipo y diligenciamiento de formato. No se incluyen demoras por fuerza mayor, paros, derrumbes, escasez de materiales o transporte.<br>
+      <strong>GARANTÍA:</strong> 
+      Los equipos cuentan con garantía limitada cubriendo defectos de fabricación bajo condiciones normales de uso. No cubre daños por instalación deficiente, manipulación indebida, descargas eléctricas, picos de voltaje o mal uso. Tampoco cubre partes eléctricas, tarjetas, controles inalámbricos, motores o componentes electrónicos, a menos que se indique expresamente. COLD CHAIN SERVICES SAS no se hace responsable de cambios de elementos de nuestros productos por parte del cliente sin previa autorización.<br>
+      <strong>MANTENIMIENTO Y PERIODICIDAD:</strong> 
+      Los mantenimientos deben ser realizados por personal calificado. Durante el período de garantía, el cliente debe garantizar al menos una visita anual. Si se incumple, se invalida la garantía. En caso de falla, el cliente deberá presentar soportes, informes o reportes técnicos válidos.<br>
+      <strong>OBLIGACIONES DEL CONTRATANTE:</strong> 
+      Aplica cuando se incluye instalación del producto, por tanto, el contratante deberá:
+    </p>
+    <ul>
+      <li>Informar con antelación los requisitos de ingreso a la obra, tanto para el personal técnico como para la entrega del producto.</li>
+      <li>Asegurarse que el área de instalación esté completamente despejada, libre de obstáculos y con acceso habilitado para el ingreso de equipos y personal.</li>
+      <li>Garantizar que los pisos, techos y estructuras de la obra estén completamente terminados antes de la instalación, con el fin de permitir una instalación segura y válida para efectos de garantía.</li>
+      <li>Suministrar una acometida eléctrica definitiva que cumpla con el voltaje indicado en la cotización emitida por COLD CHAIN SERVICES SAS.</li>
+      <li>En caso de no contar con acometida definitiva, esto no será motivo válido para rechazar la recepción del producto ni la firma del acta de entrega. El cliente u obra será el único responsable de garantizar la estabilidad del voltaje requerido.</li>
+      <li>Si se presentan daños en los motores o accesorios eléctricos debido a variaciones de voltaje, COLD CHAIN SERVICES SAS no asumirá responsabilidad alguna y los costos de reparación serán asumidos por el cliente.</li>
+    </ul>
   `;
 }
