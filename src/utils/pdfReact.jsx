@@ -16,49 +16,75 @@ import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
 import toast from "react-hot-toast";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
-
+import TablaPDFManual from "./TablaPDFManual";
 Font.register({ family: 'Helvetica' });
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 10.5,
+    padding: 32,
+    fontSize: 10,
     fontFamily: 'Helvetica',
-    color: '#333',
-    lineHeight: 1.6,
+    color: '#222',
+    lineHeight: 1.25, // Más compacto
+    backgroundColor: '#fff',
   },
   header: {
-    fontSize: 11,
-    textAlign: 'right',
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 15,
-    color: '#1a3357',
+    fontSize: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a3357',
+    borderBottomColor: '#e0e0e0',
     paddingBottom: 4,
-    fontWeight: 'bold',
   },
-  sectionTitle: {
-    fontSize: 12,
+  title: {
+    fontSize: 14,
     color: '#1a3357',
-    marginTop: 18,
-    marginBottom: 6,
+    marginVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#1a3357',
     paddingBottom: 3,
     fontWeight: 'bold',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  datosCliente: {
+    marginVertical: 6,
+    padding: 8,
+    backgroundColor: '#f7f9fa',
+    borderRadius: 4,
+    border: '1 solid #e0e0e0',
+  },
+  label: {
+    fontWeight: 'bold',
+    color: '#1a3357',
+    marginRight: 4,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    color: '#1a3357',
+    marginTop: 6,         // Antes: 14
+    marginBottom: 2,      // Antes: 4
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 1,     // Antes: 2
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   htmlContent: {
-    marginBottom: 10,
+    marginBottom: 3,      // Antes: 6
   },
   footer: {
-    fontSize: 8,
-    marginTop: 30,
+    fontSize: 7.5,
+    marginTop: 18,
     textAlign: "center",
     color: "#999",
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    paddingTop: 4,
+  },
+  leftPadded: {
+    paddingLeft: 18, // o el valor que mejor se vea, prueba 18-24
   },
 });
 
@@ -106,33 +132,44 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         </View>
 
         <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
-        <Text>Cliente: {nombreCliente || cliente}</Text>
-        <Text>Contacto: _________________________</Text>
-        <Text>NIT: _________________________</Text>
-        <Text>Ciudad: _________________________</Text>
+
+        <View style={styles.datosCliente}>
+          <Text>
+            <Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}
+          </Text>
+          <Text>
+            <Text style={styles.label}>Contacto:</Text> _________________________
+          </Text>
+          <Text>
+            <Text style={styles.label}>NIT:</Text> _________________________
+          </Text>
+          <Text>
+            <Text style={styles.label}>Ciudad:</Text> _________________________
+          </Text>
+        </View>
 
         <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
         <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
 
         {imagenSeleccionada &&
           (imagenSeleccionada.startsWith("data:image/jpeg") ||
-          imagenSeleccionada.startsWith("data:image/png")) && (
+            imagenSeleccionada.startsWith("data:image/png")) && (
             <Image
               src={imagenSeleccionada}
               style={{
                 width: "100%",
-                maxHeight: 250,
+                maxHeight: 180,
                 objectFit: "contain",
-                marginVertical: 12,
-                border: "1 solid #ccc"
+                marginVertical: 10,
+                border: "1 solid #e0e0e0",
+                borderRadius: 4,
               }}
             />
-        )}
-
+          )}
 
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
+          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
         </Text>
       </Page>
 
@@ -143,7 +180,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
+          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
         </Text>
       </Page>
 
@@ -151,7 +188,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
         <Text style={styles.footer} fixed>
           Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – comercial@ccservices.com.co
+          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
         </Text>
       </Page>
     </Document>

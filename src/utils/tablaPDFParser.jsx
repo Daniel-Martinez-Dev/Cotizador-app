@@ -55,9 +55,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: "normal",
   },
-  emptyCell: {
-    flex: 1,
-  }
+  leftAlign: {
+    textAlign: "left",
+  },
+  leftPadded: {
+    paddingLeft: 16,
+  },
 });
 
 const convertirTablaHTMLaComponentes = (html) => {
@@ -71,10 +74,11 @@ const convertirTablaHTMLaComponentes = (html) => {
         const celdas = [...tr.querySelectorAll("td"), ...tr.querySelectorAll("th")];
 
         const isHeader = tr.querySelectorAll("th").length > 0;
-        const isTotalRow = celdas[0]?.textContent.toLowerCase().includes("subtotal") ||
-                           celdas[0]?.textContent.toLowerCase().includes("iva") ||
-                           celdas[0]?.textContent.toLowerCase().includes("total");
-
+        const isTotalRow =
+          celdas[0]?.textContent.toLowerCase().includes("subtotal") ||
+          celdas[0]?.textContent.toLowerCase().includes("iva") ||
+          celdas[0]?.textContent.toLowerCase().includes("total");
+        const isDescuentoRow = celdas[0]?.textContent.toLowerCase().includes("descuento");
         const isExtraRow = celdas[0] && /^(↳|³|->|→)/.test(celdas[0].textContent.trim());
 
         return (
@@ -84,27 +88,90 @@ const convertirTablaHTMLaComponentes = (html) => {
               styles.row,
               isHeader && styles.headerRow,
               isExtraRow && styles.extraRow,
-              isTotalRow && styles.totalRow
+              isTotalRow && styles.totalRow,
+              isDescuentoRow && { backgroundColor: "#e8f5e9" },
             ]}
           >
             {celdas.map((cell, j) => {
               let content = cell.textContent.trim();
-              const isNumeric = /^\$?\d+[.,]?\d*/.test(content);
+              const isNumeric = /^\$?\-?\d+[.,]?\d*/.test(content);
               const isExtra = isExtraRow && j === 0;
 
+              if (isDescuentoRow) {
+                if (j === 0) {
+                  return (
+                    <Text
+                      key={j}
+                      style={[
+                        styles.cell,
+                        styles.boldCell,
+                        styles.rightAlign,
+                        { color: "#388e3c", flex: 3 },
+                      ]}
+                      wrap
+                    >
+                      {content}
+                    </Text>
+                  );
+                }
+                if (j === celdas.length - 1) {
+                  return (
+                    <Text
+                      key={j}
+                      style={[
+                        styles.cell,
+                        styles.boldCell,
+                        styles.rightAlign,
+                        { color: "#388e3c", flex: 1 },
+                      ]}
+                      wrap
+                    >
+                      {celdas[j]?.textContent.trim() || ""}
+                    </Text>
+                  );
+                }
+                return null;
+              }
+
               if (isTotalRow) {
-                return (
-                  <Text key={j} style={[styles.cell, styles.boldCell, styles.rightAlign]} wrap>
-                    {content}
-                  </Text>
-                );
+                if (j === 0) {
+                  return (
+                    <Text
+                      key={j}
+                      style={[styles.cell, styles.boldCell, styles.rightAlign, { flex: 3 }]}
+                      wrap
+                    >
+                      {content}
+                    </Text>
+                  );
+                }
+                if (j === celdas.length - 1) {
+                  return (
+                    <Text
+                      key={j}
+                      style={[styles.cell, styles.boldCell, styles.rightAlign, { flex: 1 }]}
+                      wrap
+                    >
+                      {celdas[j]?.textContent.trim() || ""}
+                    </Text>
+                  );
+                }
+                return null;
               }
 
               if (isExtra) {
                 content = content.replace(/^(↳|³|->|→)\s*/, "");
                 return (
-                  <Text key={j} style={[styles.cell, styles.indentText, isNumeric && styles.rightAlign]} wrap>
-                    ↳ {content}
+                  <Text
+                    key={j}
+                    style={[
+                      styles.cell,
+                      j === 0 && styles.indentText,
+                      j > 1 && styles.rightAlign,
+                    ]}
+                    wrap
+                  >
+                    {content}
                   </Text>
                 );
               }
@@ -112,8 +179,7 @@ const convertirTablaHTMLaComponentes = (html) => {
               const cellStyles = [
                 styles.cell,
                 isHeader && styles.headerCell,
-                j === 1 && !isHeader && styles.centerAlign,
-                (j === 2 || j === 3) && isNumeric && styles.rightAlign,
+                (j === 1 || j === 2 || j === 3) && !isHeader && styles.rightAlign,
                 !isHeader && j === 0 && !isExtraRow && styles.boldCell,
               ];
 
