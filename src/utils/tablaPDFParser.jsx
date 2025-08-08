@@ -51,15 +51,8 @@ const styles = StyleSheet.create({
   totalRow: {
     backgroundColor: "#e6f7ff",
   },
-  indentText: {
-    marginLeft: 12,
-    fontWeight: "normal",
-  },
-  leftAlign: {
-    textAlign: "left",
-  },
-  leftPadded: {
-    paddingLeft: 16,
+  descuentoRow: {
+    backgroundColor: "#e8f5e9",
   },
 });
 
@@ -68,18 +61,30 @@ const convertirTablaHTMLaComponentes = (html) => {
   const doc = parser.parseFromString(html, "text/html");
   const filas = [...doc.querySelectorAll("tr")];
 
+  let productoIndex = 0;
+  let extraIndex = 0;
+
   return (
     <View style={styles.table} wrap>
       {filas.map((tr, i) => {
         const celdas = [...tr.querySelectorAll("td"), ...tr.querySelectorAll("th")];
 
         const isHeader = tr.querySelectorAll("th").length > 0;
-        const isTotalRow =
-          celdas[0]?.textContent.toLowerCase().includes("subtotal") ||
-          celdas[0]?.textContent.toLowerCase().includes("iva") ||
-          celdas[0]?.textContent.toLowerCase().includes("total");
+        const isTotalRow = celdas[0]?.textContent.toLowerCase().includes("subtotal") ||
+                           celdas[0]?.textContent.toLowerCase().includes("iva") ||
+                           celdas[0]?.textContent.toLowerCase().includes("total");
         const isDescuentoRow = celdas[0]?.textContent.toLowerCase().includes("descuento");
         const isExtraRow = celdas[0] && /^(↳|³|->|→)/.test(celdas[0].textContent.trim());
+
+        // Numeración
+        if (!isHeader && !isTotalRow && !isDescuentoRow) {
+          if (!isExtraRow) {
+            productoIndex += 1;
+            extraIndex = 0;
+          } else {
+            extraIndex += 1;
+          }
+        }
 
         return (
           <View
@@ -89,14 +94,14 @@ const convertirTablaHTMLaComponentes = (html) => {
               isHeader && styles.headerRow,
               isExtraRow && styles.extraRow,
               isTotalRow && styles.totalRow,
-              isDescuentoRow && { backgroundColor: "#e8f5e9" },
+              isDescuentoRow && styles.descuentoRow,
             ]}
           >
             {celdas.map((cell, j) => {
               let content = cell.textContent.trim();
               const isNumeric = /^\$?\-?\d+[.,]?\d*/.test(content);
-              const isExtra = isExtraRow && j === 0;
 
+              // Descuento general
               if (isDescuentoRow) {
                 if (j === 0) {
                   return (
@@ -104,9 +109,8 @@ const convertirTablaHTMLaComponentes = (html) => {
                       key={j}
                       style={[
                         styles.cell,
-                        styles.boldCell,
                         styles.rightAlign,
-                        { color: "#388e3c", flex: 3 },
+                        { color: "#388e3c", flex: 3 }
                       ]}
                       wrap
                     >
@@ -120,9 +124,8 @@ const convertirTablaHTMLaComponentes = (html) => {
                       key={j}
                       style={[
                         styles.cell,
-                        styles.boldCell,
                         styles.rightAlign,
-                        { color: "#388e3c", flex: 1 },
+                        { color: "#388e3c", flex: 1 }
                       ]}
                       wrap
                     >
@@ -133,12 +136,13 @@ const convertirTablaHTMLaComponentes = (html) => {
                 return null;
               }
 
+              // Subtotal, IVA, Total
               if (isTotalRow) {
                 if (j === 0) {
                   return (
                     <Text
                       key={j}
-                      style={[styles.cell, styles.boldCell, styles.rightAlign, { flex: 3 }]}
+                      style={[styles.cell, styles.rightAlign, { flex: 3 }, styles.boldCell]}
                       wrap
                     >
                       {content}
@@ -149,7 +153,7 @@ const convertirTablaHTMLaComponentes = (html) => {
                   return (
                     <Text
                       key={j}
-                      style={[styles.cell, styles.boldCell, styles.rightAlign, { flex: 1 }]}
+                      style={[styles.cell, styles.rightAlign, { flex: 1 }, styles.boldCell]}
                       wrap
                     >
                       {celdas[j]?.textContent.trim() || ""}
@@ -159,27 +163,21 @@ const convertirTablaHTMLaComponentes = (html) => {
                 return null;
               }
 
-              if (isExtra) {
-                content = content.replace(/^(↳|³|->|→)\s*/, "");
-                return (
-                  <Text
-                    key={j}
-                    style={[
-                      styles.cell,
-                      j === 0 && styles.indentText,
-                      j > 1 && styles.rightAlign,
-                    ]}
-                    wrap
-                  >
-                    {content}
-                  </Text>
-                );
+              // Numeración
+              if (j === 0 && !isHeader) {
+                if (isExtraRow) {
+                  content = content.replace(/^(↳|³|->|→)\s*/, "");
+                  content = `${productoIndex}.${extraIndex} ${content}`;
+                } else {
+                  content = `${productoIndex}. ${content}`;
+                }
               }
 
               const cellStyles = [
                 styles.cell,
                 isHeader && styles.headerCell,
-                (j === 1 || j === 2 || j === 3) && !isHeader && styles.rightAlign,
+                j === 1 && !isHeader && styles.centerAlign, // Cantidad centrada
+                (j === 2 || j === 3) && styles.rightAlign, // Precio Unitario y Subtotal siempre a la derecha
                 !isHeader && j === 0 && !isExtraRow && styles.boldCell,
               ];
 
