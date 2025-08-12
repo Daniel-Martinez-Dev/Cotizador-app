@@ -13,79 +13,88 @@ import {
 import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
+import { pdfTheme } from './pdfTheme';
 import toast from "react-hot-toast";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import TablaPDFManual from "./TablaPDFManual";
 Font.register({ family: 'Helvetica' });
 
+const T = pdfTheme; // alias corto
+
 const styles = StyleSheet.create({
   page: {
-    padding: 32,
-    fontSize: 10,
+  paddingHorizontal: T.page.marginHorizontal,
+  paddingVertical: T.page.marginVertical,
+    fontSize: T.font.base,
     fontFamily: 'Helvetica',
-    color: '#222',
-    lineHeight: 1.25, // Más compacto
-    backgroundColor: '#fff',
+    color: T.colors.text,
+    lineHeight: 1.25,
+    backgroundColor: T.colors.pageBg,
+    flexDirection: 'column'
   },
   header: {
-    fontSize: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 4,
+    borderBottomColor: T.colors.sectionDivider,
+    paddingBottom: T.spacing.xs,
+    marginBottom: T.spacing.sm,
+    fontSize: T.font.small,
+    color: T.colors.subtleText
   },
   title: {
-    fontSize: 14,
-    color: '#1a3357',
-    marginVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a3357',
-    paddingBottom: 3,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    fontSize: T.font.h1,
+    color: T.colors.headerBg,
+    marginTop: T.spacing.xs,
+    marginBottom: T.spacing.sm,
     textAlign: 'center',
+    fontWeight: 'bold',
+    letterSpacing: 0.8,
+    borderBottomWidth: 1,
+    borderBottomColor: T.colors.headerBg,
+    paddingBottom: 3
   },
   datosCliente: {
-    marginVertical: 6,
-    padding: 8,
+    marginTop: T.spacing.xs,
+    marginBottom: T.spacing.md,
+    padding: T.spacing.sm,
     backgroundColor: '#f7f9fa',
-    borderRadius: 4,
-    border: '1 solid #e0e0e0',
+    borderRadius: T.radius.md,
+    borderWidth: 1,
+    borderColor: T.colors.sectionDivider,
   },
   label: {
     fontWeight: 'bold',
-    color: '#1a3357',
-    marginRight: 4,
+    color: T.colors.headerBg,
+    marginRight: 3,
   },
   sectionTitle: {
-    fontSize: 11,
-    color: '#1a3357',
-    marginTop: 6,         // Antes: 14
-    marginBottom: 2,      // Antes: 4
+    fontSize: T.font.h2,
+    color: T.colors.headerBg,
+    marginTop: T.spacing.sm,
+    marginBottom: T.spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 1,     // Antes: 2
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    borderBottomColor: T.colors.sectionDivider,
+    paddingBottom: 2,
+    fontWeight: 'bold'
   },
   htmlContent: {
-    marginBottom: 3,      // Antes: 6
+    marginBottom: T.spacing.xs,
+  },
+  flexGrowContent: {
+    flexGrow: 1,
   },
   footer: {
-    fontSize: 7.5,
-    marginTop: 18,
-    textAlign: "center",
-    color: "#999",
+    fontSize: T.font.small,
+    textAlign: 'center',
+    color: T.colors.subtleText,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    paddingTop: 4,
+    borderTopColor: T.colors.sectionDivider,
+    paddingTop: T.spacing.xs,
+    marginTop: 'auto'
   },
-  leftPadded: {
-    paddingLeft: 18, // o el valor que mejor se vea, prueba 18-24
-  },
+  leftPadded: { paddingLeft: 18 },
 });
 
 function SeccionHTML({ titulo, contenido }) {
@@ -123,6 +132,11 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
   const imagenSeleccionada = imagenesPorProducto[nombreImagen] || null;
 
+  const footerContent = (
+    <>Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
+      www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co</>
+  );
+
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
@@ -130,66 +144,43 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
           <Text>Fecha: {fecha}</Text>
           <Text>Cotización No: {numeroCotizacion}</Text>
         </View>
-
         <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
-
         <View style={styles.datosCliente}>
-          <Text>
-            <Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}
-          </Text>
-          <Text>
-            <Text style={styles.label}>Contacto:</Text> _________________________
-          </Text>
-          <Text>
-            <Text style={styles.label}>NIT:</Text> _________________________
-          </Text>
-          <Text>
-            <Text style={styles.label}>Ciudad:</Text> _________________________
-          </Text>
+          <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
+          <Text><Text style={styles.label}>Contacto:</Text> _________________________</Text>
+          <Text><Text style={styles.label}>NIT:</Text> _________________________</Text>
+          <Text><Text style={styles.label}>Ciudad:</Text> _________________________</Text>
         </View>
+        <View style={styles.flexGrowContent}>
+          <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
+          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
+        </View>
+        <Text style={styles.footer} fixed>{footerContent}</Text>
+      </Page>
 
-        <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
-        <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
-
-        {imagenSeleccionada &&
-          (imagenSeleccionada.startsWith("data:image/jpeg") ||
-            imagenSeleccionada.startsWith("data:image/png")) && (
-            <Image
-              src={imagenSeleccionada}
-              style={{
-                width: "100%",
-                maxHeight: 180,
-                objectFit: "contain",
-                marginVertical: 10,
-                border: "1 solid #e0e0e0",
-                borderRadius: 4,
-              }}
-            />
+      <Page size="A4" style={styles.page} wrap>
+        <View style={styles.flexGrowContent}>
+          {imagenSeleccionada && (imagenSeleccionada.startsWith('data:image/jpeg') || imagenSeleccionada.startsWith('data:image/png')) && (
+            <>
+              <Text style={styles.sectionTitle}>IMAGEN DE REFERENCIA</Text>
+              <Image
+                src={imagenSeleccionada}
+                style={{ width: '100%', maxHeight: 180, objectFit: 'contain', marginBottom: T.spacing.sm, border: '1 solid ' + T.colors.sectionDivider, borderRadius: T.radius.md }}
+              />
+            </>
           )}
-
-        <Text style={styles.footer} fixed>
-          Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
-        </Text>
+          <Text style={styles.sectionTitle}>Detalle de Precios</Text>
+          {convertirTablaHTMLaComponentes(tablaHTML, { summaryPanel: true, zebra: true, currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true } })}
+          <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
+        </View>
+        <Text style={styles.footer} fixed>{footerContent}</Text>
       </Page>
 
       <Page size="A4" style={styles.page} wrap>
-        <Text style={styles.sectionTitle}>Detalle de Precios</Text>
-        {convertirTablaHTMLaComponentes(tablaHTML)}
-        <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
-
-        <Text style={styles.footer} fixed>
-          Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
-        </Text>
-      </Page>
-
-      <Page size="A4" style={styles.page} wrap>
-        <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
-        <Text style={styles.footer} fixed>
-          Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-          www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co
-        </Text>
+        <View style={styles.flexGrowContent}>
+          <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
+        </View>
+        <Text style={styles.footer} fixed>{footerContent}</Text>
       </Page>
     </Document>
   );
