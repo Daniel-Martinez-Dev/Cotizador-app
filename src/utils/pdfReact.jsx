@@ -128,7 +128,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.header}>
           <Text>Fecha: {fecha}</Text>
-          <Text>Cotización No.: {numeroCotizacion}</Text>
+          <Text>Cotización No: {numeroCotizacion}</Text>
         </View>
 
         <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>

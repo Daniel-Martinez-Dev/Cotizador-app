@@ -221,16 +221,16 @@ function generarTablaPrecios(cot) {
 
   // === Subtotal, IVA y Total ===
   html += `
-      <tr style="font-weight:bold; background-color:#f2f2f2;">
+      <tr style="font-weight:bold; background-color:#eaeaea;">
         <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</td>
         <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
       </tr>
-      <tr style="font-weight:bold; background-color:#f2f2f2;">
+      <tr style="font-weight:bold; background-color:#eaeaea;">
         <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">IVA (19%)</td>
         <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
       </tr>
       <tr style="font-weight:bold; background-color: #d7ecff;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 12px; text-align:right;">Total</td>
+        <td colspan="3" style="border: 1px solid #ccc; padding: 14px; text-align:right;">Total</td>
         <td style="border: 1px solid #ccc; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
       </tr>
     </tbody>
@@ -244,28 +244,24 @@ function generarTablaPrecios(cot) {
 
 
 function generarCondicionesComerciales(cot) {
-  return `<p><strong>Forma de pago:</strong> ${cot.formaPago || "50% de anticipo contra orden de compra y 50% para retiro en planta."}<br />
-  <strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || "15 días hábiles contados a partir de anticipo efectivo."}<br />
-  <strong>Vigencia de la oferta:</strong> ${cot.vigencia || "30 días calendario desde la fecha de emisión."}<br />
-  <strong>Garantía:</strong> ${cot.garantia || "6 meses contra defectos de fabricación."}</p>`;
+  return `
+  <p><strong>Forma de pago: </strong> ${cot.formaPago || "50% de anticipo contra orden de compra y 50% para retiro en planta."}<br />
+  <strong>Tiempo de entrega: </strong> ${cot.tiempoEntrega || "15 días hábiles contados a partir de anticipo efectivo."}<br />
+  <strong>Vigencia de la oferta: </strong> ${cot.vigencia || "30 días calendario desde la fecha de emisión."}<br />
+  <strong>Garantía: </strong> ${cot.garantia || "12 meses contra defectos de fabricación."}</p>`;
 }
 
 function generarTerminosGenerales(cot) {
   return `
     <p>
       Esta oferta se basa en la información suministrada por el cliente. Para concretar un acuerdo, es indispensable contar con planos y fotografías proporcionadas por el cliente. No se podrá iniciar el diseño o fabricación de equipos sin la aprobación previa de los planos o dibujos enviados por el cliente y firmados.<br>
-      <strong>INSTALACIÓN:</strong> 
-      El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br>
-      <strong>NO INCLUYE:</strong> 
-      Acondicionamientos de vano, obras civiles o eléctricas, acometidas eléctricas u otros trabajos ajenos, suministro de SISO o personal de seguridad.<br>
+      <strong>INSTALACIÓN:</strong> El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br>
+      <strong>  NO INCLUYE:</strong> Acondicionamientos de vano, obras civiles o eléctricas, acometidas eléctricas u otros trabajos ajenos, suministro de SISO o personal de seguridad.<br>
       <strong>TIEMPO DE ENTREGA:</strong> 
       Sujeto a disponibilidad de planta, previa aprobación de las condiciones, recibido de anticipo y diligenciamiento de formato. No se incluyen demoras por fuerza mayor, paros, derrumbes, escasez de materiales o transporte.<br>
-      <strong>GARANTÍA:</strong> 
-      Los equipos cuentan con garantía limitada cubriendo defectos de fabricación bajo condiciones normales de uso. No cubre daños por instalación deficiente, manipulación indebida, descargas eléctricas, picos de voltaje o mal uso. Tampoco cubre partes eléctricas, tarjetas, controles inalámbricos, motores o componentes electrónicos, a menos que se indique expresamente. COLD CHAIN SERVICES SAS no se hace responsable de cambios de elementos de nuestros productos por parte del cliente sin previa autorización.<br>
-      <strong>MANTENIMIENTO Y PERIODICIDAD:</strong> 
-      Los mantenimientos deben ser realizados por personal calificado. Durante el período de garantía, el cliente debe garantizar al menos una visita anual. Si se incumple, se invalida la garantía. En caso de falla, el cliente deberá presentar soportes, informes o reportes técnicos válidos.<br>
-      <strong>OBLIGACIONES DEL CONTRATANTE:</strong> 
-      Aplica cuando se incluye instalación del producto, por tanto, el contratante deberá:
+      <strong>GARANTÍA:</strong> Los equipos cuentan con garantía limitada cubriendo defectos de fabricación bajo condiciones normales de uso. No cubre daños por instalación deficiente, manipulación indebida, descargas eléctricas, picos de voltaje o mal uso. Tampoco cubre partes eléctricas, tarjetas, controles inalámbricos, motores o componentes electrónicos, a menos que se indique expresamente. COLD CHAIN SERVICES SAS no se hace responsable de cambios de elementos de nuestros productos por parte del cliente sin previa autorización.<br>
+      <strong>MANTENIMIENTO Y PERIODICIDAD:</strong> Los mantenimientos deben ser realizados por personal calificado. Durante el período de garantía, el cliente debe garantizar al menos una visita anual. Si se incumple, se invalida la garantía. En caso de falla, el cliente deberá presentar soportes, informes o reportes técnicos válidos.<br>
+      <strong>OBLIGACIONES DEL CONTRATANTE:</strong> Aplica cuando se incluye instalación del producto, por tanto, el contratante deberá:
     </p>
     <ul>
       <li>Informar con antelación los requisitos de ingreso a la obra, tanto para el personal técnico como para la entrega del producto.</li>
