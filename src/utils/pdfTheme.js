@@ -16,10 +16,9 @@ export const pdfTheme = {
   font: { base: 9, header: 9, small: 7, h1: 13, h2: 10 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 10, lg: 16, xl: 24 },
   page: {
-    // Márgenes seguros para impresión (en puntos: 1pt = 1/72")
-    // 36pt ≈ 12.7mm, 40pt ≈ 14mm
-  marginHorizontal: 24,
-  marginVertical: 18
+    // Márgenes reducidos para permitir imágenes más grandes
+    marginHorizontal: 18,
+    marginVertical: 14
   },
   radius: { sm: 2, md: 4 }
 };

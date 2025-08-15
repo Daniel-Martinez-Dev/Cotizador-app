@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: T.font.h2,
     color: T.colors.headerBg,
-    marginTop: T.spacing.sm,
-    marginBottom: T.spacing.xs,
+  marginTop: T.spacing.xs,
+  marginBottom: 3,
     borderBottomWidth: 1,
     borderBottomColor: T.colors.sectionDivider,
     paddingBottom: 2,
@@ -143,7 +143,8 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
     clienteTelefono,
     productos,
     secciones = [],
-    imagenSeleccionada: imagenSeleccionadaPorUsuario
+  imagenSeleccionada: imagenSeleccionadaPorUsuario,
+  imagenesSeleccionadas = []
   } = cotizacion;
 
   const producto = productos?.[0];
@@ -160,6 +161,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 
   const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
   const imagenSeleccionada = imagenesPorProducto[nombreImagen] || null;
+  const imagenesMulti = Array.isArray(imagenesSeleccionadas) ? imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean) : [];
 
   const footerContent = (
     <>Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
@@ -209,15 +211,32 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         <View style={styles.flexGrowContent}>
           <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
           <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
-          {imagenSeleccionada && (
-            <>
-              <Text style={styles.sectionTitle}>Imagen de Referencia</Text>
-              <Image
-                src={imagenSeleccionada}
-                style={{ width: '100%', maxHeight: 180, objectFit: 'contain', marginBottom: T.spacing.sm, border: '1 solid ' + T.colors.sectionDivider, borderRadius: T.radius.md }}
-              />
-            </>
-          )}
+          {(imagenSeleccionada || imagenesMulti.length > 0) && (() => {
+            const extras = imagenesMulti.slice(0,2);
+            const total = (imagenSeleccionada ? 1 : 0) + extras.length;
+            // calcular width por imagen
+            let widthPct;
+            if (total === 1) widthPct = '100%';
+            else if (total === 2) widthPct = '48%';
+            else widthPct = '32%';
+            return (
+              <>
+                <Text style={styles.sectionTitle}>Imágenes de Referencia</Text>
+                <View style={{ flexDirection:'row', flexWrap:'wrap', justifyContent: total === 2 ? 'center' : 'space-between' }}>
+                  {imagenSeleccionada && (
+                    <View style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
+                      <Image src={imagenSeleccionada} style={{ width:'100%', height:165, objectFit:'contain' }} />
+                    </View>
+                  )}
+                  {extras.map((imgSrc, idx) => (
+                    <View key={idx} style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
+                      <Image src={imgSrc} style={{ width:'100%', height:165, objectFit:'contain' }} />
+                    </View>
+                  ))}
+                </View>
+              </>
+            );
+          })()}
         </View>
         <Text style={styles.footer} fixed>{footerContent}</Text>
       </Page>

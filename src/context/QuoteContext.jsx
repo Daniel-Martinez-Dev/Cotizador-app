@@ -10,7 +10,8 @@ export function useQuote() {
 
 export function QuoteProvider({ children }) {
   const [quoteData, setQuoteData] = useState({});
-  const [imagenSeleccionada, setImagenSeleccionada] = useState(null);
+  const [imagenSeleccionada, setImagenSeleccionada] = useState(null); // backward compat (single)
+  const [imagenesSeleccionadas, setImagenesSeleccionadas] = useState([]); // nuevas múltiples
   const [clientes, setClientes] = useState([]); // listado cacheado
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // objeto cliente activo
 
@@ -21,6 +22,8 @@ export function QuoteProvider({ children }) {
         setQuoteData,
   imagenSeleccionada,
   setImagenSeleccionada,
+  imagenesSeleccionadas,
+  setImagenesSeleccionadas,
   clientes,
   setClientes,
   clienteSeleccionado,
