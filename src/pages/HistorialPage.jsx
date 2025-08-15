@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
@@ -17,6 +17,16 @@ export default function HistorialPage() {
   const [rangoFecha, setRangoFecha] = useState([null, null]);
   const [ordenarPor, setOrdenarPor] = useState("fecha");
   const [ordenAscendente, setOrdenAscendente] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const estados = [
+    'COTIZACIÓN ENVIADA',
+    'SEGUIMIENTO 1',
+    'SEGUIMIENTO 2',
+    'NEGOCIACIÓN',
+    'APROBADA / PEND. PAGO',
+    'VENDIDA',
+    'CANCELADA'
+  ];
 
   const [startDate, endDate] = rangoFecha;
 
@@ -26,10 +36,15 @@ export default function HistorialPage() {
   useEffect(() => {
     const fetchData = async () => {
       const querySnapshot = await getDocs(collection(db, "cotizaciones"));
-      const datos = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const datos = querySnapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          estadoSeguimiento: d.estadoSeguimiento || 'COTIZACIÓN ENVIADA',
+          estadoFecha: d.estadoFecha || d.estadoCambio || d.timestamp || null // fallback
+        };
+      });
       setCotizaciones(datos);
 
       const clientes = [...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))];
@@ -50,6 +65,7 @@ export default function HistorialPage() {
   const primerProducto = c.productos?.[0];
   const nombreProducto = primerProducto ? (primerProducto.nombrePersonalizado || primerProducto.tipo || '') : '';
   const coincideProducto = filtroProducto ? nombreProducto === filtroProducto : true;
+  const coincideEstado = filtroEstado ? c.estadoSeguimiento === filtroEstado : true;
     const coincideNumero = c.numero
       ?.toString()
       .toLowerCase()
@@ -60,7 +76,7 @@ export default function HistorialPage() {
         (c.timestamp.toDate() >= startDate && c.timestamp.toDate() <= endDate)
       : true;
 
-  return coincideCliente && coincideNumero && coincideFecha && coincideProducto;
+  return coincideCliente && coincideNumero && coincideFecha && coincideProducto && coincideEstado;
   });
 
   const cotizacionesOrdenadas = [...filtrarCotizaciones].sort((a, b) => {
@@ -71,6 +87,19 @@ export default function HistorialPage() {
     if (ordenAscendente) return valorA > valorB ? 1 : -1;
     return valorA < valorB ? 1 : -1;
   });
+
+  const claseEstado = (estado) => {
+    switch(estado){
+      case 'COTIZACIÓN ENVIADA': return 'bg-slate-100 text-slate-700 border-slate-300';
+      case 'SEGUIMIENTO 1': return 'bg-indigo-100 text-indigo-700 border-indigo-300';
+      case 'SEGUIMIENTO 2': return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'NEGOCIACIÓN': return 'bg-amber-100 text-amber-700 border-amber-300';
+      case 'APROBADA / PEND. PAGO': return 'bg-sky-100 text-sky-700 border-sky-300';
+      case 'VENDIDA': return 'bg-green-100 text-green-700 border-green-300';
+      case 'CANCELADA': return 'bg-red-100 text-red-700 border-red-300';
+      default: return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
 
   const manejarEditar = (cotizacion) => {
     setQuoteData({
@@ -103,10 +132,10 @@ export default function HistorialPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white shadow-md rounded-lg">
+    <div className="max-w-7xl mx-auto p-6 bg-white shadow-md rounded-lg">
       <h1 className="text-2xl font-bold mb-4">Historial de Cotizaciones</h1>
 
-  <div className="grid grid-cols-5 gap-4 mb-6 items-center">
+  <div className="grid grid-cols-6 gap-4 mb-6 items-center">
         <select
           value={filtroCliente}
           onChange={(e) => setFiltroCliente(e.target.value)}
@@ -135,6 +164,15 @@ export default function HistorialPage() {
           {productosUnicos.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
         </select>
 
+        <select
+          value={filtroEstado}
+          onChange={(e)=>setFiltroEstado(e.target.value)}
+          className="border p-2 rounded"
+        >
+          <option value="">Todos los estados</option>
+          {estados.map(es => <option key={es} value={es}>{es}</option>)}
+        </select>
+
         <DatePicker
           selectsRange
           startDate={startDate}
@@ -146,11 +184,10 @@ export default function HistorialPage() {
           dateFormat="dd/MM/yyyy"
         />
         <button
-          onClick={()=>{ setFiltroCliente(''); setFiltroNumero(''); setFiltroProducto(''); setRangoFecha([null,null]); }}
+          onClick={()=>{ setFiltroCliente(''); setFiltroNumero(''); setFiltroProducto(''); setFiltroEstado(''); setRangoFecha([null,null]); }}
           className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
         >Limpiar</button>
       </div>
-
       {cotizacionesOrdenadas.length === 0 ? (
         <p>No se encontraron cotizaciones.</p>
       ) : (
@@ -168,6 +205,7 @@ export default function HistorialPage() {
                 {iconoOrden("numero")}
               </th>
               <th className="border px-4 py-2">Cliente</th>
+              <th className="border px-4 py-2">Producto</th>
               <th
                 className="border px-4 py-2 cursor-pointer"
                 onClick={() => {
@@ -179,6 +217,8 @@ export default function HistorialPage() {
                 {iconoOrden("fecha")}
               </th>
               <th className="border px-4 py-2">Total</th>
+              <th className="border px-4 py-2">Último Cambio</th>
+              <th className="border px-4 py-2">Estado</th>
               <th className="border px-4 py-2">Interacción</th>
 
             </tr>
@@ -188,6 +228,7 @@ export default function HistorialPage() {
               <tr key={cot.id} className="text-center">
                 <td className="border px-4 py-2">{cot.numero}</td>
                 <td className="border px-4 py-2">{cot.nombreCliente || cot.cliente}</td>
+                <td className="border px-4 py-2">{cot.productos?.[0]?.tipo || '-'}</td>
                 <td className="border px-4 py-2">
                   {cot.timestamp?.toDate
                     ? cot.timestamp.toDate().toLocaleDateString("es-CO")
@@ -199,6 +240,27 @@ export default function HistorialPage() {
                     currency: "COP",
                     minimumFractionDigits: 0
                   })}
+                </td>
+                <td className="border px-4 py-2 text-xs">
+                  {cot.estadoFecha?.toDate ? cot.estadoFecha.toDate().toLocaleDateString('es-CO') : '—'}
+                </td>
+                <td className="border px-2 py-2">
+                  <select
+                    value={cot.estadoSeguimiento}
+                    onChange={async (e)=>{
+                      const nuevo = e.target.value;
+                      try {
+                        await updateDoc(doc(db, 'cotizaciones', cot.id), { estadoSeguimiento: nuevo, estadoFecha: serverTimestamp() });
+                        setCotizaciones(prev => prev.map(c => c.id === cot.id ? { ...c, estadoSeguimiento: nuevo, estadoFecha: { toDate: ()=> new Date() } } : c));
+                      } catch(err){
+                        console.error('Error actualizando estado', err);
+                        alert('No se pudo actualizar el estado');
+                      }
+                    }}
+                    className={`text-[10px] sm:text-xs border rounded px-2 py-1 font-medium whitespace-nowrap ${claseEstado(cot.estadoSeguimiento)}`}
+                  >
+                    {estados.map(es => <option key={es} value={es}>{es}</option>)}
+                  </select>
                 </td>
                 <td className="border px-4 py-2 space-x-2">
                   <button

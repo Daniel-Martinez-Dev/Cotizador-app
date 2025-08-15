@@ -14,8 +14,16 @@ export default function PreviewPage() {
   const [secciones, setSecciones] = useState([]);
   const [editando, setEditando] = useState(null);
   const [ediciones, setEdiciones] = useState({});
-const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
+const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setImagenesSeleccionadas } = useQuote();
   const [imagenBase64, setImagenBase64] = useState("");
+
+  // Cleanup al desmontar (volver al menú) para evitar persistencia de imágenes previas
+  useEffect(() => {
+    return () => {
+      setImagenSeleccionada(null);
+      setImagenesSeleccionadas([]);
+    };
+  }, []);
 
   const producto = quoteData?.productos?.[0];
   const nombreProducto = producto?.nombreSeleccionado || producto?.tipo || "";
@@ -33,16 +41,25 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
         console.error("Error generando secciones HTML:", error);
       }
     }
+  }, [quoteData]);
 
+  // Cambios de producto -> recargar imagen principal filtrada y limpiar extras
+  useEffect(() => {
     if (imagenesDisponibles.length > 0) {
       const primera = imagenesDisponibles[0][0];
       setImagenSeleccionada(primera);
+      setImagenesSeleccionadas([]); // limpiar extras
       cargarImagen(primera);
+    } else {
+      setImagenSeleccionada(null);
+      setImagenesSeleccionadas([]);
+      setImagenBase64("");
     }
-  }, [quoteData]);
+  }, [nombreProducto]);
 
   const cargarImagen = async (clave) => {
     const promesa = imagenesPorProducto[clave];
+    if (!promesa) return;
     const base64 = await promesa;
     setImagenBase64(base64);
   };
@@ -192,30 +209,70 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
       {renderCampo("Especificaciones Técnicas", "especificacionesHTML")}
 
       {imagenesDisponibles.length > 0 && (
-        <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-center">
-          <label className="block mb-2 font-medium text-gray-700">Selecciona una imagen:</label>
-          <select
-            value={imagenSeleccionada || ""}
-            onChange={(e) => {
-              setImagenSeleccionada(e.target.value);
-              cargarImagen(e.target.value);
-            }}
-            className="mb-4 px-4 py-2 border rounded"
-          >
-            {imagenesDisponibles.map(([key]) => (
-              <option key={key} value={key}>
-                {key}
-              </option>
-            ))}
-          </select>
-          {imagenBase64 && (
-            <div>
-              <img
-                src={imagenBase64}
-                alt="Producto"
-                className="max-w-xs mx-auto border rounded"
-              />
-              <p className="mt-2 text-sm text-gray-500">Imagen referencial del producto</p>
+        <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4">
+          <div>
+            <label className="block mb-2 font-medium text-gray-700">Imagen principal (según categoría)</label>
+            <select
+              value={imagenSeleccionada || ""}
+              onChange={(e)=>{ setImagenSeleccionada(e.target.value); cargarImagen(e.target.value); }}
+              className="px-4 py-2 border rounded w-full sm:w-auto"
+            >
+              {imagenesDisponibles.map(([key]) => (
+                <option key={key} value={key}>{key}</option>
+              ))}
+            </select>
+            {imagenBase64 && (
+              <img src={imagenBase64} alt="principal" className="mt-3 max-h-40 object-contain border rounded" />
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-medium text-gray-700">Imágenes adicionales (máx 2)</label>
+              <button
+                type="button"
+                disabled={imagenesSeleccionadas.length >= 2}
+                onClick={() => setImagenesSeleccionadas(prev => [...prev, ""])}
+                className={`px-3 py-1.5 text-sm rounded border ${imagenesSeleccionadas.length >=2 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed':'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'}`}
+              >+ Añadir</button>
+            </div>
+            {imagenesSeleccionadas.length === 0 && (
+              <p className="text-xs text-gray-500">No has agregado imágenes extra.</p>
+            )}
+            <div className="space-y-3">
+              {imagenesSeleccionadas.map((clave, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <select
+                    value={clave}
+                    onChange={(e)=>{
+                      const val = e.target.value;
+                      setImagenesSeleccionadas(prev => prev.map((c,i)=> i===idx ? val : c));
+                    }}
+                    className="px-3 py-2 border rounded flex-1"
+                  >
+                    <option value="">-- Seleccionar --</option>
+                    {Object.keys(imagenesPorProducto).map(k => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={()=> setImagenesSeleccionadas(prev => prev.filter((_,i)=> i!==idx))}
+                    className="text-red-600 text-sm px-2 py-1 border border-red-300 rounded hover:bg-red-50"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {imagenesSeleccionadas.filter(Boolean).length > 0 && (
+            <div className="flex flex-row gap-4 pt-2 flex-wrap">
+              {imagenesSeleccionadas.filter(Boolean).map(clave => (
+                <div key={clave} className="flex flex-col items-center w-32">
+                  <img src={imagenesPorProducto[clave]} alt={clave} className="h-24 object-contain border rounded w-full bg-white" />
+                  <span className="mt-1 text-[10px] text-gray-600 text-center truncate w-full" title={clave}>{clave}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -254,7 +311,7 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
           className="bg-green-700 text-white px-4 py-2 rounded"
           onClick={() =>
             generarPDFReact(
-              { ...quoteData, secciones: [ediciones], imagenSeleccionada },
+              { ...quoteData, secciones: [ediciones], imagenSeleccionada, imagenesSeleccionadas: imagenesSeleccionadas.filter(Boolean).slice(0,2) },
               estaEditando
             )
           }

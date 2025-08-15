@@ -3,13 +3,15 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export async function guardarCotizacionEnFirebase(cotizacion, numero) {
   try {
-    console.log("Ejecutando guardarCotizacionEnFirebase..."); // ⚠️ prueba
+    // Evitar que un numero antiguo dentro de la cotizacion sobreescriba el consecutivo nuevo
+    const cotizacionLimpia = { ...cotizacion };
+    if (cotizacionLimpia.numero !== undefined) delete cotizacionLimpia.numero;
+
     await addDoc(collection(db, "cotizaciones"), {
-      numero,
-      ...cotizacion,
+      ...cotizacionLimpia,
+      numero, // el consecutivo correcto siempre al final
       timestamp: serverTimestamp()
     });
-    console.log("Cotización guardada en Firebase");
   } catch (error) {
     console.error("Error al guardar la cotización:", error);
   }
