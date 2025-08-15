@@ -122,13 +122,34 @@ function generarTablaPrecios(cot) {
     const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
     const subtotal = cantidad * precio;
 
+    // Descripción detallada solicitada por tipo con salto de línea antes de las medidas
+    const ancho = prod.ancho || prod.ancho_vano || "-";
+    const alto = prod.alto || prod.alto_vano || "-";
+    let descripcionProducto = "";
+    const medidasLinea = `<br />${ancho}mm ancho * ${alto}mm alto.`; // siempre en segunda línea
+    switch (prod.tipo) {
+      case "Puertas Rápidas":
+        descripcionProducto = `Puerta Rápida Enrrollable${medidasLinea}`;
+        break;
+      case "Divisiones Térmicas":
+        descripcionProducto = `División Térmica o Mampara para vehículo${medidasLinea}`;
+        break;
+      case "Abrigo Retráctil Estándar":
+        descripcionProducto = `Abrigo Retráctil para muelle de carga${medidasLinea}`;
+        break;
+      case "Abrigo Retráctil Inflable":
+        descripcionProducto = `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`;
+        break;
+      case "Sello de Andén":
+        descripcionProducto = `Sello de Andén para muelle de carga${medidasLinea}`;
+        break;
+      default:
+        descripcionProducto = `${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") ? (prod.nombrePersonalizado || prod.tipo) : prod.tipo}${medidasLinea}`;
+    }
+
     html += `
       <tr style="font-weight: bold;">
-        <td style="border: 1px solid #ccc; padding: 8px;">
-          ${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos")
-            ? `${prod.nombrePersonalizado || prod.tipo}`
-            : prod.tipo} (${prod.ancho}x${prod.alto})
-        </td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${descripcionProducto}</td>
         <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
         <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
         <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
@@ -184,9 +205,10 @@ function generarTablaPrecios(cot) {
         const totalExtra = extra.precio * cantidadExtra;
 
         if (extra?.nombre && !isNaN(extra.precio)) {
+          // Mismo estilo que los otros extras y sin la etiqueta "(Personalizado)"
           html += `
-            <tr style="background-color:#eaeaea;">
-              <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre} (Personalizado)</td>
+            <tr style="background-color:#f9f9f9;">
+              <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre}</td>
               <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
               <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
               <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
@@ -229,8 +251,8 @@ function generarTablaPrecios(cot) {
         <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">IVA (19%)</td>
         <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
       </tr>
-      <tr style="font-weight:bold; background-color: #d7ecff;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 14px; text-align:right;">Total</td>
+  <tr style="font-weight:bold; background-color: #d7ecff; font-size:16px;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Total</td>
         <td style="border: 1px solid #ccc; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
       </tr>
     </tbody>
@@ -244,6 +266,26 @@ function generarTablaPrecios(cot) {
 
 
 function generarCondicionesComerciales(cot) {
+  const primerTipo = cot.productos?.[0]?.tipo || "";
+
+  // Condiciones específicas para Puertas Rápidas
+  if (primerTipo === "Puertas Rápidas") {
+    // TODO: Reemplazar el bloque abajo con el texto EXACTO suministrado por el usuario para "Condiciones Comerciales" de Puertas Rápidas.
+    // El formato admite etiquetas HTML básicas (<p>, <ul>, <li>, <strong>, <br />) que ya son soportadas por el parser PDF.
+    return `
+      <p><strong>Forma de pago:</strong> ${cot.formaPago || "50% de anticipo con la orden y 50% antes del despacho / instalación."}<br />
+      <strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || "15 días hábiles contados a partir de anticipo efectivo y confirmación de planos firmados."}<br />
+      <strong>Vigencia de la oferta:</strong> ${cot.vigencia || "30 días calendario desde la fecha de emisión."}<br />
+      <strong>Garantía:</strong> ${cot.garantia || "12 meses contra defectos de fabricación (motor y componentes electrónicos). No cubre instalación no autorizada, modificación de cableado, golpes, cortes en lona por uso indebido, exposición a químicos no compatibles, sobrecargas eléctricas o falta de mantenimiento documentado."}<br />
+      <strong>Incluye:</strong> Puerta rápida enrollable según especificaciones, estructura autoportante, motor y tablero de control, elementos de seguridad y acceso descritos, manual básico de operación.<br />
+      <strong>No incluye:</strong> Acometida eléctrica hasta el punto de conexión, canalizaciones, adecuaciones civiles del vano, obras de refuerzo, sistemas de puesta a tierra, dispositivos adicionales no especificados.<br />
+      <strong>Condiciones de instalación:</strong> El vano debe estar terminado, nivelado y aplomado según planos, libre de obstrucciones y con resistencia estructural adecuada. Se requiere suministro eléctrico definitivo (220V monofásico estable) antes de programar la instalación. Variaciones de voltaje que afecten el equipo invalidan la garantía. Si el cliente requiere cursos, capacitaciones, personal SYSO, técnicos o coordinadores, deberán informarse antes para incluirlos en el precio; de no hacerlo, se facturarán por separado.<br />
+      <p><strong>Observaciones:</strong> El cliente debe designar un responsable para recibir la capacitación básica de operación. Elementos adicionales solicitados posteriormente serán cotizados por separado. El cliente debe proveer un espacio seguro para el almacenamiento de los equipos durante la instalación.</p>
+    `;
+  }
+
+
+  // Condiciones genéricas (otros productos)
   return `
   <p><strong>Forma de pago: </strong> ${cot.formaPago || "50% de anticipo contra orden de compra y 50% para retiro en planta."}<br />
   <strong>Tiempo de entrega: </strong> ${cot.tiempoEntrega || "15 días hábiles contados a partir de anticipo efectivo."}<br />
@@ -251,22 +293,23 @@ function generarCondicionesComerciales(cot) {
   <strong>Garantía: </strong> ${cot.garantia || "12 meses contra defectos de fabricación."}</p>`;
 }
 
-function generarTerminosGenerales(cot) {
-  return `
-    <p>Esta oferta se basa en la información suministrada por el cliente. Para concretar un acuerdo, es indispensable contar con planos y fotografías proporcionadas por el cliente. No se podrá iniciar el diseño o fabricación de equipos sin la aprobación previa de los planos o dibujos enviados por el cliente y firmados.<br>
-      <strong>INSTALACIÓN:</strong> El servicio de instalación es opcional. El cliente puede instalar directamente los equipos. En caso de requerir instalación por parte de COLD CHAIN SERVICES SAS, esta incluirá únicamente la instalación de los equipos contratados.<br>
-      <strong>NO INCLUYE:</strong> Acondicionamientos de vano, obras civiles o eléctricas, acometidas eléctricas u otros trabajos ajenos, suministro de SISO o personal de seguridad.<br>
-      <strong>TIEMPO DE ENTREGA:</strong> Sujeto a disponibilidad de planta, previa aprobación de las condiciones, recibido de anticipo y diligenciamiento de formato. No se incluyen demoras por fuerza mayor, paros, derrumbes, escasez de materiales o transporte.<br>
-      <strong>GARANTÍA:</strong> Los equipos cuentan con garantía limitada cubriendo defectos de fabricación bajo condiciones normales de uso. No cubre daños por instalación deficiente, manipulación indebida, descargas eléctricas, picos de voltaje o mal uso. Tampoco cubre partes eléctricas, tarjetas, controles inalámbricos, motores o componentes electrónicos, a menos que se indique expresamente. COLD CHAIN SERVICES SAS no se hace responsable de cambios de elementos de nuestros productos por parte del cliente sin previa autorización.<br>
-      <strong>MANTENIMIENTO Y PERIODICIDAD:</strong> Los mantenimientos deben ser realizados por personal calificado. Durante el período de garantía, el cliente debe garantizar al menos una visita anual. Si se incumple, se invalida la garantía. En caso de falla, el cliente deberá presentar soportes, informes o reportes técnicos válidos.<br>
-      <strong>OBLIGACIONES DEL CONTRATANTE:</strong> Aplica cuando se incluye instalación del producto, por tanto, el contratante deberá:</p>
-    <ul>
-      <li>Informar con antelación los requisitos de ingreso a la obra, tanto para el personal técnico como para la entrega del producto.</li>
-      <li>Asegurarse que el área de instalación esté completamente despejada, libre de obstáculos y con acceso habilitado para el ingreso de equipos y personal.</li>
-      <li>Garantizar que los pisos, techos y estructuras de la obra estén completamente terminados antes de la instalación, con el fin de permitir una instalación segura y válida para efectos de garantía.</li>
-      <li>Suministrar una acometida eléctrica definitiva que cumpla con el voltaje indicado en la cotización emitida por COLD CHAIN SERVICES SAS.</li>
-      <li>En caso de no contar con acometida definitiva, esto no será motivo válido para rechazar la recepción del producto ni la firma del acta de entrega. El cliente u obra será el único responsable de garantizar la estabilidad del voltaje requerido.</li>
-      <li>Si se presentan daños en los motores o accesorios eléctricos debido a variaciones de voltaje, COLD CHAIN SERVICES SAS no asumirá responsabilidad alguna y los costos de reparación serán asumidos por el cliente.</li>
-    </ul>
-  `;
+function generarTerminosGenerales(cot) {return `
+  <p><strong>ALCANCE DE LA OFERTA:</strong> Esta propuesta se basa en la información suministrada por el cliente. Para formalizar el suministro es indispensable recibir planos o fotografías claras del área y su aprobación firmada antes de iniciar fabricación.</p>
+  <p><strong>INSTALACIÓN (OPCIONAL):</strong> El cliente puede ejecutar la instalación con su propio personal. Si contrata la instalación con COLD CHAIN SERVICES SAS, esta se limita exclusivamente a los equipos ofertados y en condiciones adecuadas de acceso y seguridad.</p>
+  <p><strong>NO INCLUYE:</strong> Obras civiles, adecuaciones de vano, reforzamientos estructurales, cableado externo, acometidas eléctricas, canalizaciones, equipos de izaje, elementos de SISO del cliente ni personal de seguridad.</p>
+  <p><strong>TIEMPO DE ENTREGA:</strong> Contado a partir de: (1) aprobación escrita de la oferta y planos, (2) recepción efectiva del anticipo y (3) disponibilidad de materiales. No contempla demoras ajenas como fuerza mayor, paros, cierres viales, escasez o retrasos logísticos.</p>
+  <p><strong>GARANTÍA:</strong> 12 meses por defectos de fabricación bajo uso y mantenimiento normales. Excluye daños por instalación inadecuada, golpes, mal uso, modificaciones no autorizadas, picos o variaciones de voltaje, exposición a agentes químicos no compatibles y desgaste normal. No cubre componentes eléctricos/electrónicos (motores, tarjetas, controles, sensores) salvo que se especifique expresamente.</p>
+  <p><strong>MANTENIMIENTO Y PERIODICIDAD:</strong> Debe ser realizado por personal calificado. Para conservar la garantía se requiere al menos una visita preventiva documentada durante el período de cobertura. La ausencia de soportes anula la garantía.</p>
+  <p><strong>OBLIGACIONES DEL CONTRATANTE (si incluye instalación):</strong></p>
+  <ul>
+    <li>Proveer acceso libre, seguro y despejado al área de trabajo.</li>
+    <li>Entregar vano / estructura terminada, nivelada y sin interferencias antes de la visita.</li>
+    <li>Asegurar suministro eléctrico definitivo y estable con el voltaje especificado.</li>
+    <li>Informar con anticipación protocolos de ingreso, inducciones o permisos especiales.</li>
+    <li>Resguardar los equipos y materiales entregados en sitio hasta su instalación.</li>
+    <li>Asumir costos de esperas o reprogramaciones causadas por condiciones no idóneas del área.</li>
+    <li>Responder por daños ocasionados por variaciones de voltaje o manipulación de terceros.</li>
+  </ul>
+  <p><strong>ACEPTACIÓN:</strong> La emisión de orden de compra y/o el pago del anticipo se consideran aceptación plena de estas condiciones.</p>
+`;
 }

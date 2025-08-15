@@ -10,15 +10,21 @@ export function useQuote() {
 
 export function QuoteProvider({ children }) {
   const [quoteData, setQuoteData] = useState({});
-  const [imagenSeleccionada, setImagenSeleccionada] = useState(null); // ✅ nueva línea
+  const [imagenSeleccionada, setImagenSeleccionada] = useState(null);
+  const [clientes, setClientes] = useState([]); // listado cacheado
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // objeto cliente activo
 
   return (
     <QuoteContext.Provider
       value={{
         quoteData,
         setQuoteData,
-        imagenSeleccionada,        // ✅ nueva línea
-        setImagenSeleccionada      // ✅ nueva línea
+  imagenSeleccionada,
+  setImagenSeleccionada,
+  clientes,
+  setClientes,
+  clienteSeleccionado,
+  setClienteSeleccionado
       }}
     >
       {children}

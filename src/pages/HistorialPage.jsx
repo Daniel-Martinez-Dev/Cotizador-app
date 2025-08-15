@@ -12,6 +12,8 @@ export default function HistorialPage() {
   const [clientesUnicos, setClientesUnicos] = useState([]);
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroNumero, setFiltroNumero] = useState("");
+  const [filtroProducto, setFiltroProducto] = useState("");
+  const [productosUnicos, setProductosUnicos] = useState([]);
   const [rangoFecha, setRangoFecha] = useState([null, null]);
   const [ordenarPor, setOrdenarPor] = useState("fecha");
   const [ordenAscendente, setOrdenAscendente] = useState(false);
@@ -30,14 +32,24 @@ export default function HistorialPage() {
       }));
       setCotizaciones(datos);
 
-      const clientes = [...new Set(datos.map(c => c.cliente).filter(Boolean))];
+      const clientes = [...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))];
       setClientesUnicos(clientes);
+
+      const productos = [...new Set(datos.map(c => {
+        const p = c.productos?.[0];
+        return p ? (p.nombrePersonalizado || p.tipo || '') : null;
+      }).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+      setProductosUnicos(productos);
     };
     fetchData();
   }, []);
 
   const filtrarCotizaciones = cotizaciones.filter(c => {
-    const coincideCliente = filtroCliente ? c.cliente === filtroCliente : true;
+  const nombreMostrar = c.nombreCliente || c.cliente;
+  const coincideCliente = filtroCliente ? nombreMostrar === filtroCliente : true;
+  const primerProducto = c.productos?.[0];
+  const nombreProducto = primerProducto ? (primerProducto.nombrePersonalizado || primerProducto.tipo || '') : '';
+  const coincideProducto = filtroProducto ? nombreProducto === filtroProducto : true;
     const coincideNumero = c.numero
       ?.toString()
       .toLowerCase()
@@ -48,7 +60,7 @@ export default function HistorialPage() {
         (c.timestamp.toDate() >= startDate && c.timestamp.toDate() <= endDate)
       : true;
 
-    return coincideCliente && coincideNumero && coincideFecha;
+  return coincideCliente && coincideNumero && coincideFecha && coincideProducto;
   });
 
   const cotizacionesOrdenadas = [...filtrarCotizaciones].sort((a, b) => {
@@ -94,7 +106,7 @@ export default function HistorialPage() {
     <div className="max-w-6xl mx-auto p-6 bg-white shadow-md rounded-lg">
       <h1 className="text-2xl font-bold mb-4">Historial de Cotizaciones</h1>
 
-      <div className="grid grid-cols-3 gap-4 mb-6 items-center">
+  <div className="grid grid-cols-5 gap-4 mb-6 items-center">
         <select
           value={filtroCliente}
           onChange={(e) => setFiltroCliente(e.target.value)}
@@ -114,6 +126,15 @@ export default function HistorialPage() {
           className="border p-2 rounded"
         />
 
+        <select
+          value={filtroProducto}
+          onChange={(e)=>setFiltroProducto(e.target.value)}
+          className="border p-2 rounded"
+        >
+          <option value="">Todos los productos</option>
+          {productosUnicos.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
+        </select>
+
         <DatePicker
           selectsRange
           startDate={startDate}
@@ -124,6 +145,10 @@ export default function HistorialPage() {
           className="border p-2 rounded w-full"
           dateFormat="dd/MM/yyyy"
         />
+        <button
+          onClick={()=>{ setFiltroCliente(''); setFiltroNumero(''); setFiltroProducto(''); setRangoFecha([null,null]); }}
+          className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+        >Limpiar</button>
       </div>
 
       {cotizacionesOrdenadas.length === 0 ? (
@@ -162,7 +187,7 @@ export default function HistorialPage() {
             {cotizacionesOrdenadas.map((cot) => (
               <tr key={cot.id} className="text-center">
                 <td className="border px-4 py-2">{cot.numero}</td>
-                <td className="border px-4 py-2">{cot.cliente}</td>
+                <td className="border px-4 py-2">{cot.nombreCliente || cot.cliente}</td>
                 <td className="border px-4 py-2">
                   {cot.timestamp?.toDate
                     ? cot.timestamp.toDate().toLocaleDateString("es-CO")
