@@ -9,10 +9,11 @@ export const theme = {
     text: '#222222',
     headerBg: '#1a3357',
     headerText: '#ffffff',
-    extraBg: '#f4f4f4',
-    totalBg: '#e6f7ff',
-    discountBg: '#e8f5e9',
-    discountText: '#388e3c'
+  extraBg: '#f9f9f9',        // coincide con HTML para extras
+  summaryBg: '#eaeaea',      // Subtotal / IVA
+  totalBg: '#d7ecff',        // Total final
+  discountBg: '#fff4f4',     // Descuento
+  discountText: '#c00000'
   },
   font: { base: 10, header: 10, small: 9 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 8 },
@@ -42,6 +43,12 @@ const styles = StyleSheet.create({
   extraRow: {
     backgroundColor: theme.colors.extraBg,
   },
+  productRow: {
+    backgroundColor: '#ffffff',
+  },
+  summaryRow: {
+    backgroundColor: theme.colors.summaryBg,
+  },
   totalRow: {
     backgroundColor: theme.colors.totalBg,
   },
@@ -49,16 +56,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.discountBg,
   },
   cell: {
-    flex: 1,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+  flex: 1,
+  paddingVertical: 4,
+  paddingHorizontal: 6,
     fontSize: theme.font.base,
     color: theme.colors.text,
   },
   headerCell: {
-    fontSize: theme.font.header,
-    fontWeight: 'bold',
-    color: theme.colors.headerText,
+  fontSize: theme.font.header,
+  fontWeight: 'bold',
+  color: theme.colors.headerText,
+  paddingVertical: 6,
+  paddingHorizontal: 8,
   },
   boldCell: {
     fontWeight: 'bold',
@@ -104,14 +113,15 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
   filas.forEach((tr, i) => {
     const celdas = [...tr.querySelectorAll('td'), ...tr.querySelectorAll('th')];
     const isHeader = tr.querySelectorAll('th').length > 0;
-    const labelCell = celdas[0]?.textContent.toLowerCase();
-    const isTotalRow = labelCell && (labelCell.includes('subtotal') || labelCell.includes('iva') || labelCell.includes('total'));
-    const isDescuentoRow = labelCell && labelCell.includes('descuento');
+    const labelRaw = celdas[0]?.textContent.trim() || '';
+    const labelCell = labelRaw.toLowerCase();
+    const isGrandTotalRow = /^(total)/i.test(labelRaw);
+    const isSubtotalIvaRow = /^(subtotal|iva)/i.test(labelRaw);
+    const isDescuentoRow = /descuento/i.test(labelCell);
     const isExtraRow = celdas[0] && /^(↳|³|->|→)/.test(celdas[0].textContent.trim());
+    // Ya no numeramos productos ni extras para coincidir con la tabla de preview.
 
-    if (!isHeader && !isTotalRow && !isDescuentoRow) {
-      if (!isExtraRow) { productoIndex += 1; extraIndex = 0; } else { extraIndex += 1; }
-    }
+    const isProductRow = !isHeader && !isExtraRow && !isDescuentoRow && !isGrandTotalRow && !isSubtotalIvaRow;
 
     const renderRow = (rowIndexForZebra) => (
       <View
@@ -119,18 +129,20 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
         style={[
           styles.row,
           isHeader && styles.headerRow,
+      isProductRow && styles.productRow,
           isExtraRow && styles.extraRow,
-          !summaryPanel && isTotalRow && styles.totalRow,
+          !summaryPanel && isSubtotalIvaRow && styles.summaryRow,
+          !summaryPanel && isGrandTotalRow && styles.totalRow,
           !summaryPanel && isDescuentoRow && styles.descuentoRow,
-          zebra && !isHeader && !isExtraRow && !isTotalRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: '#fafbfc' },
-          summaryPanel && (isTotalRow || isDescuentoRow) && { display: 'none' }
+          zebra && !isHeader && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: '#fafbfc' },
+          summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow) && { display: 'none' }
         ]}
       >
         {celdas.map((cell, j) => {
           let content = cell.textContent.trim();
           const isNumericCandidate = /^[$]?[0-9\-\.\, ]+$/.test(content);
 
-          if (summaryPanel && (isTotalRow || isDescuentoRow)) return null;
+          if (summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow)) return null;
 
           if (!summaryPanel && isDescuentoRow) {
             if (j === 0) return <Text key={j} style={[styles.cell, styles.rightAlign, styles.descuentoText, { flex: 3 }]} wrap>{content}</Text>;
@@ -141,34 +153,45 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
             return null;
           }
 
-            if (!summaryPanel && isTotalRow) {
-            if (j === 0) return <Text key={j} style={[styles.cell, styles.rightAlign, { flex: 3 }, styles.boldCell]} wrap>{content}</Text>;
+          if (!summaryPanel && (isGrandTotalRow || isSubtotalIvaRow)) {
+            if (j === 0) {
+              const styleExtras = isGrandTotalRow ? { flex: 3, fontSize: 16 } : { flex: 3 };
+              return <Text key={j} style={[styles.cell, styles.rightAlign, styles.boldCell, styleExtras]} wrap>{content}</Text>;
+            }
             if (j === celdas.length - 1) {
               const val = celdas[j]?.textContent.trim() || '';
-              return <Text key={j} style={[styles.cell, styles.rightAlign, { flex: 1 }, styles.boldCell]} wrap>{val}</Text>;
+              const styleExtras = isGrandTotalRow ? { flex: 1, fontSize: 16 } : { flex: 1 };
+              return <Text key={j} style={[styles.cell, styles.rightAlign, styles.boldCell, styleExtras]} wrap>{val}</Text>;
             }
-            return null;
+            return null; // Ocultar celdas intermedias fusionadas en HTML
           }
 
-          if (j === 0 && !isHeader) {
-            if (isExtraRow) {
-              content = content.replace(/^(↳|³|->|→)\s*/, '');
-              content = `${productoIndex}.${extraIndex} ${content}`;
-            } else {
-              content = `${productoIndex}. ${content}`;
+          if (j === 0) {
+            if (isExtraRow && !isHeader) {
+              content = content.replace(/^(↳|³|->|→|-)\s*/, '').trim();
+              content = `» ${content}`; // símbolo elegido para extras
+            }
+            // Salto de línea antes de dimensiones si están presentes en la misma frase
+            const pattern = /(\d{2,5})\s*mm\s*ancho\s*\*?\s*(\d{2,5})\s*mm\s*alto/i;
+            if (pattern.test(content) && !content.includes('\n')) {
+              content = content.replace(pattern, '\n$1 mm ancho * $2 mm alto');
             }
           }
 
-          if (isNumericCandidate && (j === 2 || j === 3 || isTotalRow)) {
+          if (isNumericCandidate && (j === 2 || j === 3 || isGrandTotalRow || isSubtotalIvaRow)) {
             content = formatCurrency(content, currencyOptions.locale, currencyOptions.currency, currencyOptions.forceTwoDecimals);
           }
 
+          // Nueva distribución balanceada: Producto 18, Cantidad 4, Precio Unitario 7, Subtotal 7 (total 36)
+          const baseFlex = j === 0 ? 18 : (j === 1 ? 4 : 7);
           const cellStyles = [
             styles.cell,
+            { flex: baseFlex },
             isHeader && styles.headerCell,
             j === 1 && !isHeader && styles.centerAlign,
             (j === 2 || j === 3) && styles.rightAlign,
-            !isHeader && j === 0 && !isExtraRow && styles.boldCell,
+            !isHeader && j === 0 && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && styles.boldCell,
+            // sin líneas verticales entre columnas
           ];
 
           return <Text key={j} style={cellStyles} wrap>{content}</Text>;
@@ -176,11 +199,11 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
       </View>
     );
 
-    if (summaryPanel && (isTotalRow || isDescuentoRow)) {
+    if (summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow)) {
       const label = celdas[0]?.textContent.trim();
       const value = celdas[celdas.length - 1]?.textContent.trim();
       summaryRows.push({
-        type: isDescuentoRow ? 'discount' : 'total',
+        type: isDescuentoRow ? 'discount' : (isGrandTotalRow ? 'total' : 'summary'),
         label,
         value: formatCurrency(value, currencyOptions.locale, currencyOptions.currency, currencyOptions.forceTwoDecimals)
       });

@@ -17,6 +17,7 @@ import { pdfTheme } from './pdfTheme';
 import toast from "react-hot-toast";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
+import logoPng from "../assets/imagenes/logo.png";
 import TablaPDFManual from "./TablaPDFManual";
 Font.register({ family: 'Helvetica' });
 
@@ -33,21 +34,44 @@ const styles = StyleSheet.create({
     backgroundColor: T.colors.pageBg,
     flexDirection: 'column'
   },
-  header: {
+  headerBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: T.colors.sectionDivider,
-    paddingBottom: T.spacing.xs,
+    alignItems: 'stretch',
     marginBottom: T.spacing.sm,
-    fontSize: T.font.small,
-    color: T.colors.subtleText
   },
+  headerBlock: {
+    flex: 1,
+    paddingHorizontal: 8,
+    justifyContent: 'center'
+  },
+  headerDivider: {
+    width: 1,
+    backgroundColor: '#1a3357'
+  },
+  logoBox: {
+    width: 150,
+    paddingRight: 30,
+    justifyContent: 'center',
+    alignItems: 'flex-start'
+  },
+  logoImg: {
+    width: 140,
+    height: 54,
+    objectFit: 'contain'
+  },
+  headerTextLine: {
+    fontSize: 8,
+    color: '#444',
+    marginBottom: 1.5,
+    fontWeight: 'normal'
+  },
+  headerTextBold: { fontWeight: 'bold', fontSize: 9, color: '#222', marginBottom: 2 },
+  rightAlign: { textAlign: 'right' },
   title: {
     fontSize: T.font.h1,
     color: T.colors.headerBg,
-    marginTop: T.spacing.xs,
-    marginBottom: T.spacing.sm,
+  marginTop: 14,
+  marginBottom: T.spacing.xs,
     textAlign: 'center',
     fontWeight: 'bold',
     letterSpacing: 0.8,
@@ -112,6 +136,11 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   const {
     nombreCliente,
     cliente,
+    clienteContacto,
+    clienteNIT,
+    clienteCiudad,
+    clienteEmail,
+    clienteTelefono,
     productos,
     secciones = [],
     imagenSeleccionada: imagenSeleccionadaPorUsuario
@@ -140,35 +169,80 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
-        <View style={styles.header}>
-          <Text>Fecha: {fecha}</Text>
-          <Text>Cotización No: {numeroCotizacion}</Text>
+  <View style={styles.headerBar} fixed>
+          <View style={styles.logoBox}>
+            <Image src={logoPng} style={styles.logoImg} />
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
+            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
+            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
+            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
+            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
+          </View>
         </View>
         <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
         <View style={styles.datosCliente}>
-          <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
-          <Text><Text style={styles.label}>Contacto:</Text> _________________________</Text>
-          <Text><Text style={styles.label}>NIT:</Text> _________________________</Text>
-          <Text><Text style={styles.label}>Ciudad:</Text> _________________________</Text>
+          <View style={{ flexDirection:'row', justifyContent:'space-between' }}>
+            <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente || '—'}</Text>
+            <Text style={styles.rightAlign}><Text style={styles.label}>Fecha:</Text> {fecha}</Text>
+          </View>
+          <View style={{ flexDirection:'row', justifyContent:'flex-end' }}>
+            <Text style={styles.rightAlign}><Text style={styles.label}>Cotización No:</Text> {numeroCotizacion}</Text>
+          </View>
+          {clienteContacto || clienteEmail || clienteTelefono ? (
+            <Text><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
+          ) : <Text><Text style={styles.label}>Contacto:</Text> —</Text>}
+          <Text><Text style={styles.label}>NIT:</Text> {clienteNIT || '—'}</Text>
+          <Text><Text style={styles.label}>Ciudad:</Text> {clienteCiudad || '—'}</Text>
+          {(clienteEmail || clienteTelefono) && (
+            <Text><Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}</Text>
+          )}
         </View>
         <View style={styles.flexGrowContent}>
           <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
           <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
-        </View>
-        <Text style={styles.footer} fixed>{footerContent}</Text>
-      </Page>
-
-      <Page size="A4" style={styles.page} wrap>
-        <View style={styles.flexGrowContent}>
-          {imagenSeleccionada && (imagenSeleccionada.startsWith('data:image/jpeg') || imagenSeleccionada.startsWith('data:image/png')) && (
+          {imagenSeleccionada && (
             <>
-              <Text style={styles.sectionTitle}>IMAGEN DE REFERENCIA</Text>
+              <Text style={styles.sectionTitle}>Imagen de Referencia</Text>
               <Image
                 src={imagenSeleccionada}
                 style={{ width: '100%', maxHeight: 180, objectFit: 'contain', marginBottom: T.spacing.sm, border: '1 solid ' + T.colors.sectionDivider, borderRadius: T.radius.md }}
               />
             </>
           )}
+        </View>
+        <Text style={styles.footer} fixed>{footerContent}</Text>
+      </Page>
+
+      <Page size="A4" style={styles.page} wrap>
+        <View style={styles.headerBar} fixed>
+          <View style={styles.logoBox}>
+            <Image src={logoPng} style={styles.logoImg} />
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
+            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
+            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
+            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
+            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
+          </View>
+        </View>
+        <View style={styles.flexGrowContent}>
           <Text style={styles.sectionTitle}>Detalle de Precios</Text>
           {convertirTablaHTMLaComponentes(tablaHTML, { summaryPanel: true, zebra: true, currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true } })}
           <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
@@ -177,6 +251,25 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
       </Page>
 
       <Page size="A4" style={styles.page} wrap>
+        <View style={styles.headerBar} fixed>
+          <View style={styles.logoBox}>
+            <Image src={logoPng} style={styles.logoImg} />
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
+            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
+            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
+            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
+          </View>
+          <View style={styles.headerDivider} />
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
+            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
+            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
+          </View>
+        </View>
         <View style={styles.flexGrowContent}>
           <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
         </View>

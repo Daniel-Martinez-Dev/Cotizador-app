@@ -9,7 +9,7 @@ import "react-quill/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 
 export default function PreviewPage() {
-  const { quoteData } = useQuote();
+  const { quoteData, setQuoteData, clienteSeleccionado } = useQuote();
   const navigate = useNavigate();
   const [secciones, setSecciones] = useState([]);
   const [editando, setEditando] = useState(null);
@@ -48,7 +48,39 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
   };
 
   const estaEditando = quoteData?.modoEdicion === true;
-  const { cliente, subtotal, iva, total, nombreCliente } = quoteData;
+  const { cliente, subtotal, iva, total, nombreCliente, clienteContacto, clienteNIT, clienteCiudad, clienteEmail, clienteTelefono } = quoteData;
+  const [editandoCliente, setEditandoCliente] = useState(false);
+  const [formCliente, setFormCliente] = useState({
+    nombreCliente: nombreCliente || "",
+    clienteContacto: clienteContacto || "",
+    clienteNIT: clienteNIT || "",
+    clienteCiudad: clienteCiudad || "",
+    clienteEmail: clienteEmail || "",
+    clienteTelefono: clienteTelefono || "",
+  });
+  useEffect(()=>{
+    if(clienteSeleccionado){
+      setFormCliente(f=>({
+        ...f,
+        nombreCliente: clienteSeleccionado.nombre || f.nombreCliente,
+        clienteContacto: clienteSeleccionado.contacto || f.clienteContacto,
+        clienteNIT: clienteSeleccionado.nit || f.clienteNIT,
+        clienteCiudad: clienteSeleccionado.ciudad || f.clienteCiudad,
+        clienteEmail: clienteSeleccionado.email || f.clienteEmail,
+        clienteTelefono: clienteSeleccionado.telefono || f.clienteTelefono,
+      }));
+    }
+  }, [clienteSeleccionado]);
+
+  const handleChangeCliente = (e) => {
+    const { name, value } = e.target;
+    setFormCliente((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const guardarDatosCliente = () => {
+    setQuoteData(prev => ({ ...prev, ...formCliente }));
+    setEditandoCliente(false);
+  };
 
   const handleEditar = (campo) => setEditando(campo);
   const handleGuardar = () => setEditando(null);
@@ -107,11 +139,53 @@ const { imagenSeleccionada, setImagenSeleccionada } = useQuote();
         </div>
       )}
 
-      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200">
-        <h1 className="text-2xl font-bold mb-4">Vista previa de la cotización</h1>
-        <div>
-          <span className="font-semibold">Cliente:</span> {nombreCliente || cliente}
-        </div>
+      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4">
+        <h1 className="text-2xl font-bold">Vista previa de la cotización</h1>
+        {!editandoCliente ? (
+          <div className="text-sm sm:text-base space-y-1">
+            <div><span className="font-semibold">Cliente:</span> {formCliente.nombreCliente || cliente || "—"}</div>
+            <div><span className="font-semibold">Contacto:</span> {formCliente.clienteContacto || "—"}</div>
+            <div><span className="font-semibold">NIT:</span> {formCliente.clienteNIT || "—"}</div>
+            <div><span className="font-semibold">Ciudad:</span> {formCliente.clienteCiudad || "—"}</div>
+            <div><span className="font-semibold">Email:</span> {formCliente.clienteEmail || "—"}</div>
+            <div><span className="font-semibold">Teléfono:</span> {formCliente.clienteTelefono || "—"}</div>
+            <button
+              onClick={() => setEditandoCliente(true)}
+              className="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >Editar Datos Cliente</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">Nombre Cliente</label>
+              <input name="nombreCliente" value={formCliente.nombreCliente} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">Contacto</label>
+              <input name="clienteContacto" value={formCliente.clienteContacto} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">NIT</label>
+              <input name="clienteNIT" value={formCliente.clienteNIT} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">Ciudad</label>
+              <input name="clienteCiudad" value={formCliente.clienteCiudad} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">Email</label>
+              <input name="clienteEmail" value={formCliente.clienteEmail} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs font-semibold text-gray-600">Teléfono</label>
+              <input name="clienteTelefono" value={formCliente.clienteTelefono} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+            </div>
+            <div className="col-span-full flex gap-3 mt-2">
+              <button onClick={guardarDatosCliente} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar</button>
+              <button onClick={() => { setEditandoCliente(false); setFormCliente(prev=>({...prev})); }} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {renderCampo("Descripción del Producto", "descripcionHTML")}
