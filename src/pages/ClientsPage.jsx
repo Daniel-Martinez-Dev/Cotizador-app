@@ -7,7 +7,7 @@ import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaUserCheck } from 
 import toast from 'react-hot-toast';
 
 export default function ClientsPage() {
-  const { clientes, setClientes, setClienteSeleccionado } = useQuote();
+  const { clientes, setClientes, setClienteSeleccionado, confirm } = useQuote();
   const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -63,7 +63,8 @@ export default function ClientsPage() {
   }
 
   async function handleEliminar(id) {
-    if (!window.confirm('¿Eliminar cliente?')) return;
+    const ok = await confirm('¿Eliminar cliente?');
+    if(!ok) return;
     try {
       await eliminarCliente(id);
       setClientes(prev => prev.filter(c=>c.id!==id));

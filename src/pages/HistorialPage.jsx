@@ -34,7 +34,7 @@ export default function HistorialPage() {
 
   const [startDate, endDate] = rangoFecha;
   const navigate = useNavigate();
-  const { setQuoteData } = useQuote();
+  const { setQuoteData, confirm } = useQuote();
 
   // Fetch inicial
   useEffect(() => {
@@ -155,11 +155,12 @@ export default function HistorialPage() {
     navigate("/preview");
   };
   const manejarEditar = cot => {
-    setQuoteData(cot);
+    // Marca modo edición para mostrar aviso en el formulario
+    setQuoteData({ ...cot, modoEdicion: true });
     navigate("/");
   };
   const manejarEliminar = async cot => {
-    if (!window.confirm("¿Eliminar la cotización #" + cot.numero + "?")) return;
+    if (!(await confirm("¿Eliminar la cotización #" + cot.numero + "?"))) return;
     try {
       await deleteDoc(doc(db, "cotizaciones", cot.id));
       setCotizaciones(prev => prev.filter(c => c.id !== cot.id));

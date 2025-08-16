@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import CotizadorApp from "./pages/CotizadorApp";
 import PreviewPage from "./pages/PreviewPage";
 import HistorialPage from "./pages/HistorialPage";
 import ClientsPage from "./pages/ClientsPage";
 import ProductsPage from "./pages/ProductsPage";
-import { QuoteProvider } from "./context/QuoteContext";
+import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
 
-export default function App() {
+function Layout() {
+  const { quoteData, setQuoteData, setClienteSeleccionado, setResetToken } = useQuote();
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem('theme') === 'dark';
@@ -27,8 +28,21 @@ export default function App() {
     }
   }, [dark]);
 
+  const [showNuevaModal, setShowNuevaModal] = useState(false);
+
+  const performNueva = (navigate, currentPath) => {
+    setQuoteData({});
+    setClienteSeleccionado(null);
+    setResetToken(Date.now());
+    if(currentPath !== '/') navigate('/');
+    window.scrollTo(0,0);
+    setShowNuevaModal(false);
+  };
+
   const NavBar = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const handleNueva = () => { setShowNuevaModal(true); };
     const links = [
       { to: '/', label: 'Cotizar' },
       { to: '/productos', label: 'Productos' },
@@ -47,12 +61,20 @@ export default function App() {
               >{l.label}</Link>
             );
         })}
+        <button
+          type="button"
+          onClick={handleNueva}
+          className="ml-2 px-3 py-1.5 rounded text-sm font-medium bg-green-600 hover:bg-green-500 text-white focus:outline-none focus:ring-2 focus:ring-trafico/60"
+          title="Iniciar nueva cotización"
+        >Nueva Cotización</button>
       </nav>
     );
   };
 
   const MobileNav = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const handleNueva = () => { setShowNuevaModal(true); };
     const links = [
       { to: '/', label: 'Cotizar' },
       { to: '/productos', label: 'Productos' },
@@ -71,13 +93,17 @@ export default function App() {
             >{l.label}</Link>
           );
         })}
+        <button
+          type="button"
+          onClick={handleNueva}
+          className="whitespace-nowrap px-3 py-1.5 rounded text-xs font-medium bg-green-600 hover:bg-green-500 text-white"
+        >Nueva</button>
       </div>
     );
   };
 
   return (
-    <QuoteProvider>
-      <Router>
+  <Router>
         <Toaster position="top-right" />
         <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-negro dark:text-white shadow flex items-center gap-4 px-4 h-14 border-b border-gray-200 dark:border-gris-700">
           <Link to="/" className="flex items-center gap-3 group">
@@ -85,6 +111,16 @@ export default function App() {
             <span className="font-semibold text-sm sm:text-base tracking-wide group-hover:text-trafico dark:group-hover:text-trafico transition-colors">Cotizador Cold Chain Services</span>
           </Link>
           <NavBar />
+          {quoteData?.modoEdicion && (
+            <div className="hidden md:flex items-center gap-2 ml-4 px-3 py-1.5 rounded border border-yellow-400 bg-yellow-50 text-yellow-800 dark:bg-gris-800 dark:border-trafico dark:text-trafico text-xs font-medium">
+              <span>Edición #{quoteData.numero || '—'}</span>
+              <button
+                type="button"
+                onClick={()=> setQuoteData(prev=> ({ ...(prev||{}), modoEdicion:false }))}
+                className="ml-1 px-2 py-0.5 rounded bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400"
+              >Salir</button>
+            </div>
+          )}
           <button
             onClick={()=>setDark(d=>!d)}
             className="ml-auto text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-trafico/60"
@@ -101,7 +137,36 @@ export default function App() {
             <Route path="/productos" element={<ProductsPage />} />
           </Routes>
         </main>
+        {showNuevaModal && (
+          <NuevaCotizacionModal onClose={()=>setShowNuevaModal(false)} onConfirm={(navigate, path)=>performNueva(navigate, path)} />
+        )}
       </Router>
+  );
+}
+
+// Modal de confirmación
+function NuevaCotizacionModal({ onClose, onConfirm }){
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-gris-800 rounded-lg shadow-lg border border-gray-200 dark:border-gris-600 p-6 animate-fade-in">
+        <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Iniciar nueva cotización</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Se perderán los datos no guardados de la cotización actual. ¿Deseas continuar?</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gris-600 text-sm">Cancelar</button>
+          <button onClick={()=>onConfirm(navigate, location.pathname)} className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm shadow focus:outline-none focus:ring-2 focus:ring-trafico/60">Sí, limpiar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App(){
+  return (
+    <QuoteProvider>
+      <Layout />
     </QuoteProvider>
   );
 }
