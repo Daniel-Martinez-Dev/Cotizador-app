@@ -77,7 +77,7 @@ export default function ClientsPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white shadow-md rounded-lg">
+  <div className="max-w-5xl mx-auto p-6 bg-white dark:bg-gris-900 shadow-md rounded-lg text-gray-900 dark:text-gray-100">
       <h1 className="text-2xl font-bold mb-4">Clientes</h1>
       <div className="mb-4">
         <button onClick={()=>navigate('/')} className="bg-gray-600 text-white px-3 py-1 rounded text-sm">← Volver al Cotizador</button>
@@ -92,15 +92,15 @@ export default function ClientsPage() {
       </div>
 
       {modoNuevo && (
-        <form onSubmit={handleCrear} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 border p-4 rounded bg-gray-50">
+  <form onSubmit={handleCrear} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 border p-4 rounded bg-gray-50 dark:bg-gris-800 dark:border-gris-700">
           {['nombre','contacto','nit','ciudad','email','telefono'].map(campo => (
             <div key={campo} className="flex flex-col">
-              <label className="text-xs font-semibold uppercase text-gray-600">{campo}</label>
-              <input value={form[campo]} onChange={e=>setForm(f=>({...f,[campo]:e.target.value}))} className="border rounded px-2 py-1" />
+              <label className="text-xs font-semibold uppercase text-gray-600 dark:text-gray-200">{campo}</label>
+              <input value={form[campo]} onChange={e=>setForm(f=>({...f,[campo]:e.target.value}))} className="border rounded px-2 py-1 bg-white dark:bg-gris-700 dark:text-white dark:border-gris-600 placeholder-gray-400" />
             </div>
           ))}
           <div className="col-span-full flex gap-3">
-            <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2"><FaSave/> Guardar</button>
+            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2 dark:bg-green-500 dark:hover:bg-green-400"><FaSave/> Guardar</button>
           </div>
         </form>
       )}

@@ -103,7 +103,7 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
   const handleGuardar = () => setEditando(null);
 
   const renderCampo = (label, campo) => (
-    <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200">
+    <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 force-light">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">{label}</h2>
       {editando === campo ? (
         <>
@@ -147,16 +147,15 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+  <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 text-gray-900 dark:text-gray-100">
       {estaEditando && (
         <div className="bg-yellow-100 border-l-4 border-yellow-600 text-yellow-800 px-4 py-3 mb-4 rounded shadow">
-          <strong>Modo edición:</strong> Estás editando la cotización{" "}
-          <span className="font-bold">#{quoteData.numero}</span>. Los cambios se sobrescribirán
-          al generar el PDF.
+          <strong>Modo edición:</strong> Estás editando la cotización {""}
+          <span className="font-bold">#{quoteData.numero}</span>. Los cambios se sobrescribirán al generar el PDF.
         </div>
       )}
 
-      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4">
+  <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4 force-light">
         <h1 className="text-2xl font-bold">Vista previa de la cotización</h1>
         {!editandoCliente ? (
           <div className="text-sm sm:text-base space-y-1">
@@ -205,13 +204,14 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
         )}
       </div>
 
-      {renderCampo("Descripción del Producto", "descripcionHTML")}
-      {renderCampo("Especificaciones Técnicas", "especificacionesHTML")}
+  {renderCampo("Descripción del Producto", "descripcionHTML")}
+  {renderCampo("Especificaciones Técnicas", "especificacionesHTML")}
 
       {imagenesDisponibles.length > 0 && (
-        <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4">
+  <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4 force-light">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Imágenes</h2>
           <div>
-            <label className="block mb-2 font-medium text-gray-700">Imagen principal (según categoría)</label>
+            <label className="block mb-2 text-sm font-medium text-gray-800">Imagen principal (según categoría)</label>
             <select
               value={imagenSeleccionada || ""}
               onChange={(e)=>{ setImagenSeleccionada(e.target.value); cargarImagen(e.target.value); }}
@@ -228,7 +228,7 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-medium text-gray-700">Imágenes adicionales (máx 2)</label>
+              <label className="text-sm font-medium text-gray-800">Imágenes adicionales (máx 2)</label>
               <button
                 type="button"
                 disabled={imagenesSeleccionadas.length >= 2}
@@ -237,7 +237,7 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
               >+ Añadir</button>
             </div>
             {imagenesSeleccionadas.length === 0 && (
-              <p className="text-xs text-gray-500">No has agregado imágenes extra.</p>
+              <p className="text-xs text-gray-600">No has agregado imágenes extra.</p>
             )}
             <div className="space-y-3">
               {imagenesSeleccionadas.map((clave, idx) => (
@@ -278,15 +278,15 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
         </div>
       )}
 
-      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 overflow-x-auto">
+  <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 overflow-x-auto force-light">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Detalle de Precios</h2>
         <div dangerouslySetInnerHTML={{ __html: ediciones.tablaHTML }} />
       </div>
 
-      {renderCampo("Condiciones Comerciales", "condicionesHTML")}
-      {renderCampo("Términos y Condiciones Generales", "terminosHTML")}
+  {renderCampo("Condiciones Comerciales", "condicionesHTML")}
+  {renderCampo("Términos y Condiciones Generales", "terminosHTML")}
 
-      <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-right">
+  <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 text-right force-light">
         <div>
           <span className="font-semibold">Subtotal: </span>
           {(subtotal || 0).toLocaleString("es-CO", { style: "currency", currency: "COP" })}

@@ -14,6 +14,8 @@ export function QuoteProvider({ children }) {
   const [imagenesSeleccionadas, setImagenesSeleccionadas] = useState([]); // nuevas múltiples
   const [clientes, setClientes] = useState([]); // listado cacheado
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // objeto cliente activo
+  const [matricesOverride, setMatricesOverride] = useState({}); // matrices modificadas desde panel
+  const [extrasOverride, setExtrasOverride] = useState({}); // extras modificados
 
   return (
     <QuoteContext.Provider
@@ -27,7 +29,11 @@ export function QuoteProvider({ children }) {
   clientes,
   setClientes,
   clienteSeleccionado,
-  setClienteSeleccionado
+  setClienteSeleccionado,
+  matricesOverride,
+  setMatricesOverride,
+  extrasOverride,
+  setExtrasOverride
       }}
     >
       {children}

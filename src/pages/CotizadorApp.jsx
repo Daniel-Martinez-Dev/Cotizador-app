@@ -58,7 +58,7 @@ function crearProductoInicial() {
   };
 }
 export default function CotizadorApp() {
-  const { quoteData, setQuoteData, clientes, setClientes, clienteSeleccionado, setClienteSeleccionado } = useQuote();
+  const { quoteData, setQuoteData, clientes, setClientes, clienteSeleccionado, setClienteSeleccionado, matricesOverride, extrasOverride } = useQuote();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -93,7 +93,7 @@ export default function CotizadorApp() {
         return resultado.fueraDeRango;
       }
       if (tipo === "Sello de Andén") return false;
-      const matriz = priceMatrices[tipo];
+  const matriz = (matricesOverride && matricesOverride[tipo]) ? matricesOverride[tipo] : priceMatrices[tipo];
       if (!matriz) return false;
       let fueraDeRango = false;
       if (tipo === "Abrigo Retráctil Estándar") {
@@ -242,7 +242,7 @@ export default function CotizadorApp() {
       fueraDeRango = resultado.fueraDeRango;
       precio = redondear5000(precio);
     } else if (tipo === "Abrigo Retráctil Estándar") {
-      const matriz = priceMatrices[tipo];
+  const matriz = (matricesOverride && matricesOverride[tipo]) ? matricesOverride[tipo] : priceMatrices[tipo];
       const resultado = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
       precio = resultado.precio;
       fueraDeRango = resultado.fueraDeRango;
@@ -266,7 +266,8 @@ export default function CotizadorApp() {
   const calcularSubtotalExtras = (producto) => {
     const { tipo, cliente, extras = [], extrasCantidades = {}, extrasPersonalizados = [], extrasPersonalizadosCant = {} } = producto;
     let subtotal = 0;
-    const listaExtras = EXTRAS_POR_DEFECTO[tipo] || [];
+  const overrideExtrasTipo = extrasOverride && extrasOverride[tipo];
+  const listaExtras = overrideExtrasTipo || EXTRAS_POR_DEFECTO[tipo] || [];
 
     for (let extraNombre of extras) {
       const extra = listaExtras.find(e => e.nombre === extraNombre);
@@ -326,8 +327,10 @@ export default function CotizadorApp() {
   };
 
   return (
-    <><div className="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-lg">
-      <h1 className="text-2xl font-bold mb-6">Generar Cotización</h1>
+  <><div className="max-w-4xl mx-auto p-6 bg-white dark:bg-gris-900 shadow-lg rounded-lg text-gray-900 dark:text-gray-100">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Generar Cotización</h1>
+      </div>
       <div className="mb-4 space-y-2">
         <label className="block mb-1 font-semibold">Cliente:</label>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -615,7 +618,7 @@ export default function CotizadorApp() {
       ))}
 
       {/* AJUSTE GENERAL */}
-      <div className="mt-8 mb-4 p-4 bg-gray-50 rounded-lg border">
+  <div className="mt-8 mb-4 p-4 bg-gray-50 dark:bg-gris-800 rounded-lg border border-gray-200 dark:border-gris-700 dark:text-white">
         <label className="block font-semibold mb-2">Ajuste general sobre el total de la cotización:</label>
         <div className="flex gap-2 items-center">
           <select
@@ -648,7 +651,7 @@ export default function CotizadorApp() {
       >
         Generar Cotización
       </button>
-    </div><button onClick={() => navigate("/historial")} className="bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400">Ver Historial</button></>    
+  </div></>    
   );
 }
 
