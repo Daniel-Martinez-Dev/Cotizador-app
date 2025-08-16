@@ -123,7 +123,7 @@ function TablaSelloAnden({ datos }) {
 }
 
 // Extras editables
-function ListaExtrasEditable({ producto, extras, onChange }) {
+function ListaExtrasEditable({ producto, extras, onChange, confirm }) {
   const [nuevoNombre, setNuevoNombre] = useState('');
   const [nuevoPrecio, setNuevoPrecio] = useState('');
   if (!extras) extras = [];
@@ -159,7 +159,7 @@ function ListaExtrasEditable({ producto, extras, onChange }) {
                 <input type="number" defaultValue={e.precioCliente||''} className="w-24 border rounded px-1 py-0.5 text-right bg-white dark:bg-gris-800 dark:text-white dark:border-gris-600" onBlur={(ev)=>{ const v=parseInt(ev.target.value)||0; const copia=[...extras]; copia[i]={...copia[i], precioCliente:v}; onChange(copia); }} />
               </td>
               <td className="border px-1 py-1 text-center">
-                <button onClick={()=>{ if(window.confirm('Eliminar extra?')) { const copia=[...extras]; copia.splice(i,1); onChange(copia);} }} className="text-red-500 hover:text-red-400 text-xs">Eliminar</button>
+                <button onClick={async()=>{ if(await confirm('Eliminar extra?')) { const copia=[...extras]; copia.splice(i,1); onChange(copia);} }} className="text-red-500 hover:text-red-400 text-xs">Eliminar</button>
               </td>
             </tr>
           ))}
@@ -199,7 +199,7 @@ function ListaExtrasReadOnly({ extras }) {
 
 export default function ProductsPage() {
   const navigate = useNavigate();
-  const { matricesOverride, setMatricesOverride, extrasOverride, setExtrasOverride } = useQuote();
+  const { matricesOverride, setMatricesOverride, extrasOverride, setExtrasOverride, confirm } = useQuote();
   const [filtro, setFiltro] = useState('');
   const [editando, setEditando] = useState({}); // { nombreProducto: true/false }
   const productos = useMemo(() => Object.keys(priceMatrices), []);
@@ -301,8 +301,9 @@ export default function ProductsPage() {
                         return copia;
                       });
                     }}
-                    onApplyPercent={(pct)=>{
-                      if(!window.confirm(`Aplicar ${pct}% a toda la matriz de ${nombre}?`)) return;
+                    onApplyPercent={async(pct)=>{
+                      const ok = await confirm(`Aplicar ${pct}% a toda la matriz de ${nombre}?`);
+                      if(!ok) return;
                       setMatricesOverride(prev=>{
                         const copia={...(prev||{})};
                         const baseOriginal = copia[nombre]?.base || datos.base;
@@ -313,14 +314,14 @@ export default function ProductsPage() {
                     }}
                   />
                 )}
-                <ListaExtrasEditable producto={nombre} extras={extrasBase} onChange={(lista)=>{
+                <ListaExtrasEditable producto={nombre} extras={extrasBase} confirm={confirm} onChange={(lista)=>{
                   setExtrasOverride(prev=> ({ ...(prev||{}), [nombre]: lista }));
                 }} />
               </>
             )}
             <div className="flex gap-2 text-xs mt-1">
-              {override && <button onClick={()=>{ if(window.confirm('Revertir cambios de esta matriz?')){ setMatricesOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir matriz</button>}
-              {extrasOverride?.[nombre] && <button onClick={()=>{ if(window.confirm('Revertir extras modificados?')){ setExtrasOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir extras</button>}
+              {override && <button onClick={async()=>{ if(await confirm('Revertir cambios de esta matriz?')){ setMatricesOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir matriz</button>}
+              {extrasOverride?.[nombre] && <button onClick={async()=>{ if(await confirm('Revertir extras modificados?')){ setExtrasOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir extras</button>}
             </div>
           </div>
         );
@@ -361,8 +362,9 @@ export default function ProductsPage() {
                       return copia;
                     });
                   }}
-                  onApplyPercent={(pct)=>{
-                    if(!window.confirm(`Aplicar ${pct}% a toda la matriz Panamericana?`)) return;
+                  onApplyPercent={async(pct)=>{
+                    const ok = await confirm(`Aplicar ${pct}% a toda la matriz Panamericana?`);
+                    if(!ok) return;
                     setMatricesOverride(prev=>{
                       const copia={...(prev||{})};
                       const baseOriginal = copia[nombre]?.base || datos.base;
@@ -374,7 +376,7 @@ export default function ProductsPage() {
                 />
               )}
               <div className="flex gap-2 text-xs mt-1">
-                {override && <button onClick={()=>{ if(window.confirm('Revertir cambios de la matriz Panamericana?')){ setMatricesOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir matriz</button>}
+                {override && <button onClick={async()=>{ if(await confirm('Revertir cambios de la matriz Panamericana?')){ setMatricesOverride(prev=>{ const c={...(prev||{})}; delete c[nombre]; return c; }); } }} className="bg-gray-300 px-2 py-1 rounded">Revertir matriz</button>}
               </div>
             </div>
           );

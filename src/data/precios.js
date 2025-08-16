@@ -82,7 +82,12 @@ export const EXTRAS_POR_DEFECTO = {
     { nombre: "Radar adicional", precio: 250000 },
     { nombre: "Transformador simple", precio: 480000 },
     { nombre: "Transformador con caja", precio: 580000 },
-    { nombre: "UPS 3KVA", precio: 1400000 }
+  { nombre: "UPS 3KVA", precio: 1400000 },
+  { nombre: "Loop Magnético", precio: 450000 },
+  { nombre: "Sensor No Touch", precio: 250000 },
+  { nombre: "Juego de Bolardos 100 cm", precio: 300000 },
+  { nombre: "Alarma Sonora", precio: 250000 },
+  { nombre: "Biométrico", precio: 450000 }
   ],
   "Abrigo Retráctil Estándar": [
     { nombre: "Juego de almohadillas", precio: 320000 },

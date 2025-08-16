@@ -58,7 +58,7 @@ function crearProductoInicial() {
   };
 }
 export default function CotizadorApp() {
-  const { quoteData, setQuoteData, clientes, setClientes, clienteSeleccionado, setClienteSeleccionado, matricesOverride, extrasOverride } = useQuote();
+  const { quoteData, setQuoteData, clientes, setClientes, clienteSeleccionado, setClienteSeleccionado, matricesOverride, extrasOverride, resetToken, setResetToken } = useQuote();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -76,6 +76,20 @@ export default function CotizadorApp() {
       setAjusteTotalValor(quoteData.ajusteTotalValor || 0);
     }
   }, []);
+
+  // Reinicio explícito vía resetToken
+  useEffect(()=>{
+    if(resetToken){
+      setProductos([crearProductoInicial()]);
+      setCliente("");
+      setAjusteTotalTipo("Descuento");
+      setAjusteTotalValor(0);
+      setQuoteData({});
+      setClienteSeleccionado(null);
+      // Limpiar token para que al volver a la página no se reinicie de nuevo automáticamente
+      setResetToken(null);
+    }
+  }, [resetToken]);
 
 
   const [extraInput, setExtraInput] = useState("");
@@ -322,12 +336,35 @@ export default function CotizadorApp() {
       }
     };
 
-    setQuoteData(cotizacion);
+  // Mantener datos previos (numero, id, modoEdicion, estado, etc.) si venimos de edición
+  setQuoteData(prev => ({ ...prev, ...cotizacion }));
     navigate("/preview");
   };
 
   return (
   <><div className="max-w-4xl mx-auto p-6 bg-white dark:bg-gris-900 shadow-lg rounded-lg text-gray-900 dark:text-gray-100">
+      {quoteData?.modoEdicion && (
+        <div className="mb-6 p-4 rounded-md border-l-4 bg-yellow-50 border-yellow-500 text-yellow-800 dark:bg-gris-800 dark:border-trafico dark:text-trafico/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Editando cotización #{quoteData.numero || '—'}</p>
+            <p className="text-xs mt-1">Los cambios que guardes o al generar PDF sobrescribirán esta cotización existente.</p>
+          </div>
+          <button
+            type="button"
+            onClick={()=>{
+              // Salir de modo edición y resetear estados locales
+              setQuoteData({});
+              setProductos([crearProductoInicial()]);
+              setCliente("");
+              setAjusteTotalTipo("Descuento");
+              setAjusteTotalValor(0);
+            }}
+            className="self-start sm:self-auto inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-2 rounded shadow focus:outline-none focus:ring-2 focus:ring-red-400"
+          >
+            Salir modo edición
+          </button>
+        </div>
+      )}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Generar Cotización</h1>
       </div>
