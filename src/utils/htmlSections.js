@@ -222,23 +222,28 @@ function generarTablaPrecios(cot) {
   // === Mostrar descuento general si existe ===
   if (cot.ajusteGeneral && cot.ajusteGeneral.tipo === "Descuento") {
     const porcentaje = parseFloat(cot.ajusteGeneral.porcentaje) || 0;
+    // No mostrar si el porcentaje es 0
+    if (porcentaje <= 0) {
+      // continuar sin agregar la fila
+    } else {
     const subtotalBruto = cot.productos.reduce((acc, prod) => {
       const cantidad = parseInt(prod.cantidad) || 1;
       const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
       return acc + cantidad * precio;
     }, 0);
     const valorDescuento = subtotalBruto * (porcentaje / 100);
-
+    // Estilos verdes para indicar un beneficio positivo para el cliente
     html += `
-      <tr style="background-color:#fff4f4; color: #c00;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">
+      <tr style="background-color:#f1fff1; color:#0a7a0a;">
+        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right; font-weight:600;">
           Descuento general del ${porcentaje}%
         </td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">
+        <td style="border: 1px solid #ccc; padding: 8px; text-align:right; font-weight:600;">
           - ${formatearPesos(valorDescuento)}
         </td>
       </tr>
     `;
+    }
   }
 
   // === Subtotal, IVA y Total ===

@@ -12,8 +12,8 @@ export const theme = {
   extraBg: '#f9f9f9',        // coincide con HTML para extras
   summaryBg: '#eaeaea',      // Subtotal / IVA
   totalBg: '#d7ecff',        // Total final
-  discountBg: '#fff4f4',     // Descuento
-  discountText: '#c00000'
+  discountBg: '#f1fff1',     // Fondo verde claro para descuento
+  discountText: '#0a7a0a'
   },
   font: { base: 10, header: 10, small: 9 },
   spacing: { xxs: 2, xs: 4, sm: 6, md: 8 },
