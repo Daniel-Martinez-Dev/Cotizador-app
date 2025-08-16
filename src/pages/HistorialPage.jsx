@@ -17,7 +17,7 @@ export default function HistorialPage() {
   const [filtroProducto, setFiltroProducto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [rangoFecha, setRangoFecha] = useState([null, null]);
-  const [ordenarPor, setOrdenarPor] = useState("fecha"); // "numero" | "fecha"
+  const [ordenarPor, setOrdenarPor] = useState("fecha"); // "numero" | "fecha" | "total"
   const [ordenAscendente, setOrdenAscendente] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -121,7 +121,10 @@ export default function HistorialPage() {
     if (ordenarPor === "numero") {
       aVal = a.numero || 0;
       bVal = b.numero || 0;
-    } else {
+    } else if (ordenarPor === "total") {
+      aVal = a.total || 0;
+      bVal = b.total || 0;
+    } else { // fecha
       aVal = a.timestamp?.toDate?.() || 0;
       bVal = b.timestamp?.toDate?.() || 0;
     }
@@ -256,7 +259,10 @@ export default function HistorialPage() {
                 <th className="border px-2 py-2">Cliente</th>
                 <th className="border px-2 py-2">Producto</th>
                 <th className="border px-2 py-2 cursor-pointer" onClick={()=>{ setOrdenarPor('fecha'); setOrdenAscendente(o=>ordenarPor==='fecha' ? !o : false); }}>Fecha {iconoOrden('fecha')}</th>
-                <th className="border px-2 py-2">Total</th>
+                <th
+                  className="border px-2 py-2 cursor-pointer"
+                  onClick={()=>{ setOrdenarPor('total'); setOrdenAscendente(o=> ordenarPor==='total' ? !o : false); }}
+                >Total {iconoOrden('total')}</th>
                 <th className="border px-2 py-2">Último Cambio</th>
                 <th className="border px-2 py-2">Estado</th>
                 <th className="border px-2 py-2">Acciones</th>
