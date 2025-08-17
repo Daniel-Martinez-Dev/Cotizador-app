@@ -12,8 +12,10 @@ export function QuoteProvider({ children }) {
   const [quoteData, setQuoteData] = useState({});
   const [imagenSeleccionada, setImagenSeleccionada] = useState(null); // backward compat (single)
   const [imagenesSeleccionadas, setImagenesSeleccionadas] = useState([]); // nuevas múltiples
-  const [clientes, setClientes] = useState([]); // listado cacheado
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // objeto cliente activo
+  // Nuevo modelo empresas/contactos
+  const [empresas, setEmpresas] = useState([]); // cache empresas
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState(null);
+  const [contactoSeleccionado, setContactoSeleccionado] = useState(null);
   const [matricesOverride, setMatricesOverride] = useState({}); // matrices modificadas desde panel
   const [extrasOverride, setExtrasOverride] = useState({}); // extras modificados
   const [resetToken, setResetToken] = useState(null); // dispara reinicio del formulario
@@ -33,8 +35,9 @@ export function QuoteProvider({ children }) {
       quoteData, setQuoteData,
       imagenSeleccionada, setImagenSeleccionada,
       imagenesSeleccionadas, setImagenesSeleccionadas,
-      clientes, setClientes,
-      clienteSeleccionado, setClienteSeleccionado,
+  empresas, setEmpresas,
+  empresaSeleccionada, setEmpresaSeleccionada,
+  contactoSeleccionado, setContactoSeleccionado,
       matricesOverride, setMatricesOverride,
       extrasOverride, setExtrasOverride,
       resetToken, setResetToken,
