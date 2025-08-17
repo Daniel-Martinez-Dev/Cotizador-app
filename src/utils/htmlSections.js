@@ -123,10 +123,21 @@ function generarTablaPrecios(cot) {
     const subtotal = cantidad * precio;
 
     // Descripción detallada solicitada por tipo con salto de línea antes de las medidas
-    const ancho = prod.ancho || prod.ancho_vano || "-";
-    const alto = prod.alto || prod.alto_vano || "-";
+    const anchoRaw = prod.ancho || prod.ancho_vano || "";
+    const altoRaw = prod.alto || prod.alto_vano || "";
+    const anchoVal = anchoRaw && !isNaN(anchoRaw) ? anchoRaw : "";
+    const altoVal = altoRaw && !isNaN(altoRaw) ? altoRaw : "";
     let descripcionProducto = "";
-    const medidasLinea = `<br />${ancho}mm ancho * ${alto}mm alto.`; // siempre en segunda línea
+    let medidasLinea = "";
+    if(anchoVal || altoVal){
+      if(anchoVal && altoVal){
+        medidasLinea = `<br />${anchoVal}mm ancho * ${altoVal}mm alto.`;
+      } else if(anchoVal){
+        medidasLinea = `<br />${anchoVal}mm ancho.`;
+      } else if(altoVal){
+        medidasLinea = `<br />${altoVal}mm alto.`;
+      }
+    }
     switch (prod.tipo) {
       case "Puertas Rápidas":
         descripcionProducto = `Puerta Rápida Enrrollable${medidasLinea}`;

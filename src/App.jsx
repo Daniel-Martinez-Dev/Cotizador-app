@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import CotizadorApp from "./pages/CotizadorApp";
+import CompaniesPage from "./pages/CompaniesPage";
 import PreviewPage from "./pages/PreviewPage";
 import HistorialPage from "./pages/HistorialPage";
-import ClientsPage from "./pages/ClientsPage";
 import ProductsPage from "./pages/ProductsPage";
 import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
+import { seedEmpresasYContactos } from './utils/seedData';
+import toast from 'react-hot-toast';
 
 function Layout() {
-  const { quoteData, setQuoteData, setClienteSeleccionado, setResetToken } = useQuote();
+  const { quoteData, setQuoteData, setResetToken, setEmpresaSeleccionada, setContactoSeleccionado } = useQuote();
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem('theme') === 'dark';
@@ -29,10 +31,25 @@ function Layout() {
   }, [dark]);
 
   const [showNuevaModal, setShowNuevaModal] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [showSeedLog, setShowSeedLog] = useState(false);
+  const [seedLog, setSeedLog] = useState([]);
+
+  const handleSeed = async ()=>{
+    if(seeding) return; setSeeding(true); setShowSeedLog(true); setSeedLog([]);
+    const addLog = (msg)=> setSeedLog(prev=> [...prev, msg]);
+    try {
+      const res = await seedEmpresasYContactos({ onProgress: addLog });
+      toast.success('Seed completado');
+      addLog(`Resumen: Empresas nuevas ${res.creadasEmp}, Contactos nuevos ${res.creadosContactos}, Legacy ${res.creadosLegacy}`);
+    } catch(e){ console.error(e); toast.error('Error seed'); }
+    finally { setSeeding(false); }
+  };
 
   const performNueva = (navigate, currentPath) => {
     setQuoteData({});
-    setClienteSeleccionado(null);
+    setEmpresaSeleccionada(null);
+    setContactoSeleccionado(null);
     setResetToken(Date.now());
     if(currentPath !== '/') navigate('/');
     window.scrollTo(0,0);
@@ -47,7 +64,7 @@ function Layout() {
       { to: '/', label: 'Cotizar' },
       { to: '/productos', label: 'Productos' },
       { to: '/historial', label: 'Historial' },
-      { to: '/clientes', label: 'Clientes' }
+  { to: '/empresas', label: 'Empresas' }
     ];
     return (
       <nav className="hidden md:flex items-center gap-2 ml-4">
@@ -79,7 +96,7 @@ function Layout() {
       { to: '/', label: 'Cotizar' },
       { to: '/productos', label: 'Productos' },
       { to: '/historial', label: 'Historial' },
-      { to: '/clientes', label: 'Clientes' }
+  { to: '/empresas', label: 'Empresas' }
     ];
     return (
       <div className="md:hidden flex gap-2 overflow-x-auto pb-2 px-1 mt-14 bg-white dark:bg-negro border-b border-gray-200 dark:border-gris-700">
@@ -126,6 +143,11 @@ function Layout() {
             className="ml-auto text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-trafico/60"
             title="Cambiar tema"
           >{dark ? 'Claro' : 'Oscuro'}</button>
+          <button
+            onClick={handleSeed}
+            className="hidden md:inline-flex text-xs sm:text-sm px-3 py-1.5 rounded border border-dashed border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+            title="Cargar datos de ejemplo"
+          >{seeding? 'Seeding...' : 'Seed'}</button>
         </header>
         <MobileNav />
         <main className="pt-16 md:pt-16 pb-8 bg-gray-50 dark:bg-gris-900 min-h-screen text-gray-900 dark:text-gray-100 transition-colors">
@@ -133,12 +155,27 @@ function Layout() {
             <Route path="/" element={<CotizadorApp />} />
             <Route path="/preview" element={<PreviewPage />} />
             <Route path="/historial" element={<HistorialPage />} />
-            <Route path="/clientes" element={<ClientsPage />} />
             <Route path="/productos" element={<ProductsPage />} />
+            <Route path="/empresas" element={<CompaniesPage />} />
           </Routes>
         </main>
         {showNuevaModal && (
           <NuevaCotizacionModal onClose={()=>setShowNuevaModal(false)} onConfirm={(navigate, path)=>performNueva(navigate, path)} />
+        )}
+        {showSeedLog && (
+          <div className="fixed bottom-4 right-4 w-80 max-h-72 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-600 rounded shadow-lg flex flex-col text-xs">
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gris-600 flex items-center justify-between">
+              <span className="font-semibold">Seed Log</span>
+              <div className="flex gap-2">
+                <button onClick={()=>setSeedLog([])} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 dark:bg-gris-700">Limpiar</button>
+                <button onClick={()=>setShowSeedLog(false)} className="text-[10px] px-2 py-0.5 rounded bg-red-500 text-white">Cerrar</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-2 space-y-1">
+              {seedLog.map((l,i)=>(<div key={i} className="leading-snug">{l}</div>))}
+              {seeding && <div className="italic opacity-70">Procesando...</div>}
+            </div>
+          </div>
         )}
       </Router>
   );

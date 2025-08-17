@@ -4,12 +4,15 @@ import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
 import { generarPDFReact } from "../utils/pdfReact";
 import { generarSeccionesHTML } from "../utils/htmlSections";
+import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
+import toast from "react-hot-toast";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 
 export default function PreviewPage() {
-  const { quoteData, setQuoteData, clienteSeleccionado } = useQuote();
+  const { quoteData, setQuoteData,
+    empresas, setEmpresas, empresaSeleccionada, setEmpresaSeleccionada, contactoSeleccionado, setContactoSeleccionado, confirm } = useQuote();
   const navigate = useNavigate();
   const [secciones, setSecciones] = useState([]);
   const [editando, setEditando] = useState(null);
@@ -75,28 +78,132 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
     clienteEmail: clienteEmail || "",
     clienteTelefono: clienteTelefono || "",
   });
+  // Estado local para contactos de la empresa seleccionada
+  const [contactosEmpresa, setContactosEmpresa] = useState([]);
+  const [cargandoEmpresas, setCargandoEmpresas] = useState(false);
+  const [cargandoContactos, setCargandoContactos] = useState(false);
+  // Formularios rápidos
+  const [showNuevaEmpresa, setShowNuevaEmpresa] = useState(false);
+  const [showNuevoContacto, setShowNuevoContacto] = useState(false);
+  const [nuevaEmpresa, setNuevaEmpresa] = useState({ nombre:"", nit:"", ciudad:"" });
+  const [nuevoContacto, setNuevoContacto] = useState({ nombre:"", email:"", telefono:"" });
+
+  // Cargar empresas al entrar si no están
   useEffect(()=>{
-    if(clienteSeleccionado){
+    async function cargar(){
+      if(empresas.length===0){
+        setCargandoEmpresas(true);
+        try { const lista = await listarEmpresas(); setEmpresas(lista); } catch(e){ console.error(e);} finally { setCargandoEmpresas(false);} }
+    }
+    cargar();
+  }, []);
+
+  // Cuando cambia la empresa seleccionada -> cargar contactos
+  useEffect(()=>{
+    async function cargarContactos(){
+      if(!empresaSeleccionada){ setContactosEmpresa([]); return; }
+      setCargandoContactos(true);
+      try { const lista = await listarContactos(empresaSeleccionada.id); setContactosEmpresa(lista); }
+      catch(e){ console.error(e); }
+      finally { setCargandoContactos(false); }
+    }
+    cargarContactos();
+  }, [empresaSeleccionada]);
+
+  // Actualizar form cuando seleccionamos empresa
+  useEffect(()=>{
+    if(empresaSeleccionada){
       setFormCliente(f=>({
         ...f,
-        nombreCliente: clienteSeleccionado.nombre || f.nombreCliente,
-        clienteContacto: clienteSeleccionado.contacto || f.clienteContacto,
-        clienteNIT: clienteSeleccionado.nit || f.clienteNIT,
-        clienteCiudad: clienteSeleccionado.ciudad || f.clienteCiudad,
-        clienteEmail: clienteSeleccionado.email || f.clienteEmail,
-        clienteTelefono: clienteSeleccionado.telefono || f.clienteTelefono,
+        nombreCliente: empresaSeleccionada.nombre || f.nombreCliente,
+        clienteNIT: empresaSeleccionada.nit || f.clienteNIT,
+        clienteCiudad: empresaSeleccionada.ciudad || f.clienteCiudad,
       }));
     }
-  }, [clienteSeleccionado]);
+  }, [empresaSeleccionada]);
+
+  // Actualizar form cuando seleccionamos contacto
+  useEffect(()=>{
+    if(contactoSeleccionado){
+      setFormCliente(f=>({
+        ...f,
+        clienteContacto: contactoSeleccionado.nombre || f.clienteContacto,
+        clienteEmail: contactoSeleccionado.email || f.clienteEmail,
+        clienteTelefono: contactoSeleccionado.telefono || f.clienteTelefono,
+      }));
+    }
+  }, [contactoSeleccionado]);
+  // Legacy clienteSeleccionado removido
 
   const handleChangeCliente = (e) => {
     const { name, value } = e.target;
     setFormCliente((prev) => ({ ...prev, [name]: value }));
   };
 
-  const guardarDatosCliente = () => {
+  const guardarDatosCliente = async () => {
+    const ok = await confirm('Se sobrescribirán los datos del cliente (empresa y/o contacto).\n¿Deseas continuar?');
+    if(!ok) return;
+    // Persistencia con nuevo modelo Empresa/Contacto basado en NIT + email contacto.
     setQuoteData(prev => ({ ...prev, ...formCliente }));
-    setEditandoCliente(false);
+    const nit = formCliente.clienteNIT?.trim();
+    const nombreEmpresa = formCliente.nombreCliente?.trim();
+    const ciudad = formCliente.clienteCiudad?.trim();
+    const emailContacto = formCliente.clienteEmail?.trim();
+    const telefonoContacto = formCliente.clienteTelefono?.trim();
+    const nombreContacto = formCliente.clienteContacto?.trim();
+
+  if(!nit){ toast.error('NIT requerido ahora'); return; }
+
+    try {
+      // Empresa por NIT
+      let empresa = await obtenerEmpresaPorNIT(nit);
+      if(!empresa){
+        const empresaId = await crearEmpresa({ nit, nombre: nombreEmpresa, ciudad });
+        empresa = { id: empresaId, nit, nombre: nombreEmpresa, ciudad };
+        toast.success("Empresa creada");
+      } else {
+        // Posible actualización de nombre/ciudad
+        const cambios = {};
+        if(nombreEmpresa && nombreEmpresa !== empresa.nombre) cambios.nombre = nombreEmpresa;
+        if(ciudad && ciudad !== empresa.ciudad) cambios.ciudad = ciudad;
+        if(Object.keys(cambios).length){ await actualizarEmpresa(empresa.id, cambios); }
+      }
+
+      // Contacto: buscamos por email si hay email, si no por nombre (simple)
+      let contacto = null;
+      if(emailContacto){
+        contacto = await buscarContactoPorEmail(empresa.id, emailContacto);
+      }
+      if(!contacto && nombreContacto){
+        // Cargar contactos y buscar coincidencia por nombre
+        const listaC = await listarContactos(empresa.id);
+        contacto = listaC.find(c=> c.nombre?.toLowerCase() === nombreContacto.toLowerCase());
+      }
+      if(!contacto){
+        const contactoId = await crearContacto(empresa.id, { nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto });
+        contacto = { id: contactoId, nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto };
+  toast.success("Contacto creado");
+      } else {
+        const cambiosC = {};
+        if(nombreContacto && nombreContacto !== contacto.nombre) cambiosC.nombre = nombreContacto;
+        if(emailContacto && emailContacto !== contacto.email) cambiosC.email = emailContacto;
+        if(telefonoContacto && telefonoContacto !== contacto.telefono) cambiosC.telefono = telefonoContacto;
+        if(Object.keys(cambiosC).length){ await actualizarContacto(empresa.id, contacto.id, cambiosC); }
+  toast.success("Contacto actualizado (sobrescrito)");
+      }
+
+      // Actualizar caches en contexto
+      const listaEmp = await listarEmpresas();
+      setEmpresas(listaEmp);
+      setEmpresaSeleccionada(listaEmp.find(e=> e.id===empresa.id) || empresa);
+      setContactoSeleccionado(contacto);
+
+    } catch(e){
+      console.error("Error guardando empresa/contacto", e);
+      toast.error("Error guardando empresa/contacto");
+    } finally {
+      setEditandoCliente(false);
+    }
   };
 
   const handleEditar = (campo) => setEditando(campo);
@@ -173,28 +280,28 @@ const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setIma
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">Nombre Cliente</label>
-              <input name="nombreCliente" value={formCliente.nombreCliente} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">Nombre Cliente</label>
+              <input name="nombreCliente" value={formCliente.nombreCliente} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">Contacto</label>
-              <input name="clienteContacto" value={formCliente.clienteContacto} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">Contacto</label>
+              <input name="clienteContacto" value={formCliente.clienteContacto} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">NIT</label>
-              <input name="clienteNIT" value={formCliente.clienteNIT} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">NIT</label>
+              <input name="clienteNIT" value={formCliente.clienteNIT} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">Ciudad</label>
-              <input name="clienteCiudad" value={formCliente.clienteCiudad} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">Ciudad</label>
+              <input name="clienteCiudad" value={formCliente.clienteCiudad} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">Email</label>
-              <input name="clienteEmail" value={formCliente.clienteEmail} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">Email</label>
+              <input name="clienteEmail" value={formCliente.clienteEmail} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs font-semibold text-gray-600">Teléfono</label>
-              <input name="clienteTelefono" value={formCliente.clienteTelefono} onChange={handleChangeCliente} className="border rounded px-3 py-2" />
+              <label className="text-xs font-semibold text-gray-800 dark:text-gray-900">Teléfono</label>
+              <input name="clienteTelefono" value={formCliente.clienteTelefono} onChange={handleChangeCliente} className="border rounded px-3 py-2 bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition" />
             </div>
             <div className="col-span-full flex gap-3 mt-2">
               <button onClick={guardarDatosCliente} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar</button>

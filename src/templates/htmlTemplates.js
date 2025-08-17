@@ -24,7 +24,7 @@ export function plantillaDivisionesTermicas(data) {
     <style>${estilosBase()}</style>
   </head>
   <body>
-    ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "DIVISIONES TÉRMICAS")}
+  ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "DIVISIONES TÉRMICAS", telefono, email)}
     <div class="section"><div class="section-title">Descripción General</div><p>${descripcion}</p></div>
     <div class="section"><div class="section-title">Especificaciones Técnicas</div>${especificacionesTecnicasHTML}</div>
     <div class="section"><div class="section-title">Detalle de Precios</div>${tablaPreciosHTML}</div>
@@ -57,7 +57,7 @@ export function plantillaPuertasRapidas(data) {
     <style>${estilosBase()}</style>
   </head>
   <body>
-    ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "PUERTAS RÁPIDAS")}
+  ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "PUERTAS RÁPIDAS", telefono, email)}
     <div class="section"><div class="section-title">Descripción General</div><p>${descripcion}</p></div>
     <div class="section"><div class="section-title">Especificaciones Técnicas</div>${especificacionesTecnicasHTML}</div>
     <div class="section"><div class="section-title">Detalle de Precios</div>${tablaPreciosHTML}</div>
@@ -90,7 +90,7 @@ export function plantillaAbrigosRetractiles(data) {
     <style>${estilosBase()}</style>
   </head>
   <body>
-    ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "ABRIGOS RETRÁCTILES")}
+  ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "ABRIGOS RETRÁCTILES", telefono, email)}
     <div class="section"><div class="section-title">Descripción General</div><p>${descripcion}</p></div>
     <div class="section"><div class="section-title">Especificaciones Técnicas</div>${especificacionesTecnicasHTML}</div>
     <div class="section"><div class="section-title">Detalle de Precios</div>${tablaPreciosHTML}</div>
@@ -123,7 +123,7 @@ export function plantillaAbrigosInflables(data) {
     <style>${estilosBase()}</style>
   </head>
   <body>
-    ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "ABRIGOS INFLABLES")}
+  ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "ABRIGOS INFLABLES", telefono, email)}
     <div class="section"><div class="section-title">Descripción General</div><p>${descripcion}</p></div>
     <div class="section"><div class="section-title">Especificaciones Técnicas</div>${especificacionesTecnicasHTML}</div>
     <div class="section"><div class="section-title">Detalle de Precios</div>${tablaPreciosHTML}</div>
@@ -156,7 +156,7 @@ export function plantillaSellosAnden(data) {
     <style>${estilosBase()}</style>
   </head>
   <body>
-    ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "SELLOS DE ANDÉN")}
+  ${encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, "SELLOS DE ANDÉN", telefono, email)}
     <div class="section"><div class="section-title">Descripción General</div><p>${descripcion}</p></div>
     <div class="section"><div class="section-title">Especificaciones Técnicas</div>${especificacionesTecnicasHTML}</div>
     <div class="section"><div class="section-title">Detalle de Precios</div>${tablaPreciosHTML}</div>
@@ -180,16 +180,21 @@ function estilosBase() {
     footer { margin-top: 60px; border-top: 1px solid #94a3b8; padding-top: 10px; font-size: 0.85em; text-align: center; color: #64748b; }`;
 }
 
-function encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, titulo) {
+function encabezado(cliente, contacto, nit, ciudad, fecha, numeroCotizacion, titulo, telefono, email) {
+  const filas = [];
+  if (cliente) filas.push(`<strong>Cliente:</strong> ${cliente}`);
+  if (contacto) filas.push(`<strong>Contacto:</strong> ${contacto}`);
+  if (nit) filas.push(`<strong>NIT:</strong> ${nit}`);
+  if (ciudad) filas.push(`<strong>Ciudad:</strong> ${ciudad}`);
+  if (telefono) filas.push(`<strong>Teléfono:</strong> ${telefono}`);
+  if (email) filas.push(`<strong>Email:</strong> ${email}`);
+  const bloqueCliente = filas.length ? `<p>${filas.join('<br />')}</p>` : '';
   return `<header>
     <img src="https://ccservices.com.co/wp-content/uploads/2021/07/CCServices-Logo-web.png" alt="Logo" class="logo" />
     <div><strong>Fecha:</strong> ${fecha}<br /><strong>Cotización No.:</strong> ${numeroCotizacion}</div>
   </header>
   <h1>COTIZACIÓN DE ${titulo}</h1>
-  <p><strong>Cliente:</strong> ${cliente}<br />
-     <strong>Contacto:</strong> ${contacto}<br />
-     <strong>NIT:</strong> ${nit}<br />
-     <strong>Ciudad:</strong> ${ciudad}<br /></p>`;
+  ${bloqueCliente}`;
 }
 
 function pieDePagina() {
