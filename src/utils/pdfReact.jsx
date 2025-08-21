@@ -193,17 +193,23 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
         <View style={styles.datosCliente}>
           <View style={{ flexDirection:'row', justifyContent:'space-between' }}>
-            <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente || '—'}</Text>
+            {(nombreCliente || cliente) && (
+              <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
+            )}
             <Text style={styles.rightAlign}><Text style={styles.label}>Fecha:</Text> {fecha}</Text>
           </View>
           <View style={{ flexDirection:'row', justifyContent:'flex-end' }}>
             <Text style={styles.rightAlign}><Text style={styles.label}>Cotización No:</Text> {numeroCotizacion}</Text>
           </View>
-          {clienteContacto || clienteEmail || clienteTelefono ? (
+          {(clienteContacto || clienteEmail || clienteTelefono) && (
             <Text><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
-          ) : <Text><Text style={styles.label}>Contacto:</Text> —</Text>}
-          <Text><Text style={styles.label}>NIT:</Text> {clienteNIT || '—'}</Text>
-          <Text><Text style={styles.label}>Ciudad:</Text> {clienteCiudad || '—'}</Text>
+          )}
+          {clienteNIT && (
+            <Text><Text style={styles.label}>NIT:</Text> {clienteNIT}</Text>
+          )}
+          {clienteCiudad && (
+            <Text><Text style={styles.label}>Ciudad:</Text> {clienteCiudad}</Text>
+          )}
           {(clienteEmail || clienteTelefono) && (
             <Text><Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}</Text>
           )}
@@ -317,7 +323,26 @@ export async function generarPDFReact(cotizacion, estaEditando) {
   asPdf.updateContainer(doc);
   const blob = await asPdf.toBlob();
 
-  const nombreArchivo = `Cotizacion#${numeroCotizacion}_${(cotizacion.nombreCliente || cotizacion.cliente || "Cliente").replace(/\s/g, "_")}_${new Date().toLocaleDateString("es-CO").replace(/\//g, "-")}.pdf`;
+  // Formato actualizado: CT#X_Producto_Empresa_dd-mm-aaaa.pdf
+  const ahora = new Date();
+  const dd = String(ahora.getDate()).padStart(2,'0');
+  const mm = String(ahora.getMonth()+1).padStart(2,'0');
+  const yyyy = String(ahora.getFullYear());
+  const fechaCompacta = `${dd}-${mm}-${yyyy}`; // dd-mm-aaaa
+  const primerProducto = cotizacion.productos?.[0]?.tipo || 'Producto';
+  const normalizarTitulo = (txt)=>{
+    const base = (txt||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // Dejar solo letras y números, separar por espacios, capitalizar y unir sin espacios
+    return base
+      .replace(/[^A-Za-z0-9\s]/g,' ') // sustituir símbolos por espacio
+      .split(/\s+/).filter(Boolean)
+      .map(w=> w.charAt(0).toUpperCase()+w.slice(1).toLowerCase())
+      .join('') || 'Valor';
+  };
+  const prodNorm = normalizarTitulo(primerProducto);
+  const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
+  const empresaNorm = normalizarTitulo(empresaBase);
+  const nombreArchivo = `CT${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = nombreArchivo;

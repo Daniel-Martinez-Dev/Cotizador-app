@@ -30,6 +30,7 @@ const crearProductoInicial = () => ({
   extrasPersonalizadosCant: {},
   componentes: [],
   nombrePersonalizado: '',
+  infoAdicional: '', // Identificador libre (muelle, placa, etc.)
   mostrarAlerta: false,
   precioEditado: '',
   ajusteTipo: 'Incremento',
@@ -392,6 +393,7 @@ export default function CotizadorApp(){
                       </div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ancho (mm)</label><input type="number" value={producto.ancho} onChange={e=> handleChangeProducto(i,'ancho', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Ancho" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Alto (mm)</label><input type="number" value={producto.alto} onChange={e=> handleChangeProducto(i,'alto', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Alto" /></div>
+                      <div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Información Adicional</label><input type="text" value={producto.infoAdicional||''} onChange={e=> handleChangeProducto(i,'infoAdicional', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="(Ej: Muelle 3, Placa 5, Zona Fría)" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ajuste (%)</label><div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div></div>
