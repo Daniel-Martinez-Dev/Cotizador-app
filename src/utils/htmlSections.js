@@ -140,10 +140,11 @@ function generarTablaPrecios(cot) {
     }
     switch (prod.tipo) {
       case "Puertas Rápidas":
-        descripcionProducto = `Puerta Rápida Enrrollable${medidasLinea}`;
+  // Nueva redacción solicitada
+  descripcionProducto = `PUERTA RÁPIDA ENROLLABLE PARA VANO DE${medidasLinea}`;
         break;
       case "Divisiones Térmicas":
-        descripcionProducto = `División Térmica o Mampara para vehículo${medidasLinea}`;
+  descripcionProducto = `DIVISIÓN TÉRMICA O MAMPARA PARA VEHÍCULO CON MEDIDAS INTERNAS DE${medidasLinea}`;
         break;
       case "Abrigo Retráctil Estándar":
         descripcionProducto = `Abrigo Retráctil para muelle de carga${medidasLinea}`;
@@ -152,7 +153,7 @@ function generarTablaPrecios(cot) {
         descripcionProducto = `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`;
         break;
       case "Sello de Andén":
-        descripcionProducto = `Sello de Andén para muelle de carga${medidasLinea}`;
+  descripcionProducto = `SELLO DE ANDÉN PARA MUELLE DE CARGA CON MEDIDAS DE${medidasLinea}`;
         break;
       default:
         descripcionProducto = `${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") ? (prod.nombrePersonalizado || prod.tipo) : prod.tipo}${medidasLinea}`;
@@ -161,7 +162,8 @@ function generarTablaPrecios(cot) {
     if(prod.infoAdicional){
       const infoClean = String(prod.infoAdicional).trim();
       if(infoClean){
-        descripcionProducto += `<br />( ${infoClean.replace(/[<>]/g,'')} )`;
+  // Salto de línea garantizado separado de medidas/base
+  descripcionProducto += `<br />(${infoClean.replace(/[<>]/g,'')})`;
       }
     }
 
