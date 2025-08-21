@@ -158,6 +158,13 @@ function generarTablaPrecios(cot) {
         descripcionProducto = `${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") ? (prod.nombrePersonalizado || prod.tipo) : prod.tipo}${medidasLinea}`;
     }
 
+    if(prod.infoAdicional){
+      const infoClean = String(prod.infoAdicional).trim();
+      if(infoClean){
+        descripcionProducto += `<br />( ${infoClean.replace(/[<>]/g,'')} )`;
+      }
+    }
+
     html += `
       <tr style="font-weight: bold;">
         <td style="border: 1px solid #ccc; padding: 8px;">${descripcionProducto}</td>
