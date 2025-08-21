@@ -106,12 +106,32 @@ export default function HistorialPage() {
     const coincideCliente = filtroCliente ? nombreCliente === filtroCliente : true;
     const coincideProducto = filtroProducto ? nombreProducto === filtroProducto : true;
     const coincideEstado = filtroEstado ? c.estadoSeguimiento === filtroEstado : true;
-    const coincideNumero = filtroNumero
-      ? c.numero?.toString().toLowerCase().includes(filtroNumero.toLowerCase())
-      : true;
-    const coincideFecha = c.timestamp?.toDate
-      ? !startDate || !endDate || (c.timestamp.toDate() >= startDate && c.timestamp.toDate() <= endDate)
-      : true;
+
+    // Filtro número: si el input son solo dígitos -> coincidencia exacta; si no, substring
+    let coincideNumero = true;
+    if (filtroNumero) {
+      const valor = c.numero?.toString() || "";
+      if (/^\d+$/.test(filtroNumero.trim())) {
+        coincideNumero = valor === filtroNumero.trim();
+      } else {
+        coincideNumero = valor.toLowerCase().includes(filtroNumero.toLowerCase());
+      }
+    }
+
+    // Filtro fecha: normalizamos a día para evitar duplicados por hora y permitir un solo extremo
+    let coincideFecha = true;
+    if (startDate || endDate) {
+      const ts = c.timestamp?.toDate?.();
+      if (!ts) {
+        coincideFecha = false; // si no hay fecha y se aplica filtro, excluimos
+      } else {
+        const dia = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate()).getTime();
+        const min = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime() : -Infinity;
+        const max = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime() : Infinity;
+        coincideFecha = dia >= min && dia <= max;
+      }
+    }
+
     return coincideCliente && coincideProducto && coincideEstado && coincideNumero && coincideFecha;
   });
 
