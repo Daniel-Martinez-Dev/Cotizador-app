@@ -40,15 +40,17 @@ export default function HistorialPage() {
   useEffect(() => {
     (async () => {
       const snap = await getDocs(collection(db, "cotizaciones"));
-      const datos = snap.docs.map(d => {
+      const mapa = new Map();
+      snap.docs.forEach(d => {
         const data = d.data();
-        return {
+        mapa.set(d.id, {
           id: d.id,
-            ...data,
+          ...data,
           estadoSeguimiento: data.estadoSeguimiento || "COTIZACIÓN ENVIADA",
           estadoFecha: data.estadoFecha || data.estadoCambio || data.timestamp || null
-        };
+        });
       });
+      const datos = Array.from(mapa.values());
       setCotizaciones(datos);
       setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
       setProductosUnicos([
@@ -135,22 +137,52 @@ export default function HistorialPage() {
     return coincideCliente && coincideProducto && coincideEstado && coincideNumero && coincideFecha;
   });
 
+  // Deduplicar primero por id (seguridad ante renders inconsistentes)
+  const filtradasUnicas = Array.from(new Map(filtradas.map(c=> [c.id, c])).values());
+
+  // Deduplicar por numero (mantener la más reciente por timestamp)
+  const mapaNumero = new Map();
+  filtradasUnicas.forEach(c=>{
+    const existente = mapaNumero.get(c.numero);
+    if(!existente) mapaNumero.set(c.numero, c); else {
+      const tExist = existente.timestamp?.toDate?.()?.getTime?.() || 0;
+      const tNuevo = c.timestamp?.toDate?.()?.getTime?.() || 0;
+      if(tNuevo > tExist) mapaNumero.set(c.numero, c);
+    }
+  });
+  const sinDuplicados = Array.from(mapaNumero.values());
+
   // Orden
-  const ordenadas = [...filtradas].sort((a, b) => {
+  const ordenadas = [...sinDuplicados].sort((a, b) => {
+    const getFecha = (x) => {
+      const t = x.timestamp?.toDate?.();
+      const e = x.estadoFecha?.toDate?.();
+      return t || e || null;
+    };
     let aVal, bVal;
-    if (ordenarPor === "numero") {
+    if (ordenarPor === 'numero') {
       aVal = a.numero || 0;
       bVal = b.numero || 0;
-    } else if (ordenarPor === "total") {
+    } else if (ordenarPor === 'total') {
       aVal = a.total || 0;
       bVal = b.total || 0;
     } else { // fecha
-      aVal = a.timestamp?.toDate?.() || 0;
-      bVal = b.timestamp?.toDate?.() || 0;
+      const fa = getFecha(a);
+      const fb = getFecha(b);
+      if (!fa && !fb) { // fallback a numero para estabilidad
+        aVal = a.numero || 0;
+        bVal = b.numero || 0;
+      } else if (!fa) { // a sin fecha va al final en orden descendente
+        return ordenAscendente ? -1 : 1;
+      } else if (!fb) { // b sin fecha va al final
+        return ordenAscendente ? 1 : -1;
+      } else {
+        aVal = fa.getTime();
+        bVal = fb.getTime();
+      }
     }
     if (aVal === bVal) return 0;
-    if (ordenAscendente) return aVal > bVal ? 1 : -1;
-    return aVal < bVal ? 1 : -1;
+    return ordenAscendente ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
   });
 
   // Paginación
