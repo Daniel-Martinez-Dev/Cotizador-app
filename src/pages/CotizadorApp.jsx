@@ -294,40 +294,50 @@ export default function CotizadorApp(){
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 space-y-6">
           <div className="p-4 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm">
-            <h2 className="text-sm font-semibold mb-3 tracking-wide uppercase text-gray-600 dark:text-gray-300">Datos Cliente</h2>
-            <div className="grid md:grid-cols-6 gap-3 mb-4">
-              <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="text-[11px] font-medium">Nombre Empresa</label>
-                <input list="listaEmpresas" value={empresaNombreInput} onChange={e=>{ const val=e.target.value; setEmpresaNombreInput(val); const emp=empresas.find(em=> em.nombre.toLowerCase()===val.toLowerCase()); if(emp){ setEmpresaSeleccionada(emp); setEmpresaNITInput(emp.nit||''); setEmpresaCiudadInput(emp.ciudad||''); } else { setEmpresaSeleccionada(null);} }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Empresa (opcional)" />
-                <datalist id="listaEmpresas">{empresas.map(em=> <option key={em.id} value={em.nombre} />)}</datalist>
+            {/* Empresa */}
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Empresa</p>
+              <div className="grid md:grid-cols-4 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium">Nombre Empresa</label>
+                  <input list="listaEmpresas" value={empresaNombreInput} onChange={e=>{ const val=e.target.value; setEmpresaNombreInput(val); const emp=empresas.find(em=> em.nombre.toLowerCase()===val.toLowerCase()); if(emp){ setEmpresaSeleccionada(emp); setEmpresaNITInput(emp.nit||''); setEmpresaCiudadInput(emp.ciudad||''); } else { setEmpresaSeleccionada(null);} }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Empresa (opcional)" />
+                  <datalist id="listaEmpresas">{empresas.map(em=> <option key={em.id} value={em.nombre} />)}</datalist>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium">NIT</label>
+                  <input value={empresaNITInput} onChange={e=> setEmpresaNITInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="NIT" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium">Ciudad</label>
+                  <input value={empresaCiudadInput} onChange={e=> setEmpresaCiudadInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Ciudad" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium">Alias / Referencia</label>
+                  <input value={cliente} onChange={e=> setCliente(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Alias interno (opcional)" />
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium">NIT</label>
-                <input value={empresaNITInput} onChange={e=> setEmpresaNITInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="NIT" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium">Ciudad</label>
-                <input value={empresaCiudadInput} onChange={e=> setEmpresaCiudadInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Ciudad" />
-              </div>
-              <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="text-[11px] font-medium">Nombre Contacto *</label>
-                <input list="listaContactos" value={contactoNombreInput} onChange={e=>{ const val=e.target.value; setContactoNombreInput(val); if(empresaSeleccionada){ const cont=contactosEmpresa.find(c=> c.nombre.toLowerCase()===val.toLowerCase()); if(cont){ setContactoSeleccionado(cont); setContactoEmailInput(cont.email||''); setContactoTelInput(cont.telefono||''); } else { setContactoSeleccionado(null);} } }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Nombre Contacto" />
-                <datalist id="listaContactos">{contactosEmpresa.map(c=> <option key={c.id} value={c.nombre} />)}</datalist>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium">Email</label>
-                <input value={contactoEmailInput} onChange={e=> setContactoEmailInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="email@dominio" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium">Teléfono</label>
-                <input value={contactoTelInput} onChange={e=> setContactoTelInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Teléfono" />
-              </div>
-              <div className="flex flex-col gap-1 md:col-span-2">
-                <label className="text-[11px] font-medium">Alias / Referencia</label>
-                <input value={cliente} onChange={e=> setCliente(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Alias interno (opcional)" />
-              </div>
-              <div className="flex flex-col gap-1 justify-end">
-                <button type="button" onClick={async ()=>{ setCreandoEntidad(true); try { await ensureEmpresaContacto(); } catch(e){ /* handled */ } finally { setCreandoEntidad(false);} }} className="mt-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3 py-2 rounded disabled:opacity-60" disabled={creandoEntidad}>{creandoEntidad? 'Validando...':'Validar / Crear'}</button>
+            </div>
+            <hr className="my-2 border-dashed border-gray-300 dark:border-gris-700" />
+            {/* Contacto */}
+            <div className="mb-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Contacto</p>
+              <div className="grid md:grid-cols-6 gap-3 items-start">
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-[11px] font-medium">Nombre Contacto *</label>
+                  <input list="listaContactos" value={contactoNombreInput} onChange={e=>{ const val=e.target.value; setContactoNombreInput(val); if(empresaSeleccionada){ const cont=contactosEmpresa.find(c=> c.nombre.toLowerCase()===val.toLowerCase()); if(cont){ setContactoSeleccionado(cont); setContactoEmailInput(cont.email||''); setContactoTelInput(cont.telefono||''); } else { setContactoSeleccionado(null);} } }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Nombre Contacto" />
+                  <datalist id="listaContactos">{contactosEmpresa.map(c=> <option key={c.id} value={c.nombre} />)}</datalist>
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-3">
+                  <label className="text-[11px] font-medium">Email</label>
+                  <input value={contactoEmailInput} onChange={e=> setContactoEmailInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="email@dominio" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium">Teléfono</label>
+                  <input value={contactoTelInput} onChange={e=> setContactoTelInput(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Teléfono" />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <button type="button" onClick={async ()=>{ setCreandoEntidad(true); try { await ensureEmpresaContacto(); } catch(e){ /* handled */ } finally { setCreandoEntidad(false);} }} className="mt-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded disabled:opacity-60 w-full" disabled={creandoEntidad}>{creandoEntidad? 'Validando...':'Validar / Crear'}</button>
+                </div>
               </div>
             </div>
             <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">Puede existir contacto sin empresa; si ingresa empresa debe incluir contacto. *Contacto obligatorio para crear.</p>
