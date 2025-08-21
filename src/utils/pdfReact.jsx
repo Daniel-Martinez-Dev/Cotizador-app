@@ -307,9 +307,11 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
 export async function generarPDFReact(cotizacion, estaEditando) {
   let numeroCotizacion = cotizacion.numero;
 
-  if (!estaEditando) {
-    numeroCotizacion = await getNextQuoteNumber();
-
+  // Guardar solo si es nueva (no edición) y no tiene id existente
+  if (!estaEditando || !cotizacion.id) {
+    if(!estaEditando){
+      numeroCotizacion = await getNextQuoteNumber();
+    }
     try {
       await guardarCotizacionEnFirebase(cotizacion, numeroCotizacion);
       toast.success(`Cotización #${numeroCotizacion} guardada`);
@@ -342,7 +344,7 @@ export async function generarPDFReact(cotizacion, estaEditando) {
   const prodNorm = normalizarTitulo(primerProducto);
   const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
   const empresaNorm = normalizarTitulo(empresaBase);
-  const nombreArchivo = `CT${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
+  const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = nombreArchivo;
