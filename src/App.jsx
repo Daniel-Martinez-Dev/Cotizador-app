@@ -9,6 +9,8 @@ import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
 import { seedEmpresasYContactos } from './utils/seedData';
+// Carga catálogo central (side-effect) para futuras referencias globales
+import './data/catalogoProductos';
 import toast from 'react-hot-toast';
 
 function Layout() {

@@ -1,7 +1,8 @@
 // src/utils/htmlSections.js
 
 import { formatearPesos } from "./formatos";
-import { EXTRAS_POR_DEFECTO } from "../data/precios";
+import { EXTRAS_POR_DEFECTO } from "../data/precios"; // legacy fallback
+import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtrasPorTipo } from '../data/catalogoProductos';
 
 export function generarSeccionesHTML(cotizacion) {
   const descripcionHTML = generarDescripcion(cotizacion);
@@ -31,76 +32,15 @@ export function generarSeccionesHTML(cotizacion) {
 }
 
 function generarDescripcion(cot) {
-  switch (cot.productos[0].tipo) {
-    case "Divisiones Térmicas":
-      return `<p>Propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para control ambiental en áreas industriales. Fabricadas con materiales de alta calidad que garantizan durabilidad, fácil mantenimiento y eficiencia en el aislamiento térmico.</p>`;
-    case "Puertas Rápidas":
-      return `<p>Propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas, para mejorar la eficiencia operativa, reducir pérdida energética y facilitar el flujo logístico en áreas de alto tránsito.</p>`;
-    case "Abrigo Retráctil Estándar":
-      return `<p>Propuesta para la fabricación de abrigos aislantes con sistema retráctil y bandas de PVC de alta resistencia para muelles de carga, con el fin de minimizar pérdida de frío y proteger el ambiente interno.</p>`;
-    case "Abrigo Retráctil Inflable":
-      return `<p>Propuesta para suministro de abrigo inflable tipo burbuja para zonas de cargue, que ofrece máxima eficiencia de sellado mediante sistema neumático y lona resistente a condiciones extremas.</p>`;
-    case "Sello de Andén":
-      return `<p>Propuesta para fabricación de sello de andén, compuesto por cortina superior y postes laterales, que aseguran sellado térmico y protección en los puntos de cargue y descargue.</p>`;
-    default:
-      return "";
-  }
+  const tipo = cot.productos[0]?.tipo;
+  const descCatalogo = getDescripcionGeneral(tipo);
+  if(descCatalogo) return `<p>${descCatalogo}</p>`;
+  return "";
 }
 
 function generarEspecificaciones(cot) {
-  switch (cot.productos[0]?.tipo) {
-    case "Puertas Rápidas":
-      return `
-        <ul>
-          <li><strong>Motor:</strong> Servomotor 0.75 KW con control “American Power” y caja con sistema de apertura, cierre y parada de emergencia instalada internamente.</li>
-          <li><strong>Estructura:</strong> Autoportante en acero inoxidable.</li>
-          <li><strong>Lona:</strong> 900 g/m² en color azul, recubierta en PVC por ambas caras, impermeable, sellable, anti-UV, antifúngica, ignífuga y resistente a químicos.</li>
-          <li><strong>Cortina:</strong> Transparente de PVC, 1.5 mm de espesor, 60 cm de ancho.</li>
-          <li><strong>Cierre automático:</strong> Temporizador ajustable, hasta 2000 ciclos/día, velocidad ajustable de 0.6 m/s.</li>
-          <li><strong>Seguridad:</strong> Cortina óptica, airbag inferior, freno electrónico, encoder digital, radar y control remoto opcional.</li>
-          <li><strong>Fuente:</strong> 220V monofásica, transformador opcional si no está disponible. El incumplimiento de esta condición invalida la garantía.</li>
-        </ul>`;
-
-    case "Sello de Andén":
-      return `
-        <ul>
-          <li><strong>Componentes:</strong> Cortina superior, postes laterales, opción de travesaño horizontal.</li>
-          <li><strong>Materiales:</strong> Lona resistente, marco estructural reforzado.</li>
-          <li><strong>Medidas:</strong> Según rangos preestablecidos (ancho y alto).</li>
-          <li><strong>Instalación:</strong> Puede incluirse, se requiere superficie preparada.</li>
-          <li><strong>Adicionales:</strong> Topes en caucho opcionales, disponibles por par.</li>
-        </ul>`;
-
-    case "Abrigo Retráctil Estándar":
-      return `
-        <ul>
-          <li><strong>Estructura:</strong> Marco de acero con sistema retráctil manual de fácil operación.</li>
-          <li><strong>Bandas:</strong> PVC resistente con propiedades térmicas y antiviento.</li>
-          <li><strong>Fijación:</strong> Incluye anclajes y perfiles metálicos de soporte.</li>
-          <li><strong>Sellado:</strong> Cobertura frontal para evitar ingreso de calor o humedad en el punto de cargue.</li>
-        </ul>`;
-
-    case "Abrigo Retráctil Inflable":
-      return `
-        <ul>
-          <li><strong>Tipo:</strong> Inflable tipo burbuja, 3400 x 3400 mm.</li>
-          <li><strong>Funcionamiento:</strong> Sistema neumático que infla las cámaras laterales para sellado hermético del andén.</li>
-          <li><strong>Material:</strong> Lona en PVC de alta resistencia con recubrimiento antiflama y protección UV.</li>
-          <li><strong>Extras:</strong> Opción de almohadillas, topes en caucho y servicio de instalación en Bogotá.</li>
-        </ul>`;
-
-    case "Divisiones Térmicas":
-      return `
-        <ul>
-          <li><strong>Material:</strong> Cortinas de PVC flexibles de alta resistencia.</li>
-          <li><strong>Diseño:</strong> Modular, ajustable a diferentes medidas.</li>
-          <li><strong>Instalación:</strong> Fácil montaje con guías superiores y refuerzo lateral.</li>
-          <li><strong>Aplicaciones:</strong> Separación de ambientes, control térmico y reducción de partículas.</li>
-        </ul>`;
-
-    default:
-      return `<p>No se han definido especificaciones técnicas para este producto.</p>`;
-  }
+  const tipo = cot.productos[0]?.tipo;
+  return getEspecificacionesHTML(tipo);
 }
 
 function generarTablaPrecios(cot) {
@@ -138,25 +78,10 @@ function generarTablaPrecios(cot) {
         medidasLinea = `<br />${altoVal}mm alto.`;
       }
     }
-    switch (prod.tipo) {
-      case "Puertas Rápidas":
-  // Nueva redacción solicitada
-  descripcionProducto = `PUERTA RÁPIDA ENROLLABLE PARA VANO DE${medidasLinea}`;
-        break;
-      case "Divisiones Térmicas":
-  descripcionProducto = `DIVISIÓN TÉRMICA O MAMPARA PARA VEHÍCULO CON MEDIDAS INTERNAS DE${medidasLinea}`;
-        break;
-      case "Abrigo Retráctil Estándar":
-        descripcionProducto = `Abrigo Retráctil para muelle de carga${medidasLinea}`;
-        break;
-      case "Abrigo Retráctil Inflable":
-        descripcionProducto = `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`;
-        break;
-      case "Sello de Andén":
-  descripcionProducto = `SELLO DE ANDÉN PARA MUELLE DE CARGA CON MEDIDAS DE${medidasLinea}`;
-        break;
-      default:
-        descripcionProducto = `${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") ? (prod.nombrePersonalizado || prod.tipo) : prod.tipo}${medidasLinea}`;
+    // Usar catálogo central para línea base; fallback mantiene lógica personalizada
+    descripcionProducto = getLineaTabla(prod, medidasLinea);
+    if(!descripcionProducto){
+      descripcionProducto = `${(prod.tipo === "Productos Personalizados" || prod.tipo === "Repuestos") ? (prod.nombrePersonalizado || prod.tipo) : prod.tipo}${medidasLinea}`;
     }
 
     if(prod.infoAdicional){
@@ -189,8 +114,8 @@ function generarTablaPrecios(cot) {
       `;
     }
 
-    // === Extras por defecto ===
-    const listaExtras = EXTRAS_POR_DEFECTO[prod.tipo] || [];
+  // === Extras por defecto ===
+  const listaExtras = getExtrasPorTipo(prod.tipo) || EXTRAS_POR_DEFECTO[prod.tipo] || [];
     if (Array.isArray(prod.extras)) {
       prod.extras.forEach((nombreExtra) => {
         const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
@@ -216,6 +141,24 @@ function generarTablaPrecios(cot) {
           }
         }
       });
+    }
+
+    // Extra automático para Cortina Thermofilm: MAX BULLET
+    if(prod.tipo === 'Cortina Thermofilm' && prod.ancho){
+      const anchoM = parseFloat(prod.ancho)/1000;
+      const altoM = parseFloat(prod.alto)/1000;
+      if(!isNaN(anchoM)){
+        const bullets = ((anchoM + 0.10) / 0.6); // valor decimal exacto
+        const precioUnitBullet = 35000;
+        const totalBullets = precioUnitBullet * bullets;
+        html += `
+          <tr style="background-color:#f9f9f9;">
+            <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ MAX BULLET PLÁSTICO PARA MONTAJE (60cm de largo)</td>
+            <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${bullets.toFixed(2)}</td>
+            <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioUnitBullet)}</td>
+            <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalBullets)}</td>
+          </tr>`;
+      }
     }
 
     // === Extras personalizados ===
