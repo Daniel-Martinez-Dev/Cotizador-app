@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { priceMatrices, CLIENTE_FACTORES, EXTRAS_POR_DEFECTO, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana } from '../data/precios';
+import { getPrecioProducto, getExtrasPorTipo, validarRangoProducto, getConfigProducto } from '../data/catalogoProductos';
+import { PRODUCTOS_ACTIVOS } from '../data/catalogoProductos';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, crearContacto, buscarContactoPorEmail } from '../utils/firebaseCompanies';
 import toast from 'react-hot-toast';
@@ -34,7 +36,8 @@ const crearProductoInicial = () => ({
   mostrarAlerta: false,
   precioEditado: '',
   ajusteTipo: 'Incremento',
-  ajusteValor: 0
+  ajusteValor: 0,
+  conInstalacion: true, // para Cortina Thermofilm
 });
 
 export default function CotizadorApp(){
@@ -98,7 +101,7 @@ export default function CotizadorApp(){
   // Sincronizar collapsed
   useEffect(()=>{ setCollapsed(prev=> productos.map((_,i)=> prev[i]??false)); }, [productos.length]);
   // Alertas rango
-  useEffect(()=>{ const nuevas=productos.map(p=>{ const {tipo, ancho, alto, cliente}=p; if(!ancho||!alto) return false; if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){ return buscarPrecio(matrizPanamericana,parseInt(ancho),parseInt(alto)).fueraDeRango; } if(tipo==='Sello de Andén') return false; const matriz=(matricesOverride&&matricesOverride[tipo])||priceMatrices[tipo]; if(!matriz) return false; if(tipo==='Abrigo Retráctil Estándar') return buscarPrecioAbrigo(matriz,parseInt(ancho),parseInt(alto)).fueraDeRango; return buscarPrecio(matriz,parseInt(ancho),parseInt(alto)).fueraDeRango; }); setAlertas(nuevas); }, [productos, matricesOverride]);
+  useEffect(()=>{ const nuevas=productos.map(p=> validarRangoProducto(p,{ matricesOverride })); setAlertas(nuevas); }, [productos, matricesOverride]);
 
   const handleAgregarProducto = ()=>{ setProductos(p=> [...p, crearProductoInicial()]); setAlertas(a=> [...a,false]); };
   const handleEliminarProducto = (i)=>{ setProductos(p=> p.filter((_,idx)=> idx!==i)); setAlertas(a=> a.filter((_,idx)=> idx!==i)); };
@@ -141,9 +144,8 @@ export default function CotizadorApp(){
   const handleChangeCantidadExtraPersonalizado = (ip, idx,val)=> setProductos(p=>{ const n=[...p]; n[ip].extrasPersonalizadosCant={...(n[ip].extrasPersonalizadosCant||{}), [idx]:val}; return n;});
 
   // Precios
-  const calcularPrecioSellos = (producto)=>{ const {ancho, alto, componentes=[], cliente}=producto; if(!ancho||!alto) return 0; const matriz=priceMatrices['Sello de Andén']; const ra=getRangoIndex(matriz.medidaRanges, parseInt(ancho)); const rh=getRangoIndex(matriz.medidaRanges, parseInt(alto)); const precios=matriz.base; let total=0; if(componentes.includes('sello completo')) total=precios.completos[rh]||0; else { if(componentes.includes('cortina')) total+=precios.cortina[ra]||0; if(componentes.includes('postes laterales')) total+=precios.postes[rh]||0; if(componentes.includes('travesaño')) total+=precios.travesano[rh]||0; } const factor=CLIENTE_FACTORES[cliente]||1; return redondear5000(Math.round(total*factor)); };
-  const calcularPrecio = (p,i)=>{ const {tipo, ancho, alto, cliente, precioManual, precioEditado, ajusteTipo, ajusteValor}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); if(!ancho||!alto) return 0; let precio=0; let fuera=false; if(tipo==='Sello de Andén'){ precio=calcularPrecioSellos(p); } else if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){ const r=buscarPrecio(matrizPanamericana, parseInt(ancho), parseInt(alto)); precio=redondear5000(r.precio); fuera=r.fueraDeRango; } else if(tipo==='Abrigo Retráctil Estándar'){ const matriz=(matricesOverride&&matricesOverride[tipo])||priceMatrices[tipo]; const r=buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto)); precio=redondear5000(r.precio); fuera=r.fueraDeRango; } else { const matriz=priceMatrices[tipo]; if(!matriz) return 0; const r=buscarPrecio(matriz, parseInt(ancho), parseInt(alto)); precio=redondear5000(r.precio*(CLIENTE_FACTORES[cliente]||1)); fuera=r.fueraDeRango; } if(fuera) return 0; let final=precio; final=aplicarAjuste(final, ajusteTipo, parseFloat(ajusteValor)); return redondear5000(final); };
-  const calcularSubtotalExtras = (p)=>{ const {tipo, cliente, extras=[], extrasCantidades={}, extrasPersonalizados=[], extrasPersonalizadosCant={}}=p; let subtotal=0; const lista=(extrasOverride&&extrasOverride[tipo])||EXTRAS_POR_DEFECTO[tipo]||[]; for(const nombre of extras){ const ex=lista.find(e=> e.nombre===nombre); if(ex){ const cant=parseInt(extrasCantidades[nombre])||1; subtotal += cant * (ex.precioDistribuidor || ex.precioCliente ? (cliente==='Distribuidor' ? (ex.precioDistribuidor||0) : (ex.precioCliente||0)) : (ex.precio||0)); } } for(const idx in extrasPersonalizados){ const ex=extrasPersonalizados[idx]; const cant=parseInt(extrasPersonalizadosCant[idx])||1; subtotal += cant*(ex.precio||0);} return redondear5000(subtotal); };
+  const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); const r=getPrecioProducto(p,{ matricesOverride }); return r.ajustado; };
+  const calcularSubtotalExtras = (p)=>{ const {tipo, cliente, extras=[], extrasCantidades={}, extrasPersonalizados=[], extrasPersonalizadosCant={}}=p; let subtotal=0; const lista=getExtrasPorTipo(tipo, extrasOverride); for(const nombre of extras){ const ex=lista.find(e=> e.nombre===nombre); if(ex){ const cant=parseInt(extrasCantidades[nombre])||1; subtotal += cant * (ex.precioDistribuidor || ex.precioCliente ? (cliente==='Distribuidor' ? (ex.precioDistribuidor||0) : (ex.precioCliente||0)) : (ex.precio||0)); } } for(const idx in extrasPersonalizados){ const ex=extrasPersonalizados[idx]; const cant=parseInt(extrasPersonalizadosCant[idx])||1; subtotal += cant*(ex.precio||0);} return redondear5000(subtotal); };
 
   // Estados para entradas libres (combobox)
   const [empresaNombreInput, setEmpresaNombreInput] = useState('');
@@ -378,7 +380,7 @@ export default function CotizadorApp(){
                       <div className="space-y-2">
                         <label className="block text-xs font-semibold tracking-wide uppercase">Producto</label>
                         <select value={producto.tipo} onChange={e=> handleChangeProducto(i,'tipo', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
-                          {[...Object.keys(priceMatrices), 'Productos Personalizados', 'Repuestos'].map(t=> <option key={t} value={t}>{t}</option>)}
+                          {[...PRODUCTOS_ACTIVOS, 'Productos Personalizados', 'Repuestos'].map(t=> <option key={t} value={t}>{t}</option>)}
                         </select>
                         {(producto.tipo==='Productos Personalizados'||producto.tipo==='Repuestos') && <p className="text-[11px] text-yellow-600 dark:text-trafico mt-1">Sin precio automático. Ingrese precio manual.</p>}
                         {(producto.tipo==='Productos Personalizados'||producto.tipo==='Repuestos') && (
@@ -391,8 +393,34 @@ export default function CotizadorApp(){
                           {Object.keys(CLIENTE_FACTORES).concat(producto.tipo==='Divisiones Térmicas' ? ['Carrocerías Panamericana']:[]).map(t=> <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
-                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ancho (mm)</label><input type="number" value={producto.ancho} onChange={e=> handleChangeProducto(i,'ancho', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Ancho" /></div>
-                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Alto (mm)</label><input type="number" value={producto.alto} onChange={e=> handleChangeProducto(i,'alto', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Alto" /></div>
+                      {getConfigProducto(producto.tipo)?.requiereMedidas && (
+                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ancho (mm)</label><input type="number" value={producto.ancho} onChange={e=> handleChangeProducto(i,'ancho', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Ancho" /></div>
+                      )}
+                      {getConfigProducto(producto.tipo)?.requiereMedidas && (
+                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Alto (mm)</label><input type="number" value={producto.alto} onChange={e=> handleChangeProducto(i,'alto', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Alto" /></div>
+                      )}
+                      {producto.tipo === 'Semáforo para Muelles de Carga' && (
+                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Variante</label>
+                          <select value={producto.varianteSemaforo||'sencillo'} onChange={e=> handleChangeProducto(i,'varianteSemaforo', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
+                            <option value="sencillo">Semáforo Sencillo (1 semáforo)</option>
+                            <option value="doble">Semáforo Doble (2 semáforos)</option>
+                            <option value="doble_sensor">Semáforo Doble con Sensor</option>
+                          </select>
+                        </div>
+                      )}
+                      {producto.tipo === 'Lámpara Industrial' && (
+                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Modelo</label>
+                          <input disabled value="LED 50W" className="w-full border p-2 rounded bg-gray-100 dark:bg-gris-800 dark:border-gris-700 text-gray-600 dark:text-gray-400" />
+                        </div>
+                      )}
+                      {producto.tipo === 'Cortina Thermofilm' && (
+                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Instalación</label>
+                          <select value={producto.conInstalacion? 'si':'no'} onChange={e=> handleChangeProducto(i,'conInstalacion', e.target.value==='si')} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
+                            <option value="si">Con instalación (180.000 / m²)</option>
+                            <option value="no">Sin instalación (175.000 / m²)</option>
+                          </select>
+                        </div>
+                      )}
                       <div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Información Adicional</label><input type="text" value={producto.infoAdicional||''} onChange={e=> handleChangeProducto(i,'infoAdicional', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="(Ej: Muelle 3, Placa 5, Zona Fría)" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>
