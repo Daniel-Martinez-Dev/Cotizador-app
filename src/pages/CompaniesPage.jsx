@@ -4,6 +4,7 @@ import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, crearEmpresa, actualizarEmpresa, eliminarEmpresa, crearContacto, actualizarContacto, eliminarContacto, obtenerEmpresaPorNIT, buscarContactoPorEmail } from '../utils/firebaseCompanies';
 import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaBuilding, FaUser, FaSync } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+import { waitForAuth, getAuthError } from '../firebase';
 
 export default function CompaniesPage(){
   const { empresas, setEmpresas, setEmpresaSeleccionada, setContactoSeleccionado, confirm } = useQuote();
@@ -26,7 +27,17 @@ export default function CompaniesPage(){
 
   async function cargarEmpresas(){
     setCargando(true);
-    try { const lista = await listarEmpresas(); setEmpresas(lista); } catch(e){ console.error(e); toast.error('Error cargando empresas'); } finally { setCargando(false); }
+    try {
+      await waitForAuth();
+      const err = getAuthError();
+      if (err === 'auth/configuration-not-found' || err === 'auth/operation-not-allowed') {
+        console.error('Anonymous Auth no está habilitada en Firebase.');
+        setCargando(false);
+        return;
+      }
+      const lista = await listarEmpresas();
+      setEmpresas(lista);
+    } catch(e){ console.error(e); toast.error('Error cargando empresas'); } finally { setCargando(false); }
   }
 
   async function toggleContactos(empresa){

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { collection, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, waitForAuth, getAuthError } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
 import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye, FaRegCommentDots } from "react-icons/fa";
@@ -9,6 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 
 export default function HistorialPage() {
   const [cotizaciones, setCotizaciones] = useState([]);
+  const [permisoError, setPermisoError] = useState("");
   const [clientesUnicos, setClientesUnicos] = useState([]);
   const [productosUnicos, setProductosUnicos] = useState([]);
 
@@ -39,29 +40,40 @@ export default function HistorialPage() {
   // Fetch inicial
   useEffect(() => {
     (async () => {
-      const snap = await getDocs(collection(db, "cotizaciones"));
-      const mapa = new Map();
-      snap.docs.forEach(d => {
-        const data = d.data();
-        mapa.set(d.id, {
-          id: d.id,
-          ...data,
-          estadoSeguimiento: data.estadoSeguimiento || "COTIZACIÓN ENVIADA",
-          estadoFecha: data.estadoFecha || data.estadoCambio || data.timestamp || null
+      // Esperar autenticación (anónima o la que sea) antes de leer
+      try { await waitForAuth(); } catch(_) {}
+      const authErr = getAuthError();
+      if (authErr === 'auth/configuration-not-found' || authErr === 'auth/operation-not-allowed') {
+        setPermisoError('La autenticación anónima no está habilitada en Firebase. Actívala en Authentication > Sign-in method o inicia sesión con otro proveedor.');
+      }
+      try {
+        const snap = await getDocs(collection(db, "cotizaciones"));
+        const mapa = new Map();
+        snap.docs.forEach(d => {
+          const data = d.data();
+          mapa.set(d.id, {
+            id: d.id,
+            ...data,
+            estadoSeguimiento: data.estadoSeguimiento || "COTIZACIÓN ENVIADA",
+            estadoFecha: data.estadoFecha || data.estadoCambio || data.timestamp || null
+          });
         });
-      });
-      const datos = Array.from(mapa.values());
-      setCotizaciones(datos);
-      setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
-      setProductosUnicos([
-        ...new Set(
-          datos
-            .map(c => c.productos?.[0])
-            .filter(Boolean)
-            .map(p => p.nombrePersonalizado || p.tipo || "")
-            .filter(Boolean)
-        )
-      ].sort());
+        const datos = Array.from(mapa.values());
+        setCotizaciones(datos);
+        setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
+        setProductosUnicos([
+          ...new Set(
+            datos
+              .map(c => c.productos?.[0])
+              .filter(Boolean)
+              .map(p => p.nombrePersonalizado || p.tipo || "")
+              .filter(Boolean)
+          )
+        ].sort());
+      } catch (e) {
+        console.error('Error cargando cotizaciones', e);
+        setPermisoError('No se pudo leer Firestore: permisos insuficientes. Verifica las reglas o habilita autenticación.');
+      }
     })();
   }, []);
 
@@ -259,6 +271,11 @@ export default function HistorialPage() {
 
   return (
   <div className="max-w-7xl mx-auto p-6 bg-white dark:bg-gris-900 shadow rounded">      
+      {permisoError && (
+        <div className="mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-700 text-xs">
+          {permisoError}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
           <button onClick={() => navigate('/')} className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700">← Volver</button>

@@ -5,6 +5,7 @@ import { getPrecioProducto, getExtrasPorTipo, validarRangoProducto, getConfigPro
 import { PRODUCTOS_ACTIVOS } from '../data/catalogoProductos';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, crearContacto, buscarContactoPorEmail } from '../utils/firebaseCompanies';
+import { waitForAuth, getAuthError } from '../firebase';
 import toast from 'react-hot-toast';
 
 // Utilidades
@@ -56,10 +57,10 @@ export default function CotizadorApp(){
   const [collapsed, setCollapsed] = useState([]);
 
   // Cargar empresas (nuevo modelo)
-  useEffect(()=>{ (async()=>{ try { if(!empresas || empresas.length===0){ const le = await listarEmpresas(); setEmpresas(le); } } catch(e){ console.error(e); } })(); }, []);
+  useEffect(()=>{ (async()=>{ try { await waitForAuth(); const err = getAuthError(); if(err==='auth/configuration-not-found' || err==='auth/operation-not-allowed'){ console.error('Anonymous Auth no está habilitada en Firebase.'); return; } if(!empresas || empresas.length===0){ const le = await listarEmpresas(); setEmpresas(le); } } catch(e){ console.error(e); } })(); }, []);
   // Al seleccionar empresa cargar contactos
   const [contactosEmpresa, setContactosEmpresa] = useState([]);
-  useEffect(()=>{ (async()=>{ if(empresaSeleccionada){ try { const lc = await listarContactos(empresaSeleccionada.id); setContactosEmpresa(lc);} catch(e){ console.error(e);} } else { setContactosEmpresa([]); setContactoSeleccionado(null);} })(); }, [empresaSeleccionada]);
+  useEffect(()=>{ (async()=>{ if(empresaSeleccionada){ try { await waitForAuth(); const lc = await listarContactos(empresaSeleccionada.id); setContactosEmpresa(lc);} catch(e){ console.error(e);} } else { setContactosEmpresa([]); setContactoSeleccionado(null);} })(); }, [empresaSeleccionada]);
   // Sincronizar nombre cliente mostrado con empresa/contacto/legacy
   useEffect(()=>{ if(empresaSeleccionada){ setCliente(empresaSeleccionada.nombre||''); } }, [empresaSeleccionada]);
   // Edición
