@@ -18,14 +18,23 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
     requiereMedidas: true,
     extrasKey: 'Divisiones Térmicas',
-    descripcionGeneral: 'Propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para control ambiental y logística en vehículos o áreas industriales, utilizando materiales de alta durabilidad y fácil mantenimiento.',
-    lineaTabla: (p, medidasLinea) => `DIVISIÓN TÉRMICA PARA VEHÍCULO CON MEDIDAS INTERNAS DE${medidasLinea}`,
+    descripcionGeneral: 'Propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para optimizar el aislamiento en vehículos de transporte refrigerado. Permiten transportar productos a diferentes temperaturas y separar cargas para evitar contaminación cruzada.',
+    lineaTabla: (p, medidasLinea) => `DIVISIÓN TÉRMICA PARA VEHÍCULO CON MEDIDAS INTERNAS DE ${medidasLinea}`,
     especificacionesHTML: `
+      <p>Las divisiones térmicas de <strong>Cold Chain Services</strong> están diseñadas para mejorar la eficiencia térmica en vehículos de transporte refrigerado, garantizando el control de temperatura y la conservación de los productos.</p>
       <ul>
-        <li><strong>Material:</strong> Cortinas de PVC flexibles de alta resistencia.</li>
-        <li><strong>Diseño:</strong> Modular, ajustable a diferentes medidas.</li>
-        <li><strong>Instalación:</strong> Fácil montaje con guías superiores y refuerzo lateral.</li>
-        <li><strong>Aplicaciones:</strong> Separación de ambientes, control térmico y reducción de partículas.</li>
+        <li><strong>Aislantes térmicos:</strong> Núcleo en poliuretano, poliestireno extruido y/o polietileno expandido, seleccionados según el nivel de aislamiento requerido.</li>
+        <li><strong>Cubierta exterior:</strong> Lona en PVC de 700 gr/m², impermeable, resistente a rayos UV y de fácil limpieza.</li>
+        <li><strong>Protección inferior:</strong> Lámina plástica antifricción de 3 mm que protege la base y facilita el desplazamiento de mercancías.</li>
+        <li><strong>Sistemas de fijación:</strong> Reatas de nylon tipo militar de alta resistencia y tornillería con tuercas de seguridad.</li>
+        <li><strong>Estructura interna:</strong> Materiales de soporte livianos que facilitan la manipulación sin comprometer la resistencia.</li>
+      </ul>
+      <p><strong>Beneficios:</strong></p>
+      <ul>
+        <li>Separación efectiva de zonas frías y templadas dentro del vehículo.</li>
+        <li>Reducción de pérdida de frío y consumo energético del sistema de refrigeración.</li>
+        <li>Prevención de mezcla de olores entre diferentes tipos de carga.</li>
+        <li>Diseño ergonómico y de bajo peso para fácil manipulación por parte del operario.</li>
       </ul>`
   },
   'Puertas Rápidas': {
@@ -35,15 +44,46 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas para mejorar eficiencia operativa, reducir pérdida energética y facilitar el flujo logístico.',
     lineaTabla: (p, medidasLinea) => `PUERTA RÁPIDA PARA VANO DE${medidasLinea}`,
     especificacionesHTML: `
+      <div>
+        <h4>Motorización y control</h4>
         <ul>
-          <li><strong>Motor:</strong> Servomotor 0.75 KW con control “American Power”.</li>
-          <li><strong>Estructura:</strong> Autoportante en acero inoxidable.</li>
-          <li><strong>Lona:</strong> 900 g/m² PVC azul, anti-UV, antifúngica, ignífuga.</li>
-          <li><strong>Cortina transparente:</strong> PVC 1.5 mm, 60 cm ancho.</li>
-          <li><strong>Ciclos:</strong> Hasta 2000 ciclos/día, velocidad hasta 0.6 m/s.</li>
-          <li><strong>Seguridad:</strong> Cortina óptica, airbag inferior, freno electrónico.</li>
-          <li><strong>Alimentación:</strong> 220V monofásica estable (requisito de garantía).</li>
-        </ul>`
+          <li>Servomotor de <strong>1,5 kW</strong> con control <strong>“American Power”</strong> (o equivalente). Caja de control con <strong>apertura, cierre y paro de emergencia</strong>, instalada al interior de la puerta.</li>
+          <li><strong>Freno electrónico</strong> incorporado.</li>
+          <li><strong>Encoder digital</strong> para posicionamiento preciso.</li>
+          <li><strong>Cierre automático</strong> con temporizador <strong>ajustable</strong>.</li>
+          <li>Sistema de control <strong>preajustado y probado en fábrica</strong>; en sitio solo se configuran <strong>sentido de giro</strong> y <strong>finales de carrera</strong>. Motor y encoder con <strong>terminales de seguridad tipo militar</strong>.</li>
+        </ul>
+        <h4>Estructura y cortina</h4>
+        <ul>
+          <li><strong>Estructura autoportante</strong> en <strong>acero inoxidable</strong>.</li>
+          <li><strong>Cubre-rollo</strong> y <strong>guarda de motor</strong> en acero inoxidable.</li>
+          <li><strong>Lona PVC 900 g/m²</strong> color azul, doble cara con resina plástica, que garantiza <strong>impermeabilidad</strong>, <strong>sellabilidad</strong>, <strong>resistencia UV</strong>, <strong>protección biocida</strong> anti-hongos, propiedad <strong>ignífuga</strong> (retarda la propagación del fuego) y <strong>resistencia a agentes químicos</strong>.</li>
+          <li><strong>Franja transparente</strong> en PVC <strong>1,5 mm</strong> de espesor x <strong>60 cm</strong> de ancho para visibilidad.</li>
+          <li><strong>Cortaviento de aluminio</strong> que une los paños de lona (reparación simple: se reemplaza solo el tramo afectado).</li>
+        </ul>
+        <h4>Seguridad y operación</h4>
+        <ul>
+          <li><strong>Cortina óptica (barrera fotoeléctrica)</strong> en un costado para detección de presencia en el paso de la puerta. <em>(Si se requiere en ambos lados, adicionar <strong>$1’100.000 + IVA</strong>.)</em></li>
+          <li><strong>Sistema “airbag” en zócalo</strong>: ante impacto en la parte baja, se acciona y restituye la cortina.</li>
+          <li><strong>Radar de apertura</strong> en un costado. <em>(Si se requiere en ambos lados, adicionar <strong>$250.000 + IVA</strong>.)</em></li>
+          <li><strong>Velocidad de operación ajustable:</strong> <strong>0,6 m/s</strong>.</li>
+          <li><strong>Capacidad de servicio:</strong> hasta <strong>2.000 ciclos/día</strong>.</li>
+        </ul>
+        <h4>Accesorios y opciones</h4>
+        <ul>
+          <li><strong>Control remoto</strong> para operación (opcional).</li>
+          <li><strong>Transformador</strong> de <strong>220 V bifásica a 220 V monofásica</strong> (opcional): <strong>$480.000 + IVA</strong>. Opción con <strong>caja metálica</strong> para almacenamiento: <strong>$580.000 + IVA</strong>.</li>
+          <li><strong>UPS 3 kVA</strong> para operación temporal ante fallas de energía (opcional): <strong>$1.400.000 + IVA</strong>.</li>
+        </ul>
+        <h4>Requisitos eléctricos</h4>
+        <ul>
+          <li><strong>Alimentación requerida:</strong> <strong>220 V monofásica</strong> (línea de 220 V de sistema 440 V, <strong>neutro</strong> y <strong>tierra</strong>). Si no se dispone de este tipo de energía, se sugiere instalar el <strong>transformador</strong> indicado.</li>
+        </ul>
+        <h4>Condiciones de garantía</h4>
+        <ul>
+          <li>La instalación debe cumplir <strong>estrictamente</strong> las condiciones de alimentación descritas. En caso de no cumplirlas al momento de la instalación, <strong>la garantía queda sin efecto</strong> y la puesta en marcha se realiza <strong>bajo exclusiva responsabilidad del cliente</strong>.</li>
+        </ul>
+      </div>`
   },
   'Abrigo Retráctil Estándar': {
     tipoCalculo: 'matriz',
