@@ -96,15 +96,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: T.font.h2,
     color: T.colors.headerBg,
-  marginTop: T.spacing.xs,
-  marginBottom: 3,
+    marginTop: 2,
+    marginBottom: 2,
     borderBottomWidth: 1,
     borderBottomColor: T.colors.sectionDivider,
-    paddingBottom: 2,
+    paddingBottom: 1,
     fontWeight: 'bold'
   },
   htmlContent: {
-    marginBottom: T.spacing.xs,
+  marginBottom: T.spacing.xs,
+  paddingRight: 8,
+  },
+  htmlContentCompact: {
+  marginBottom: T.spacing.xs,
+  paddingRight: 8,
+    fontSize: Math.max(9, (T.font?.base || 12) - 1),
+    lineHeight: 1.2,
   },
   flexGrowContent: {
     flexGrow: 1,
@@ -121,12 +128,15 @@ const styles = StyleSheet.create({
   leftPadded: { paddingLeft: 18 },
 });
 
-function SeccionHTML({ titulo, contenido }) {
+function SeccionHTML({ titulo, contenido, compact = false, dense = false }) {
   return (
     <View>
-      <Text style={styles.sectionTitle}>{titulo}</Text>
-      <View style={styles.htmlContent}>
-        {parseHtmlToPDFComponents(contenido)}
+      <Text style={{
+        ...styles.sectionTitle,
+        ...(compact ? { marginTop: 4, marginBottom: 2, paddingBottom: 1 } : null)
+      }}>{titulo}</Text>
+      <View style={compact ? styles.htmlContentCompact : styles.htmlContent}>
+  {parseHtmlToPDFComponents(contenido, { compact, dense })}
       </View>
     </View>
   );
@@ -150,6 +160,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   const producto = productos?.[0];
   const tipoProducto = producto?.tipo?.toUpperCase?.() || "PRODUCTO";
   const fecha = new Date().toLocaleDateString("es-CO");
+  const isPuertasRapidas = (producto?.tipo === 'Puertas Rápidas');
 
   const {
     descripcionHTML = "",
@@ -215,9 +226,9 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
           )}
         </View>
         <View style={styles.flexGrowContent}>
-          <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} />
-          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} />
-          {(imagenSeleccionada || imagenesMulti.length > 0) && (() => {
+          <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} compact dense />
+          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} compact dense />
+          {(imagenSeleccionada || imagenesMulti.length > 0) && !isPuertasRapidas && (() => {
             const extras = imagenesMulti.slice(0,2);
             const total = (imagenSeleccionada ? 1 : 0) + extras.length;
             // calcular width por imagen
@@ -268,9 +279,34 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
           </View>
         </View>
         <View style={styles.flexGrowContent}>
+          {isPuertasRapidas && (imagenSeleccionada || imagenesMulti.length > 0) && (() => {
+            const extras = imagenesMulti.slice(0,2);
+            const total = (imagenSeleccionada ? 1 : 0) + extras.length;
+            let widthPct;
+            if (total === 1) widthPct = '100%';
+            else if (total === 2) widthPct = '48%';
+            else widthPct = '32%';
+            return (
+              <>
+                <Text style={styles.sectionTitle}>Imágenes de Referencia</Text>
+                <View style={{ flexDirection:'row', flexWrap:'wrap', justifyContent: total === 2 ? 'center' : 'space-between' }}>
+                  {imagenSeleccionada && (
+                    <View style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
+                      <Image src={imagenSeleccionada} style={{ width:'100%', height:165, objectFit:'contain' }} />
+                    </View>
+                  )}
+                  {extras.map((imgSrc, idx) => (
+                    <View key={idx} style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
+                      <Image src={imgSrc} style={{ width:'100%', height:165, objectFit:'contain' }} />
+                    </View>
+                  ))}
+                </View>
+              </>
+            );
+          })()}
           <Text style={styles.sectionTitle}>Detalle de Precios</Text>
           {convertirTablaHTMLaComponentes(tablaHTML, { summaryPanel: true, zebra: true, currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true } })}
-          <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} />
+          <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} compact dense />
         </View>
         <Text style={styles.footer} fixed>{footerContent}</Text>
       </Page>
@@ -296,7 +332,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
           </View>
         </View>
         <View style={styles.flexGrowContent}>
-          <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} />
+          <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} compact dense />
         </View>
         <Text style={styles.footer} fixed>{footerContent}</Text>
       </Page>
