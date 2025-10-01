@@ -21,21 +21,27 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para optimizar el aislamiento en vehículos de transporte refrigerado. Permiten transportar productos a diferentes temperaturas y separar cargas para evitar contaminación cruzada.',
     lineaTabla: (p, medidasLinea) => `DIVISIÓN TÉRMICA PARA VEHÍCULO CON MEDIDAS INTERNAS DE ${medidasLinea}`,
     especificacionesHTML: `
-      <p>Las divisiones térmicas de <strong>Cold Chain Services</strong> están diseñadas para mejorar la eficiencia térmica en vehículos de transporte refrigerado, garantizando el control de temperatura y la conservación de los productos.</p>
-      <ul>
-        <li><strong>Aislantes térmicos:</strong> Núcleo en poliuretano, poliestireno extruido y/o polietileno expandido, seleccionados según el nivel de aislamiento requerido.</li>
-        <li><strong>Cubierta exterior:</strong> Lona en PVC de 700 gr/m², impermeable, resistente a rayos UV y de fácil limpieza.</li>
-        <li><strong>Protección inferior:</strong> Lámina plástica antifricción de 3 mm que protege la base y facilita el desplazamiento de mercancías.</li>
-        <li><strong>Sistemas de fijación:</strong> Reatas de nylon tipo militar de alta resistencia y tornillería con tuercas de seguridad.</li>
-        <li><strong>Estructura interna:</strong> Materiales de soporte livianos que facilitan la manipulación sin comprometer la resistencia.</li>
-      </ul>
-      <p><strong>Beneficios:</strong></p>
-      <ul>
-        <li>Separación efectiva de zonas frías y templadas dentro del vehículo.</li>
-        <li>Reducción de pérdida de frío y consumo energético del sistema de refrigeración.</li>
-        <li>Prevención de mezcla de olores entre diferentes tipos de carga.</li>
-        <li>Diseño ergonómico y de bajo peso para fácil manipulación por parte del operario.</li>
-      </ul>`
+      <div>
+        <h4>Descripción general</h4>
+        <ul>
+          <li>Optimiza el aislamiento en vehículos refrigerados para conservar la cadena de frío.</li>
+        </ul>
+        <h4>Materiales</h4>
+        <ul>
+          <li><strong>Aislantes:</strong> Núcleo de poliuretano, poliestireno extruido y/o polietileno expandido.</li>
+          <li><strong>Cubierta:</strong> Lona PVC 700 g/m² impermeable y lavable, resistente a UV.</li>
+          <li><strong>Protección inferior:</strong> Lámina plástica antifricción 3 mm.</li>
+          <li><strong>Fijación:</strong> Reatas nylon alta resistencia + tornillería con tuercas de seguridad.</li>
+          <li><strong>Estructura interna:</strong> Soportes livianos para fácil manipulación sin perder rigidez.</li>
+        </ul>
+        <h4>Beneficios</h4>
+        <ul>
+          <li>Separa zonas frías / templadas.</li>
+          <li>Reduce pérdida de frío y consumo energético.</li>
+          <li>Evita mezcla de olores entre cargas.</li>
+          <li>Diseño liviano y ergonómico para el operario.</li>
+        </ul>
+      </div>`
   },
   'Puertas Rápidas': {
     tipoCalculo: 'matriz',
@@ -92,12 +98,15 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para la fabricación de abrigos aislantes retráctiles con bandas de PVC de alta resistencia para muelles de carga, minimizando la pérdida de frío y protegiendo el ambiente interno.',
     lineaTabla: (p, medidasLinea) => `Abrigo Retráctil para muelle de carga${medidasLinea}`,
     especificacionesHTML: `
+      <div>
+        <h4>Componentes principales</h4>
         <ul>
           <li><strong>Estructura:</strong> Marco de acero con sistema retráctil manual.</li>
-          <li><strong>Bandas:</strong> PVC resistente con propiedades térmicas.</li>
-          <li><strong>Fijación:</strong> Incluye anclajes y perfiles metálicos.</li>
-          <li><strong>Sellado:</strong> Minimiza transferencia térmica en el punto de cargue.</li>
-        </ul>`
+          <li><strong>Bandas:</strong> PVC de alta resistencia con función aislante.</li>
+          <li><strong>Fijación:</strong> Anclajes y perfiles metálicos incluidos.</li>
+          <li><strong>Sellado:</strong> Reduce transferencia térmica durante cargue.</li>
+        </ul>
+      </div>`
   },
   'Abrigo Retráctil Inflable': {
     tipoCalculo: 'matriz',
@@ -106,12 +115,15 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para suministro de abrigo inflable tipo burbuja para zonas de cargue, ofreciendo máxima eficiencia de sellado mediante sistema neumático y lona resistente.',
     lineaTabla: (p, medidasLinea) => `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`,
     especificacionesHTML: `
+      <div>
+        <h4>Características</h4>
         <ul>
           <li><strong>Tipo:</strong> Inflable tipo burbuja.</li>
           <li><strong>Sistema:</strong> Cámaras neumáticas para sellado hermético.</li>
-          <li><strong>Material:</strong> Lona PVC alta resistencia, antiflama y UV.</li>
-          <li><strong>Extras:</strong> Almohadillas, topes, instalación (opcionales).</li>
-        </ul>`
+          <li><strong>Material:</strong> Lona PVC alta resistencia antiflama y UV.</li>
+          <li><strong>Extras disponibles:</strong> Almohadillas, topes, instalación.</li>
+        </ul>
+      </div>`
   },
   'Sello de Andén': {
     tipoCalculo: 'componentes',
@@ -120,12 +132,15 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para fabricación de sello de andén compuesto por cortina superior y postes laterales, asegurando sellado térmico y protección en puntos de cargue y descargue.',
     lineaTabla: (p, medidasLinea) => `SELLO DE ANDÉN PARA MUELLE DE${medidasLinea}`,
     especificacionesHTML: `
+      <div>
+        <h4>Configuración</h4>
         <ul>
-          <li><strong>Componentes:</strong> Cortina superior, postes laterales, opción travesaño.</li>
-          <li><strong>Materiales:</strong> Lona resistente y marco reforzado.</li>
-          <li><strong>Medidas:</strong> Según rangos definidos.</li>
-          <li><strong>Instalación:</strong> Superficie preparada y nivelada.</li>
-        </ul>`,
+          <li><strong>Componentes:</strong> Cortina superior, postes laterales, opcional travesaño.</li>
+          <li><strong>Estructura:</strong> Marco reforzado + lona industrial.</li>
+          <li><strong>Rangos:</strong> Dimensiones según tabla comercial.</li>
+          <li><strong>Instalación:</strong> Requiere superficie nivelada y preparada.</li>
+        </ul>
+      </div>`,
     getPrecioBase: (p)=>{ // cálculo por componentes
       const {ancho, alto, componentes=[]} = p;
       if(!ancho || !alto) return { precio:null, fueraDeRango:false };
@@ -150,19 +165,28 @@ const PRODUCT_CATALOG = {
       return v.nombre;
     },
     especificacionesHTML: `
-      <ul>
-        <li><strong>Aplicación:</strong> Control visual de ingreso / salida de vehículos en muelles de carga.</li>
-        <li><strong>Alimentación:</strong> 110V con caja de control.</li>
-        <li><strong>Montaje:</strong> Sobre superficie o estructura metálica (no incluida si no se especifica).</li>
-        <li><strong>Indicadores:</strong> Leds de alto brillo rojo/verde, visibles en ambiente industrial.</li>
-        <li><strong>Opcional:</strong> Sensor de masas para activación automática (variante con sensor).</li>
-  <li><strong>Luces LED bicolor:</strong> Con indicador interno.</li>
-  <li><strong>Colores:</strong> Verde y rojo de alta visibilidad.</li>
-  <li><strong>Rango de operación eléctrica:</strong> 80–240 VAC amplia tolerancia.</li>
-  <li><strong>Caja de control:</strong> Termoplástica con muletilla, grado de protección IP65.</li>
-  <li><strong>Ambiente:</strong> Adecuado para trabajo en exteriores (protección contra polvo y salpicaduras).</li>
-  <li><strong>Instalación:</strong> Listo para montaje en pared (soportes / anclajes estándar).</li>
-      </ul>` ,
+      <div>
+        <h4>Aplicación y operación</h4>
+        <ul>
+          <li>Control visual de ingreso / salida de vehículos.</li>
+          <li>Indicadores LED rojo / verde alto brillo.</li>
+          <li>Variante con sensor de masas (opcional).</li>
+        </ul>
+        <h4>Características eléctricas</h4>
+        <ul>
+          <li><strong>Alimentación:</strong> 80–240 VAC (caja de control 110V).</li>
+          <li><strong>Caja de control:</strong> Termoplástica IP65 con muletilla.</li>
+        </ul>
+        <h4>Instalación</h4>
+        <ul>
+          <li>Montaje en pared o estructura metálica.</li>
+          <li>Listo para fijación con anclajes estándar.</li>
+        </ul>
+        <h4>Ambiente</h4>
+        <ul>
+          <li>Apto para exteriores: protección contra polvo y salpicaduras.</li>
+        </ul>
+      </div>` ,
     getPrecioBase: (p) => {
       const lista = PRODUCT_CATALOG['Semáforo para Muelles de Carga'].variantes;
       const v = lista.find(v=> v.id === p.varianteSemaforo) || lista[0];
@@ -175,15 +199,26 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para el suministro de lámpara industrial para muelle de carga con reflector LED de 50W, diseñada para brindar iluminación dirigida y segura dentro de vehículos durante operaciones de cargue y descargue.',
     lineaTabla: () => 'LÁMPARA INDUSTRIAL PARA MUELLE DE CARGA',
     especificacionesHTML: `
-      <ul>
-        <li><strong>Reflector LED:</strong> 50W tipo “tableta”, 2100 lúmenes, 100–240 VAC.</li>
-        <li><strong>Estructura:</strong> Brazo ecualizable en tubo de acero cuadrado 1½” cal. 16 con refuerzos en ángulos de 1½” y 1”.</li>
-        <li><strong>Operación:</strong> Permite orientar la luz al interior del vehículo de forma ergonómica.</li>
-        <li><strong>Mango de sujeción:</strong> Facilita el direccionamiento preciso de la iluminación.</li>
-        <li><strong>Seguridad eléctrica:</strong> Polo a tierra para protección del usuario frente a descargas.</li>
-        <li><strong>Aplicación:</strong> Iluminación de zona de cargue y espacios internos de camiones.</li>
-        <li><strong>Instalación:</strong> Para montaje fijo en pared / estructura (sin instalación ni flete incluidos).</li>
-      </ul>` ,
+      <div>
+        <h4>Componentes</h4>
+        <ul>
+          <li><strong>Reflector LED:</strong> 50W (≈2100 lm) 100–240 VAC.</li>
+          <li><strong>Brazo ecualizable:</strong> Acero cuadrado 1½” cal.16 con refuerzos.</li>
+          <li><strong>Mango:</strong> Direccionamiento ergonómico interior vehículo.</li>
+        </ul>
+        <h4>Seguridad</h4>
+        <ul>
+          <li>Polo a tierra para protección del usuario.</li>
+        </ul>
+        <h4>Aplicación</h4>
+        <ul>
+          <li>Iluminación en cargue y zonas internas de camiones.</li>
+        </ul>
+        <h4>Instalación</h4>
+        <ul>
+          <li>Montaje fijo en pared / estructura (sin instalación ni flete).</li>
+        </ul>
+      </div>` ,
     getPrecioBase: () => ({ precio: 580000, fueraDeRango: false })
   },
   'Canastilla de Seguridad': {
@@ -192,17 +227,26 @@ const PRODUCT_CATALOG = {
     descripcionGeneral: 'Propuesta para el suministro de CANASTILLA DE SEGURIDAD ESTÁNDAR para montacargas, diseñada para labores de limpieza, mantenimiento y toma de producto en niveles superiores cumpliendo criterios de seguridad estructural.',
     lineaTabla: () => 'CANASTILLA DE SEGURIDAD ESTÁNDAR PARA MONTACARGA',
     especificacionesHTML: `
-      <ul>
-        <li><strong>Base:</strong> Doble de 1,0 m × 1,2 m en tubo cuadrado/rectangular calibre 16 con guías inferiores en lámina CR calibre 12 para uñas del montacargas.</li>
-        <li><strong>Piso:</strong> Lámina tipo alfajor calibre 12 soldada mediante proceso MIG.</li>
-        <li><strong>Estructura lateral:</strong> 1,1 m de altura en tubo 1” agua negra con uniones y dobleces soldados (MIG); doble puerta: una con pasador 1/2”, otra tranca hacia el exterior.</li>
-        <li><strong>Estructura adicional:</strong> Panel de 2 m en tubo 1” con malla de seguridad para lado contra el montacargas que evita atrapamientos.</li>
-        <li><strong>Enganche de seguridad:</strong> Certificado a 1,22 m de altura y 1,02 m de ancho para acople seguro.</li>
-        <li><strong>Acabado:</strong> Pintura electrostática color amarillo.</li>
-        <li><strong>Certificaciones entregadas:</strong> Ensayos mecánicos del sistema de enganche y punto de anclaje, ficha técnica, certificado de calidad y garantía, placa de identificación con advertencias (norma Res. 4272 de 2021).</li>
-        <li><strong>Aplicación:</strong> Operaciones seguras de elevación de personal en tareas de mantenimiento y logística interna.</li>
-        <li><strong>Nota comparativa:</strong> Se recomienda verificar diseño, estructura y tipo de enganche contra oferentes alternos (Res. 4272 de 2021).</li>
-      </ul>` ,
+      <div>
+        <h4>Estructura</h4>
+        <ul>
+          <li><strong>Base:</strong> 1,0 × 1,2 m tubo cuadrado/rectangular cal.16 con guías CR cal.12.</li>
+          <li><strong>Piso:</strong> Lámina tipo alfajor cal.12 soldada MIG.</li>
+          <li><strong>Lateral:</strong> 1,1 m altura tubo 1” con doble puerta (pasador 1/2” + tranca externa).</li>
+          <li><strong>Panel posterior:</strong> 2 m tubo 1” con malla de seguridad.</li>
+        </ul>
+        <h4>Seguridad y acabado</h4>
+        <ul>
+          <li><strong>Enganche:</strong> Certificado (1,22 m alto × 1,02 m ancho).</li>
+          <li><strong>Acabado:</strong> Pintura electrostática amarilla.</li>
+          <li><strong>Certificaciones:</strong> Ensayos mecánicos, ficha técnica, certificado de calidad, placa normativa (Res. 4272/2021).</li>
+        </ul>
+        <h4>Aplicación</h4>
+        <ul>
+          <li>Elevación segura de personal para mantenimiento y logística interna.</li>
+          <li>Comparar diseño/estructura contra oferentes (Res. 4272/2021).</li>
+        </ul>
+      </div>` ,
     getPrecioBase: () => ({ precio: 5410000, fueraDeRango: false })
   },
   'Cortina Thermofilm': {
@@ -215,14 +259,26 @@ const PRODUCT_CATALOG = {
       return `CORTINA THERMOFILM TRANSPARENTE REFORZADA (${ancho && alto ? `${ancho} ANCHO * ${alto} ALTO` : ''}${ancho && !alto ? ancho : ''}${alto && !ancho ? alto : ''})`;
     },
     especificacionesHTML: `
-      <ul>
-        <li><strong>Material:</strong> Thermofilm transparente reforzado de 20 cm de ancho por banda y 2 mm de espesor.</li>
-        <li><strong>Dimensionamiento:</strong> Se adicionan 10 cm a ancho y alto para cálculo de área y traslapes.</li>
-        <li><strong>Fijación:</strong> Uso de max bullet plástico para montaje (60 cm separación).</li>
-        <li><strong>Instalación:</strong> Opción con o sin instalación (precio m² variable).</li>
-        <li><strong>Aplicación:</strong> Control de temperatura, polvo y paso de partículas en vanos logísticos.</li>
-        <li><strong>Opcional:</strong> Transporte / andamio se cotiza como extra personalizado si aplica.</li>
-      </ul>` ,
+      <div>
+        <h4>Material y diseño</h4>
+        <ul>
+          <li>Thermofilm transparente reforzado 20 cm banda × 2 mm espesor.</li>
+          <li>Se adicionan 10 cm a ancho y alto para traslapes y cálculo de área.</li>
+        </ul>
+        <h4>Montaje</h4>
+        <ul>
+          <li>Max bullet plástico cada ~60 cm (decimal según ancho real).</li>
+          <li>Opción con o sin instalación (precio €/m² variable).</li>
+        </ul>
+        <h4>Aplicación</h4>
+        <ul>
+          <li>Control de temperatura, polvo y partículas en vanos logísticos.</li>
+        </ul>
+        <h4>Extras</h4>
+        <ul>
+          <li>Transporte / andamio como extra personalizado si aplica.</li>
+        </ul>
+      </div>` ,
     getPrecioBase: (p) => {
       const { ancho, alto, conInstalacion } = p;
       if(!ancho || !alto) return { precio:null, fueraDeRango:false };
