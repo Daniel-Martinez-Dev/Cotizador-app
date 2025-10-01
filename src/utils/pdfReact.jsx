@@ -111,7 +111,6 @@ const styles = StyleSheet.create({
   marginBottom: T.spacing.xs,
   paddingRight: 8,
     fontSize: Math.max(9, (T.font?.base || 12) - 1),
-    lineHeight: 1.2,
   },
   flexGrowContent: {
     flexGrow: 1,
