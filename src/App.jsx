@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import CotizadorApp from "./pages/CotizadorApp";
 import CompaniesPage from "./pages/CompaniesPage";
 import PreviewPage from "./pages/PreviewPage";
@@ -8,7 +8,7 @@ import ProductsPage from "./pages/ProductsPage";
 import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
-import { seedEmpresasYContactos } from './utils/seedData';
+import { seedEmpresasYContactos, migrarQuitarComillas, dedupeEmpresasPorNIT } from './utils/seedData';
 // Carga catálogo central (side-effect) para futuras referencias globales
 import './data/catalogoProductos';
 import toast from 'react-hot-toast';
@@ -36,16 +36,33 @@ function Layout() {
   const [seeding, setSeeding] = useState(false);
   const [showSeedLog, setShowSeedLog] = useState(false);
   const [seedLog, setSeedLog] = useState([]);
+  const [deduping, setDeduping] = useState(false);
 
   const handleSeed = async ()=>{
     if(seeding) return; setSeeding(true); setShowSeedLog(true); setSeedLog([]);
     const addLog = (msg)=> setSeedLog(prev=> [...prev, msg]);
     try {
+      addLog('Iniciando migración limpieza de comillas...');
+      const mig = await migrarQuitarComillas({ onProgress: addLog });
+      addLog(`Migración: Empresas limpiadas ${mig.actualizadasEmp}, Contactos limpiados ${mig.actualizadosCont}`);
+      addLog('Ejecutando seed CSV...');
       const res = await seedEmpresasYContactos({ onProgress: addLog });
       toast.success('Seed completado');
-      addLog(`Resumen: Empresas nuevas ${res.creadasEmp}, Contactos nuevos ${res.creadosContactos}, Legacy ${res.creadosLegacy}`);
-    } catch(e){ console.error(e); toast.error('Error seed'); }
+      addLog(`Resumen: Líneas ${res.lineasProcesadas}, Empresas nuevas ${res.creadasEmp}, Sucursales nuevas ${res.creadosContactos}, Sucursales duplicadas ${res.sucursalesDuplicadas}, Total Empresas BD ${res.totalEmp}`);
+    } catch(e){ console.error(e); toast.error('Error seed'); addLog('ERROR: ' + (e.message||e)); }
     finally { setSeeding(false); }
+  };
+
+  const handleDedupe = async () => {
+    if(deduping) return; setDeduping(true); setShowSeedLog(true); setSeedLog([]);
+    const addLog = (msg)=> setSeedLog(prev=> [...prev, msg]);
+    try {
+      addLog('Iniciando deduplicación por NIT...');
+      const res = await dedupeEmpresasPorNIT({ onProgress: addLog });
+      addLog(`Resultado: Grupos procesados ${res.gruposProcesados}, Empresas eliminadas ${res.eliminadas}, Contactos movidos ${res.contactosMovidos}, Campos completados ${res.camposActualizados}`);
+      toast.success('Deduplicación completada');
+    } catch(e){ console.error(e); toast.error('Error dedupe'); addLog('ERROR: '+(e.message||e)); }
+    finally { setDeduping(false); }
   };
 
   const performNueva = (navigate, currentPath) => {
@@ -150,6 +167,11 @@ function Layout() {
             className="hidden md:inline-flex text-xs sm:text-sm px-3 py-1.5 rounded border border-dashed border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             title="Cargar datos de ejemplo"
           >{seeding? 'Seeding...' : 'Seed'}</button>
+          <button
+            onClick={handleDedupe}
+            className="hidden md:inline-flex text-xs sm:text-sm px-3 py-1.5 rounded border border-dashed border-fuchsia-400 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-400/40"
+            title="Eliminar empresas duplicadas por NIT"
+          >{deduping? 'Depurando...' : 'Dedupe'}</button>
         </header>
         <MobileNav />
         <main className="pt-16 md:pt-16 pb-8 bg-gray-50 dark:bg-gris-900 min-h-screen text-gray-900 dark:text-gray-100 transition-colors">
