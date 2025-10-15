@@ -31,6 +31,11 @@ export function generarSeccionesHTML(cotizacion) {
   };
 }
 
+// Pequeños helpers para construir HTML de texto/listas de forma consistente
+const p = (text) => `<p>${text}</p>`;
+const li = (text) => `<li>${text}</li>`;
+const ulOpen = `<ul class="condiciones-compactas">`;
+
 function generarDescripcion(cot) {
   const tipo = cot.productos[0]?.tipo;
   const descCatalogo = getDescripcionGeneral(tipo);

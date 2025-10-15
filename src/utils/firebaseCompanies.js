@@ -33,6 +33,7 @@ export async function crearEmpresa(data){
     nit: data.nit?.trim() || "",
     nombre: data.nombre?.trim() || "",
     ciudad: data.ciudad || "",
+    direccion: data.direccion || "", // NUEVO: dirección principal de la empresa (opcional)
     emailGeneral: data.emailGeneral || "", // opcional
     telefonoGeneral: data.telefonoGeneral || "", // opcional
     createdAt: serverTimestamp(),
