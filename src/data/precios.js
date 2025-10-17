@@ -117,6 +117,12 @@ export const EXTRAS_POR_DEFECTO = {
   ]
 };
 
+// Extras universales disponibles para todos los productos
+export const EXTRAS_UNIVERSALES = [
+  { nombre: "Instalación", precio: 0 }, // precio por digitar/ajustar en la cotización
+  { nombre: "Transporte", precio: 0 }   // precio por digitar/ajustar en la cotización
+];
+
 
 // 👉 Función auxiliar única
 function getRangoIndex(ranges, valor) {
