@@ -1,6 +1,6 @@
 // Catálogo centralizado de productos
 // Permite agregar nuevos productos en un solo lugar (descripción PDF, línea en tabla, etc.)
-import { priceMatrices, EXTRAS_POR_DEFECTO, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES } from './precios';
+import { priceMatrices, EXTRAS_POR_DEFECTO, EXTRAS_UNIVERSALES, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES } from './precios';
 
 // Definición base por etiqueta (coincide con claves existentes en priceMatrices / EXTRAS_POR_DEFECTO)
 // Para cada producto se puede definir:
@@ -18,7 +18,7 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
     requiereMedidas: true,
     extrasKey: 'Divisiones Térmicas',
-    descripcionGeneral: 'Propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para optimizar el aislamiento en vehículos de transporte refrigerado. Permiten transportar productos a diferentes temperaturas y separar cargas para evitar contaminación cruzada.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de divisiones térmicas fabricadas a la medida, diseñadas para optimizar el aislamiento en vehículos de transporte refrigerado. Permiten transportar productos a diferentes temperaturas y separar cargas para evitar contaminación cruzada.',
     lineaTabla: (p, medidasLinea) => `DIVISIÓN TÉRMICA PARA VEHÍCULO CON MEDIDAS INTERNAS DE ${medidasLinea}`,
     especificacionesHTML: `
       <div>
@@ -47,47 +47,43 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
   extrasKey: 'Puertas Rápidas',
-    descripcionGeneral: 'Propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas para mejorar eficiencia operativa, reducir pérdida energética y facilitar el flujo logístico.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas para mejorar eficiencia operativa, reducir pérdida energética y facilitar el flujo logístico.',
     lineaTabla: (p, medidasLinea) => `PUERTA RÁPIDA PARA VANO DE${medidasLinea}`,
     especificacionesHTML: `
       <div>
         <h4>Motorización y control</h4>
         <ul>
-          <li>Servomotor de <strong>1,5 kW</strong> con control <strong>“American Power”</strong> (o equivalente). Caja de control con <strong>apertura, cierre y paro de emergencia</strong>, instalada al interior de la puerta.</li>
-          <li><strong>Freno electrónico</strong> incorporado.</li>
-          <li><strong>Encoder digital</strong> para posicionamiento preciso.</li>
-          <li><strong>Cierre automático</strong> con temporizador <strong>ajustable</strong>.</li>
-          <li>Sistema de control <strong>preajustado y probado en fábrica</strong>; en sitio solo se configuran <strong>sentido de giro</strong> y <strong>finales de carrera</strong>. Motor y encoder con <strong>terminales de seguridad tipo militar</strong>.</li>
+          <li>Servomotor de 0.75 kW con control “American Power” (o equivalente). Caja de control con apertura, cierre y paro de emergencia, instalada al interior de la puerta.</li>
+          <li>Freno electrónico incorporado, encoder digital para posicionamiento preciso y cierre automático con temporizador ajustable.</li>
+          <li>Sistema de control preajustado y probado en fábrica; en sitio solo se configuran sentido de giro y finales de carrera. Motor y encoder con terminales de seguridad tipo militar.</li>
+          <li>Capacidad de servicio: hasta 2.000 ciclos/día.</li>
         </ul>
         <h4>Estructura y cortina</h4>
         <ul>
-          <li><strong>Estructura autoportante</strong> en <strong>acero inoxidable</strong>.</li>
-          <li><strong>Cubre-rollo</strong> y <strong>guarda de motor</strong> en acero inoxidable.</li>
-          <li><strong>Lona PVC 900 g/m²</strong> color azul, doble cara con resina plástica, que garantiza <strong>impermeabilidad</strong>, <strong>sellabilidad</strong>, <strong>resistencia UV</strong>, <strong>protección biocida</strong> anti-hongos, propiedad <strong>ignífuga</strong> (retarda la propagación del fuego) y <strong>resistencia a agentes químicos</strong>.</li>
-          <li><strong>Franja transparente</strong> en PVC <strong>1,5 mm</strong> de espesor x <strong>60 cm</strong> de ancho para visibilidad.</li>
-          <li><strong>Cortaviento de aluminio</strong> que une los paños de lona (reparación simple: se reemplaza solo el tramo afectado).</li>
+          <li>Estructura autoportante, cubre-rollo y guarda de motor en acero inoxidable.</li>
+          <li>Lona PVC 900 g/m² color azul, doble cara con resina plástica, que garantiza impermeabilidad, sellabilidad, resistencia UV, protección biocida anti-hongos, propiedad ignífuga (retarda la propagación del fuego) y resistencia a agentes químicos.</li>
+          <li>Franja transparente en PVC 1,5 mm de espesor × 60 cm de ancho para visibilidad.</li>
+          <li>Cortavientos y zócalo de aluminio 6063 (reparación simple: se reemplaza solo el tramo afectado).</li>
         </ul>
         <h4>Seguridad y operación</h4>
         <ul>
-          <li><strong>Cortina óptica (barrera fotoeléctrica)</strong> en un costado para detección de presencia en el paso de la puerta. <em>(Si se requiere en ambos lados, adicionar <strong>$1’100.000 + IVA</strong>.)</em></li>
-          <li><strong>Sistema “airbag” en zócalo</strong>: ante impacto en la parte baja, se acciona y restituye la cortina.</li>
-          <li><strong>Radar de apertura</strong> en un costado. <em>(Si se requiere en ambos lados, adicionar <strong>$250.000 + IVA</strong>.)</em></li>
-          <li><strong>Velocidad de operación ajustable:</strong> <strong>0,6 m/s</strong>.</li>
-          <li><strong>Capacidad de servicio:</strong> hasta <strong>2.000 ciclos/día</strong>.</li>
+          <li>Cortina óptica (barrera fotoeléctrica) en un costado para detección de presencia en el paso de la puerta. (Si se requiere en ambos lados, adicionar $1’100.000 + IVA.)</li>
+          <li>Sistema “airbag” en zócalo: ante impacto en la parte baja, se acciona y restituye la cortina.</li>
         </ul>
         <h4>Accesorios y opciones</h4>
         <ul>
-          <li><strong>Control remoto</strong> para operación (opcional).</li>
-          <li><strong>Transformador</strong> de <strong>220 V bifásica a 220 V monofásica</strong> (opcional): <strong>$480.000 + IVA</strong>. Opción con <strong>caja metálica</strong> para almacenamiento: <strong>$580.000 + IVA</strong>.</li>
-          <li><strong>UPS 3 kVA</strong> para operación temporal ante fallas de energía (opcional): <strong>$1.400.000 + IVA</strong>.</li>
+          <li>Radar de apertura en un costado. (Si se requiere en ambos lados, adicionar $250.000 + IVA.)</li>
+          <li>Control remoto para operación (opcional).</li>
+          <li>Transformador de 220 V bifásica a 220 V monofásica (opcional): $480.000 + IVA. Opción con caja metálica para almacenamiento: $580.000 + IVA.</li>
+          <li>UPS 3 kVA para operación temporal ante fallas de energía (opcional): $1.400.000 + IVA.</li>
         </ul>
         <h4>Requisitos eléctricos</h4>
         <ul>
-          <li><strong>Alimentación requerida:</strong> <strong>220 V monofásica</strong> (línea de 220 V de sistema 440 V, <strong>neutro</strong> y <strong>tierra</strong>). Si no se dispone de este tipo de energía, se sugiere instalar el <strong>transformador</strong> indicado.</li>
+          <li>Alimentación requerida: 220 V monofásica (línea de 220 V de sistema 440 V, neutro y tierra). Si no se dispone de este tipo de energía, se sugiere instalar el transformador indicado.</li>
         </ul>
         <h4>Condiciones de garantía</h4>
         <ul>
-          <li>La instalación debe cumplir <strong>estrictamente</strong> las condiciones de alimentación descritas. En caso de no cumplirlas al momento de la instalación, <strong>la garantía queda sin efecto</strong> y la puesta en marcha se realiza <strong>bajo exclusiva responsabilidad del cliente</strong>.</li>
+          <li>La instalación debe cumplir estrictamente las condiciones de alimentación descritas. En caso de no cumplirlas al momento de la instalación, la garantía queda sin efecto y la puesta en marcha se realiza bajo exclusiva responsabilidad del cliente.</li>
         </ul>
       </div>`
   },
@@ -95,7 +91,7 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
   extrasKey: 'Abrigo Retráctil Estándar',
-    descripcionGeneral: 'Propuesta para la fabricación de abrigos aislantes retráctiles con bandas de PVC de alta resistencia para muelles de carga, minimizando la pérdida de frío y protegiendo el ambiente interno.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación de abrigos aislantes retráctiles con bandas de PVC de alta resistencia para muelles de carga, minimizando la pérdida de frío y protegiendo el ambiente interno.',
     lineaTabla: (p, medidasLinea) => `Abrigo Retráctil para muelle de carga${medidasLinea}`,
     especificacionesHTML: `
       <div>
@@ -112,7 +108,7 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
   extrasKey: 'Abrigo Retráctil Inflable',
-    descripcionGeneral: 'Propuesta para suministro de abrigo inflable tipo burbuja para zonas de cargue, ofreciendo máxima eficiencia de sellado mediante sistema neumático y lona resistente.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para suministro de abrigo inflable tipo burbuja para zonas de cargue, ofreciendo máxima eficiencia de sellado mediante sistema neumático y lona resistente.',
     lineaTabla: (p, medidasLinea) => `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`,
     especificacionesHTML: `
       <div>
@@ -129,7 +125,7 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'componentes',
   requiereMedidas: true,
   extrasKey: 'Sello de Andén',
-    descripcionGeneral: 'Propuesta para fabricación de sello de andén compuesto por cortina superior y postes laterales, asegurando sellado térmico y protección en puntos de cargue y descargue.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para fabricación de sello de andén compuesto por cortina superior y postes laterales, asegurando sellado térmico y protección en puntos de cargue y descargue.',
     lineaTabla: (p, medidasLinea) => `SELLO DE ANDÉN PARA MUELLE DE${medidasLinea}`,
     especificacionesHTML: `
       <div>
@@ -154,7 +150,7 @@ const PRODUCT_CATALOG = {
   'Semáforo para Muelles de Carga': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Propuesta para el suministro de sistemas de señalización luminosa (semáforos) para operaciones de cargue y descargue en muelles, mejorando la seguridad operativa y flujo logístico.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de sistemas de señalización luminosa (semáforos) para operaciones de cargue y descargue en muelles, mejorando la seguridad operativa y flujo logístico.',
     variantes: [
       { id: 'sencillo', nombre: 'SEMÁFORO SENCILLO PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y UN SEMÁFORO)', precio: 560000 },
       { id: 'doble', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y DOS SEMÁFOROS)', precio: 850000 },
@@ -196,7 +192,7 @@ const PRODUCT_CATALOG = {
   'Lámpara Industrial': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Propuesta para el suministro de lámpara industrial para muelle de carga con reflector LED de 50W, diseñada para brindar iluminación dirigida y segura dentro de vehículos durante operaciones de cargue y descargue.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de lámpara industrial para muelle de carga con reflector LED de 50W, diseñada para brindar iluminación dirigida y segura dentro de vehículos durante operaciones de cargue y descargue.',
     lineaTabla: () => 'LÁMPARA INDUSTRIAL PARA MUELLE DE CARGA',
     especificacionesHTML: `
       <div>
@@ -224,7 +220,7 @@ const PRODUCT_CATALOG = {
   'Canastilla de Seguridad': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Propuesta para el suministro de CANASTILLA DE SEGURIDAD ESTÁNDAR para montacargas, diseñada para labores de limpieza, mantenimiento y toma de producto en niveles superiores cumpliendo criterios de seguridad estructural.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de CANASTILLA DE SEGURIDAD ESTÁNDAR para montacargas, diseñada para labores de limpieza, mantenimiento y toma de producto en niveles superiores cumpliendo criterios de seguridad estructural.',
     lineaTabla: () => 'CANASTILLA DE SEGURIDAD ESTÁNDAR PARA MONTACARGA',
     especificacionesHTML: `
       <div>
@@ -252,7 +248,7 @@ const PRODUCT_CATALOG = {
   'Cortina Thermofilm': {
     tipoCalculo: 'especial',
     requiereMedidas: true,
-    descripcionGeneral: 'Propuesta para el suministro e instalación (opcional) de cortina Thermofilm transparente reforzada para control ambiental y separación física, incluyendo refuerzos y elementos de fijación (max bullets) según dimensionamiento.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro e instalación (opcional) de cortina Thermofilm transparente reforzada para control ambiental y separación física, incluyendo refuerzos y elementos de fijación (max bullets) según dimensionamiento.',
     lineaTabla: (p, medidasLinea) => {
       const ancho = p.ancho ? `${p.ancho}mm` : '';
       const alto = p.alto ? `${p.alto}mm` : '';
@@ -324,7 +320,11 @@ export function getExtrasPorTipo(etiqueta, extrasOverride){
   const cfg = getConfigProducto(etiqueta);
   const key = cfg?.extrasKey || etiqueta;
   if(extrasOverride && extrasOverride[etiqueta]) return extrasOverride[etiqueta];
-  return EXTRAS_POR_DEFECTO[key] || [];
+  const propios = EXTRAS_POR_DEFECTO[key] || [];
+  // Combinar extras propios con universales (evitar duplicados por nombre)
+  const byName = new Map();
+  [...propios, ...EXTRAS_UNIVERSALES].forEach(e => { if(e && e.nombre) byName.set(e.nombre.toLowerCase(), e); });
+  return Array.from(byName.values());
 }
 
 // ===== VALIDACIÓN MEDIDAS / RANGO =====

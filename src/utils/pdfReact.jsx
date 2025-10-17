@@ -96,8 +96,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: T.font.h2,
     color: T.colors.headerBg,
-    marginTop: 2,
-    marginBottom: 2,
+  marginTop: 1,
+  marginBottom: 1,
     borderBottomWidth: 1,
     borderBottomColor: T.colors.sectionDivider,
     paddingBottom: 1,
@@ -127,15 +127,15 @@ const styles = StyleSheet.create({
   leftPadded: { paddingLeft: 18 },
 });
 
-function SeccionHTML({ titulo, contenido, compact = false, dense = false }) {
+function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false }) {
   return (
     <View>
       <Text style={{
         ...styles.sectionTitle,
-        ...(compact ? { marginTop: 4, marginBottom: 2, paddingBottom: 1 } : null)
+  ...(compact ? { marginTop: 0.5, marginBottom: 0.5, paddingBottom: 0.5 } : null)
       }}>{titulo}</Text>
       <View style={compact ? styles.htmlContentCompact : styles.htmlContent}>
-  {parseHtmlToPDFComponents(contenido, { compact, dense })}
+  {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems })}
       </View>
     </View>
   );
@@ -226,7 +226,7 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
         </View>
         <View style={styles.flexGrowContent}>
           <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} compact dense />
-          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} compact dense />
+          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} readable onlyBoldHeadings compressShortItems />
           {(imagenSeleccionada || imagenesMulti.length > 0) && !isPuertasRapidas && (() => {
             const extras = imagenesMulti.slice(0,2);
             const total = (imagenSeleccionada ? 1 : 0) + extras.length;

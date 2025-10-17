@@ -48,11 +48,11 @@ const styles = StyleSheet.create({
     textAlign: 'justify',
     lineHeight: baseLineHeight,
   },
-  bullet: { marginRight: 3 },
+  bullet: { marginRight: 2 },
   line: { flexDirection: 'row', flexWrap: 'wrap' }
 });
 
-export function parseHtmlToPDFComponents(html, { compact = false, dense = false } = {}) {
+export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false } = {}) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const root = doc.body;
@@ -71,12 +71,25 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false 
   if (dense) {
     s = {
       ...s,
-  paragraph: { ...s.paragraph, marginBottom: 0, lineHeight: 0.95 },
+  paragraph: { ...s.paragraph, marginBottom: 0, lineHeight: 0.9 },
       list: { ...s.list, marginBottom: 0 },
       listItem: { ...s.listItem, marginBottom: 0 },
-      listItemText: { ...s.listItemText, lineHeight: 0.95 },
-      heading: { ...s.heading, lineHeight: 0.97 },
-      headingSmall: { ...s.headingSmall, lineHeight: 0.97 },
+      listItemText: { ...s.listItemText, lineHeight: 0.9 },
+      heading: { ...s.heading, lineHeight: 0.94 },
+      headingSmall: { ...s.headingSmall, lineHeight: 0.94 },
+    };
+  }
+
+  // Modo legible: mayor interlineado y separación, útil para Especificaciones Técnicas
+  if (readable) {
+    s = {
+      ...s,
+  paragraph: { ...s.paragraph, lineHeight: 0.8, marginBottom: 1.0 },
+  list: { ...s.list, marginTop: 0.5, marginBottom: 0.5, paddingLeft: 12 },
+  listItem: { ...s.listItem, marginBottom: 0.2 },
+  listItemText: { ...s.listItemText, lineHeight: 0.8},
+  heading: { ...s.heading, marginBottom: 2.5, lineHeight: 1.04 },
+  headingSmall: { ...s.headingSmall, marginTop: 1.5, marginBottom: 2.5, lineHeight: 1.04 },
     };
   }
 
@@ -114,6 +127,16 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false 
     return merged;
   };
 
+  const isInside = (n, tag) => {
+    let cur = n && n.parentNode;
+    tag = (tag || '').toLowerCase();
+    while (cur) {
+      if (cur.nodeName && cur.nodeName.toLowerCase() === tag) return true;
+      cur = cur.parentNode;
+    }
+    return false;
+  };
+
   const processNode = (node, index) => {
     switch (node.nodeName.toLowerCase()) {
       case "h3":
@@ -138,19 +161,24 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false 
       }
       case "br":
         return <Text key={index}>""</Text>;
-      case "strong":
+      case "strong": {
+        // Si solo se permiten subtítulos en negrilla, desactivar bold dentro de listas y párrafos
+        const isInList = isInside(node, 'li') || isInside(node, 'ul');
+        const isInHeading = isInside(node, 'h3') || isInside(node, 'h4');
+        const style = onlyBoldHeadings && isInList && !isInHeading ? {} : s.bold;
         return (
-          <Text key={index} style={s.bold}>
+          <Text key={index} style={style}>
             {parseChildren(node)}
           </Text>
         );
+      }
       case "em":
         return (
           <Text key={index} style={s.italic}>
             {parseChildren(node)}
           </Text>
         );
-      case "ul": {
+  case "ul": {
         const className = node.getAttribute && node.getAttribute('class');
         if (className && className.includes('condiciones-compactas')) {
           const isEspec = className.includes('espec-compactas');
@@ -169,11 +197,11 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false 
           }
           // Especificaciones: mostrar bullets compactos
           return (
-            <View key={index} style={{ marginTop:3, marginBottom:0, paddingLeft: extraIndent }}>
+            <View key={index} style={{ marginTop:2, marginBottom:0, paddingLeft: extraIndent }}>
               {[...node.children].map((liNode, i) => (
-                <View key={i} style={{ flexDirection:'row', marginBottom:0 }}>
-                  <Text style={{ width:6, textAlign:'center', lineHeight: s.paragraph.lineHeight }}>•</Text>
-                  <Text style={{ ...s.paragraph, flex:1, marginBottom:0 }}>
+                <View key={i} style={{ flexDirection:'row', marginBottom: s.listItem.marginBottom }}>
+                  <Text style={{ width:6, textAlign:'center', lineHeight: (s.listItemText?.lineHeight || s.paragraph.lineHeight) }}>•</Text>
+                  <Text style={{ ...s.listItemText, flex:1, marginBottom:0 }}>
                     {parseChildren(liNode)}
                   </Text>
                 </View>
@@ -181,12 +209,62 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false 
             </View>
           );
         }
+        // Agrupar ítems cortos si está activado
+        const liNodes = [...node.children];
+        if (!compressShortItems) {
+          return (
+            <View key={index} style={s.list}>
+              {liNodes.map((li, i) => (
+                <View key={i} style={s.listItem}>
+                  <Text style={s.bullet}>•</Text>
+                  <Text style={s.listItemText}>{parseChildren(li)}</Text>
+                </View>
+              ))}
+            </View>
+          );
+        }
+        // Estrategia de agrupación: combinar ítems con texto corto en una sola línea separados por •
+        const groups = [];
+        let current = [];
+        let currentLen = 0;
+        const maxLineLen = 120; // umbral aproximado
+        const maxItemsPerLine = 3;
+        liNodes.forEach((li) => {
+          const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
+          const len = text.length;
+          const isLong = len > 100; // ítems largos permanecen solos
+          if (isLong) {
+            if (current.length) { groups.push([...current]); current = []; currentLen = 0; }
+            groups.push([li]);
+          } else {
+            if (
+              current.length === 0 ||
+              (currentLen + len <= maxLineLen && current.length < maxItemsPerLine)
+            ) {
+              current.push(li);
+              currentLen += len;
+            } else {
+              groups.push([...current]);
+              current = [li];
+              currentLen = len;
+            }
+          }
+        });
+        if (current.length) groups.push(current);
+
         return (
           <View key={index} style={s.list}>
-            {[...node.children].map((li, i) => (
+            {groups.map((grp, i) => (
               <View key={i} style={s.listItem}>
                 <Text style={s.bullet}>•</Text>
-                <Text style={s.listItemText}>{parseChildren(li)}</Text>
+                <Text style={s.listItemText}>
+                  {grp.map((li, j) => (
+                    <Text key={j}>
+                      {li.textContent.replace(/\s+/g, ' ').trim()}
+                      {j < grp.length - 1 ? ' • ' : ''}
+                    </Text>
+                  ))}
+                </Text>
               </View>
             ))}
           </View>

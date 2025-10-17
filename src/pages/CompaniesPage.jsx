@@ -20,6 +20,7 @@ export default function CompaniesPage(){
   // Formularios
   const [formEmpresa, setFormEmpresa] = useState({ nombre:'', nit:'', ciudad:'' });
   const [formEmpresaEdit, setFormEmpresaEdit] = useState({ nombre:'', nit:'', ciudad:'' });
+  const sanitizeNIT = (nit)=> (nit||'').toString().replace(/["“”]/g,'');
   const [formContacto, setFormContacto] = useState({ nombre:'', email:'', telefono:'' });
   const [formContactoEdit, setFormContactoEdit] = useState({ nombre:'', email:'', telefono:'' });
 
@@ -35,8 +36,9 @@ export default function CompaniesPage(){
         setCargando(false);
         return;
       }
-      const lista = await listarEmpresas();
-      setEmpresas(lista);
+  const lista = await listarEmpresas();
+  // normaliza NIT en estado UI
+  setEmpresas(lista.map(e=> ({ ...e, nit: sanitizeNIT(e.nit) })));
     } catch(e){ console.error(e); toast.error('Error cargando empresas'); } finally { setCargando(false); }
   }
 
@@ -55,11 +57,11 @@ export default function CompaniesPage(){
     e.preventDefault();
     if(!formEmpresa.nombre.trim()){ toast.error('Nombre requerido'); return; }
     if(formEmpresa.nit){
-      const existe = await obtenerEmpresaPorNIT(formEmpresa.nit.trim());
+      const existe = await obtenerEmpresaPorNIT(sanitizeNIT(formEmpresa.nit.trim()));
       if(existe){ toast.error('NIT ya registrado'); return; }
     }
     try {
-      const id = await crearEmpresa(formEmpresa);
+  const id = await crearEmpresa({ ...formEmpresa, nit: sanitizeNIT(formEmpresa.nit) });
       setEmpresas(prev=> [...prev, { id, ...formEmpresa }].sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
       toast.success('Empresa creada');
       setFormEmpresa({ nombre:'', nit:'', ciudad:'' });
@@ -69,13 +71,14 @@ export default function CompaniesPage(){
 
   function startEditarEmpresa(emp){
     setEditEmpresaId(emp.id);
-    setFormEmpresaEdit({ nombre:emp.nombre||'', nit:emp.nit||'', ciudad:emp.ciudad||'' });
+  setFormEmpresaEdit({ nombre:emp.nombre||'', nit:sanitizeNIT(emp.nit)||'', ciudad:emp.ciudad||'' });
   }
   async function guardarEdicionEmpresa(empId){
     if(!formEmpresaEdit.nombre.trim()){ toast.error('Nombre requerido'); return; }
     try {
-      await actualizarEmpresa(empId, formEmpresaEdit);
-      setEmpresas(prev => prev.map(e=> e.id===empId? { ...e, ...formEmpresaEdit }: e).sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
+  const payload = { ...formEmpresaEdit, nit: sanitizeNIT(formEmpresaEdit.nit) };
+  await actualizarEmpresa(empId, payload);
+  setEmpresas(prev => prev.map(e=> e.id===empId? { ...e, ...payload }: e).sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
       toast.success('Empresa actualizada');
       setEditEmpresaId(null);
     } catch(e){ console.error(e); toast.error('Error actualizando'); }
@@ -171,7 +174,7 @@ export default function CompaniesPage(){
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <div className="font-medium text-sm flex items-center gap-2"><FaBuilding className="text-gray-400" /> {emp.nombre} <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{emp.nit}</span></div>
+                      <div className="font-medium text-sm flex items-center gap-2"><FaBuilding className="text-gray-400" /> {emp.nombre} <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{sanitizeNIT(emp.nit)}</span></div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-3">
                         {emp.ciudad && <span>{emp.ciudad}</span>}
                         <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/'); }}>Usar en cotización</span>

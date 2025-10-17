@@ -18,19 +18,31 @@ import {
 
 const COL = "empresas";
 
+// Normaliza NIT: elimina comillas dobles/tipográficas y espacios
+const sanitizeNIT = (nit) => (nit ?? "").toString().replace(/["“”]/g, "").trim();
+
 // --- EMPRESAS ---
 export async function obtenerEmpresaPorNIT(nit) {
   if(!nit) return null;
-  const q = query(collection(db, COL), where("nit","==", nit), limit(1));
-  const snap = await getDocs(q);
+  const nitNorm = sanitizeNIT(nit);
+  // 1) Buscar por NIT normalizado (sin comillas)
+  let q1 = query(collection(db, COL), where("nit","==", nitNorm), limit(1));
+  let snap = await getDocs(q1);
+  // 2) Fallback: algunos registros pudieron guardarse con comillas alrededor
+  if (snap.empty) {
+    const quoted = `"${nitNorm}"`;
+    const q2 = query(collection(db, COL), where("nit","==", quoted), limit(1));
+    snap = await getDocs(q2);
+  }
   if (snap.empty) return null;
   const d = snap.docs[0];
-  return { id: d.id, ...d.data() };
+  const data = d.data();
+  return { id: d.id, ...data, nit: sanitizeNIT(data.nit) };
 }
 
 export async function crearEmpresa(data){
   const ref = await addDoc(collection(db, COL), {
-    nit: data.nit?.trim() || "",
+  nit: sanitizeNIT(data.nit),
     nombre: data.nombre?.trim() || "",
     ciudad: data.ciudad || "",
     direccion: data.direccion || "", // NUEVO: dirección principal de la empresa (opcional)
@@ -43,7 +55,9 @@ export async function crearEmpresa(data){
 }
 
 export async function actualizarEmpresa(id, data){
-  await updateDoc(doc(db, COL, id), { ...data, updatedAt: serverTimestamp() });
+  const payload = { ...data };
+  if (payload.nit != null) payload.nit = sanitizeNIT(payload.nit);
+  await updateDoc(doc(db, COL, id), { ...payload, updatedAt: serverTimestamp() });
 }
 
 export async function eliminarEmpresa(id){
@@ -53,7 +67,7 @@ export async function eliminarEmpresa(id){
 export async function listarEmpresas(){
   const q = query(collection(db, COL), orderBy("nombre","asc"));
   const snap = await getDocs(q);
-  return snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  return snap.docs.map(d=>{ const data = d.data(); return { id:d.id, ...data, nit: sanitizeNIT(data.nit) }; });
 }
 
 // --- CONTACTOS ---

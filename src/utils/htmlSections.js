@@ -289,7 +289,7 @@ function generarCondicionesComerciales(cot) {
   }
   if (primerTipo === "Puertas Rápidas") {
     const items = [
-      (Boolean(cot.incluyeInstalacion) ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas.' : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). Si se requiere instalación, deberá solicitarse y cotizarse por separado.'),
+  (Boolean(cot.incluyeInstalacion) ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas. El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro.' : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro. Si se requiere instalación, deberá solicitarse y cotizarse por separado.'),
       `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo con la orden y 50% antes del despacho / instalación.'}`,
       `<strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || '15 días hábiles contados a partir de anticipo efectivo y confirmación de planos firmados.'}`,
       `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || '30 días calendario desde la fecha de emisión.'}`,
@@ -303,9 +303,14 @@ function generarCondicionesComerciales(cot) {
   }
   // Versión genérica como lista
   const incluyeInstalacion = Boolean(cot.incluyeInstalacion) || (Array.isArray(cot.productos) && cot.productos.some(p => p?.incluyeInstalacion || (Array.isArray(p?.extras) && p.extras.some(e => /instalación|instalacion/i.test(e)))));
+  const noOfreceInstalacion = ["Divisiones Térmicas", "Canastilla de Seguridad"].includes(primerTipo);
   const alcance = incluyeInstalacion
-    ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas.'
-    : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). Si se requiere instalación, deberá solicitarse y cotizarse por separado.';
+    ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas. El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro.'
+    : (
+      noOfreceInstalacion
+        ? '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro.'
+        : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro. Si se requiere instalación, deberá solicitarse y cotizarse por separado.'
+    );
   const itemsGenericos = [
     alcance,
     `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo contra orden de compra y 50% para retiro en planta.'}`,
@@ -317,15 +322,29 @@ function generarCondicionesComerciales(cot) {
 }
 
 function generarTerminosGenerales(cot) {
-  const items = [
-    '<strong>ALCANCE DE LA OFERTA:</strong> Esta propuesta se basa en la información suministrada por el cliente. Se requiere aprobación firmada de planos antes de iniciar fabricación.',
-    '<strong>INSTALACIÓN (OPCIONAL):</strong> El cliente puede ejecutar la instalación con su personal. Si la realiza COLD CHAIN SERVICES SAS, se limita a los equipos ofertados y condiciones adecuadas de acceso y seguridad.',
-    '<strong>NO INCLUYE:</strong> Obras civiles, adecuaciones de vano, reforzamientos estructurales, cableado externo, acometidas eléctricas, canalizaciones, equipos de izaje, elementos de SISO del cliente ni personal de seguridad.',
-    '<strong>TIEMPO DE ENTREGA:</strong> Inicia tras: (1) aprobación escrita oferta/planos, (2) recepción efectiva del anticipo y (3) disponibilidad de materiales. No contempla demoras por fuerza mayor, paros, cierres viales o retrasos logísticos.',
-    '<strong>GARANTÍA:</strong> 12 meses por defectos de fabricación bajo uso y mantenimiento normales. Excluye daños por instalación inadecuada, golpes, mal uso, modificaciones no autorizadas, variaciones de voltaje, químicos no compatibles y desgaste normal. Componentes eléctricos/electrónicos solo si se especifica expresamente.',
-    '<strong>MANTENIMIENTO Y PERIODICIDAD:</strong> Debe ejecutarse por personal calificado. Para conservar garantía se requiere al menos una visita preventiva documentada dentro del período; su ausencia la invalida.',
-    '<strong>OBLIGACIONES DEL CONTRATANTE (si incluye instalación):</strong> Proveer acceso libre y seguro; vano/estructura terminados y nivelados; suministro eléctrico definitivo estable; informar protocolos de ingreso; resguardar equipos en sitio; cubrir costos de esperas por condiciones no idóneas; responder por daños por voltaje o manipulación de terceros.',
-    '<strong>ACEPTACIÓN:</strong> La emisión de orden de compra y/o el pago del anticipo constituyen aceptación plena de estas condiciones.'
+  const itemsTop = [
+    'Esta oferta técnica y económica se formula con base en la información suministrada por el cliente. Para proceder con el diseño, fabricación o suministro de los equipos, es indispensable contar con planos, medidas y fotografías proporcionadas por el cliente, los cuales deben ser aprobados y firmados antes de iniciar cualquier proceso productivo. Ningún trabajo de fabricación se ejecutará sin la confirmación escrita de estos documentos, que representan la aceptación formal de las condiciones técnicas de la propuesta.',
+    '<strong>Alcance de la Oferta:</strong> La presente propuesta comprende exclusivamente los equipos y servicios expresamente descritos en la cotización. Cualquier modificación, ampliación o requerimiento adicional deberá ser objeto de un nuevo acuerdo formal entre las partes. No se incluyen en el alcance obras civiles, adecuaciones de vano, reforzamientos estructurales, cableado externo, acometidas eléctricas, canalizaciones, equipos de izaje, suministro de elementos de seguridad industrial (SISO) o personal de vigilancia.',
+    '<strong>Instalación (Opcional):</strong> El servicio de instalación es opcional. El cliente puede ejecutar la instalación con su propio personal o contratarla con Cold Chain Services S.A.S. En caso de requerirse, la instalación cubrirá únicamente los equipos ofertados y se realizará bajo condiciones adecuadas de acceso, seguridad y disponibilidad del área de trabajo. Salvo que se indique lo contrario, las instalaciones están presupuestadas para ejecutarse en días hábiles (lunes a viernes, de 7:00 a.m. a 5:00 p.m.). Cualquier labor que deba realizarse fuera de este horario, en festivos o en jornadas nocturnas, deberá ser previamente cotizada y aprobada por ambas partes.',
+    '<strong>Tiempo de Entrega:</strong> El plazo de entrega se contará a partir del cumplimiento de los siguientes requisitos: (1) aprobación escrita de la oferta y de los planos, (2) recepción efectiva del anticipo pactado, y (3) confirmación de disponibilidad de materiales. Los tiempos de entrega estimados no contemplan demoras ocasionadas por fuerza mayor, paros, bloqueos, derrumbes, escasez de materiales, cierres viales o retrasos logísticos ajenos a la compañía.',
+    '<strong>Garantía:</strong> Todos los equipos cuentan con una garantía limitada de doce (12) meses, la cual cubre exclusivamente defectos de fabricación bajo condiciones normales de uso y mantenimiento. Esta garantía no aplica para daños causados por instalación inadecuada, golpes, manipulación indebida, modificaciones no autorizadas, descargas eléctricas, variaciones de voltaje, exposición a químicos no compatibles, ni por el desgaste normal de las piezas. Los componentes eléctricos y electrónicos, tales como motores, tarjetas, controles o sensores, estarán cubiertos únicamente si se especifica expresamente en la cotización. Cualquier alteración o ajuste no autorizado por el personal técnico de Cold Chain Services S.A.S. anulará automáticamente la garantía.',
+    '<strong>Mantenimiento y Periodicidad:</strong> Durante el período de garantía, los mantenimientos preventivos y correctivos deberán ser realizados por personal técnico calificado. Para conservar la validez de la garantía, el cliente deberá garantizar al menos una visita anual de mantenimiento documentada. El incumplimiento de esta condición, o la ausencia de registros técnicos válidos en caso de falla, invalidará la cobertura de garantía.',
+    '<strong>Obligaciones del Contratante (Aplican si se incluye instalación):</strong>'
   ];
-  return `<ul class='condiciones-compactas'>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;
+
+  const obligaciones = [
+    'Informar con antelación los requisitos de ingreso al sitio de obra, tanto para el personal técnico como para la entrega de materiales y equipos.',
+    'Asegurar que el área de instalación esté completamente despejada, libre de obstáculos y con acceso adecuado para el ingreso de equipos, herramientas y personal.',
+    'Garantizar que los pisos, techos, muros y estructuras estén completamente terminados, nivelados y listos para recibir los equipos, asegurando condiciones idóneas de seguridad y estabilidad.',
+    'Suministrar una acometida eléctrica definitiva, estable y con el voltaje especificado en la oferta.',
+    'En caso de no contar con la acometida definitiva, esto no constituirá causa válida para rechazar la recepción de los equipos o la firma del acta de entrega. El cliente será el único responsable de garantizar la estabilidad del suministro eléctrico requerido.',
+    'Cualquier daño en los motores o accesorios eléctricos originado por fluctuaciones de voltaje, mala conexión o manipulación de terceros será asumido directamente por el cliente.'
+  ];
+
+  const cierre = [
+    '<strong>Aceptación:</strong> La emisión de una orden de compra, la firma de la cotización o el pago del anticipo constituyen aceptación plena de las condiciones aquí descritas. Estas condiciones prevalecen sobre cualquier comunicación previa y forman parte integral del acuerdo comercial entre el cliente y Cold Chain Services S.A.S.'
+  ];
+
+  const ul = (arr) => `<ul class='condiciones-compactas'>${arr.map(t => `<li>${t}</li>`).join('')}</ul>`;
+  return `${ul(itemsTop)}${ul(obligaciones)}${ul(cierre)}`;
 }
