@@ -19,6 +19,7 @@ import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
 import TablaPDFManual from "./TablaPDFManual";
+import { compressImageToDataURL } from './pdfImageCompression';
 Font.register({ family: 'Helvetica' });
 
 const T = pdfTheme; // alias corto
@@ -141,7 +142,7 @@ function SeccionHTML({ titulo, contenido, compact = false, dense = false, readab
   );
 }
 
-async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
+async function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
   const {
     nombreCliente,
     cliente,
@@ -170,8 +171,11 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion }) {
   } = secciones[0] || {};
 
   const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
-  const imagenSeleccionada = imagenesPorProducto[nombreImagen] || null;
-  const imagenesMulti = Array.isArray(imagenesSeleccionadas) ? imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean) : [];
+  const imagenSeleccionadaRaw = imagenesPorProducto[nombreImagen] || null;
+  const imagenesMultiRaw = Array.isArray(imagenesSeleccionadas) ? imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean) : [];
+  // Usar imágenes optimizadas si fueron pasadas; si no, usar originales
+  const imagenSeleccionada = imagenesOptimizadas?.principal ?? imagenSeleccionadaRaw;
+  const imagenesMulti = imagenesOptimizadas?.extras ?? imagenesMultiRaw;
 
   const footerContent = (
     <>Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
@@ -355,7 +359,30 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     }
   }
 
-  const doc = await PDFCotizacion({ cotizacion, numeroCotizacion });
+  // Preparar imágenes optimizadas (si hay seleccionadas)
+  const producto = cotizacion.productos?.[0];
+  const nombreImagen = cotizacion.imagenSeleccionada || producto?.imagen || '';
+  const imagenSeleccionadaSrc = nombreImagen ? (imagenesPorProducto[nombreImagen] || null) : null;
+  const imagenesMultiSrc = Array.isArray(cotizacion.imagenesSeleccionadas)
+    ? cotizacion.imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean)
+    : [];
+
+  let imagenesOptimizadas = undefined;
+  try {
+    const opts = { maxWidth: 1200, maxHeight: 900, quality: 0.6, mimeType: 'image/jpeg' };
+    const principal = imagenSeleccionadaSrc ? await compressImageToDataURL(imagenSeleccionadaSrc, opts) : null;
+    const extras = [];
+    for (const src of imagenesMultiSrc.slice(0, 2)) { // a lo sumo 2 extras en layout
+      extras.push(await compressImageToDataURL(src, opts));
+    }
+    if (principal || extras.length) {
+      imagenesOptimizadas = { principal, extras };
+    }
+  } catch (e) {
+    console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
+  }
+
+  const doc = await PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas });
   const asPdf = pdf();
   asPdf.updateContainer(doc);
   const blob = await asPdf.toBlob();

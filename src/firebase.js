@@ -23,12 +23,20 @@ let resolveAuthReady;
 const authReady = new Promise((res)=>{ resolveAuthReady = res; });
 let authErrorCode = null;
 
-// Intentar autenticación anónima para habilitar permisos de lectura/escritura si las reglas lo requieren
-signInAnonymously(auth).catch((e)=>{
-  authErrorCode = e?.code || 'auth/unknown-error';
-  console.error("Anonymous auth failed", e);
-  // Aunque falle, continuamos; onAuthStateChanged igualmente resolverá con null
-});
+// Intentar autenticación anónima para habilitar permisos de lectura/escritura si las reglas lo requieren.
+// Nota: si la app exige login real, la auth anónima suele estar deshabilitada en Firebase y genera
+// `auth/operation-not-allowed`. Por eso, el valor por defecto depende de VITE_REQUIRE_LOGIN.
+// - Forzar ON:  VITE_ANON_AUTH=true
+// - Forzar OFF: VITE_ANON_AUTH=false
+const requireLogin = String(import.meta.env.VITE_REQUIRE_LOGIN ?? 'true').toLowerCase() !== 'false';
+const allowAnon = String(import.meta.env.VITE_ANON_AUTH ?? (requireLogin ? 'false' : 'true')).toLowerCase() !== 'false';
+if (allowAnon) {
+  signInAnonymously(auth).catch((e)=>{
+    authErrorCode = e?.code || 'auth/unknown-error';
+    console.error("Anonymous auth failed", e);
+    // Aunque falle, continuamos; onAuthStateChanged igualmente resolverá con null
+  });
+}
 
 // Resolver cuando tengamos un usuario (o null si no hay)
 onAuthStateChanged(auth, (user)=>{
