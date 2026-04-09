@@ -34,7 +34,8 @@ function parseCSVEmpresas(raw) {
     while (parts.length < 5) parts.push('');
   const stripQuotes = v => v?.replace(/^"+|"+$/g,'').replace(/^'+|'+$/g,'').trim();
   const [nitRaw, nombreRaw, dirRaw, ciudadRaw, telRaw] = parts;
-  const nit = stripQuotes(nitRaw);
+  // Normalizar NIT del CSV: quitar comillas, puntos y espacios
+  const nit = stripQuotes(nitRaw).replace(/\./g, '').replace(/\s+/g, '');
   const nombre = stripQuotes(nombreRaw);
   const direccion = stripQuotes(dirRaw);
   const ciudad = stripQuotes(ciudadRaw);
@@ -198,14 +199,24 @@ export async function migrarQuitarComillas({ onProgress } = {}) {
   for (const emp of empresas) {
     const limpioNombre = emp.nombre?.replace(regex,'').replace(/^'+|'+$/g,'').trim();
     const limpioCiudad = emp.ciudad?.replace(regex,'').replace(/^'+|'+$/g,'').trim();
+    // Limpiar NIT: quitar comillas, puntos y espacios para uniformidad
+    const limpioNit = emp.nit?.toString().replace(regex,'').replace(/^'+|'+$/g,'').replace(/\./g,'').replace(/\s+/g,'').trim();
+    const limpioDireccion = emp.direccion?.replace(regex,'').replace(/^'+|'+$/g,'').trim();
     let changed = false;
     const patch = {};
     if (limpioNombre && limpioNombre !== emp.nombre) { patch.nombre = limpioNombre; changed = true; }
     if (limpioCiudad && limpioCiudad !== emp.ciudad) { patch.ciudad = limpioCiudad; changed = true; }
+    if (limpioNit && limpioNit !== emp.nit) { patch.nit = limpioNit; changed = true; }
+    if (limpioDireccion && limpioDireccion !== emp.direccion) { patch.direccion = limpioDireccion; changed = true; }
     if (changed) {
       await actualizarEmpresa(emp.id, patch);
       actualizadasEmp++;
-      onProgress?.(`Empresa limpiada: ${emp.nombre} -> ${patch.nombre}`);
+      const cambios = [];
+      if (patch.nombre) cambios.push(`nombre: "${emp.nombre}" -> "${patch.nombre}"`);
+      if (patch.ciudad) cambios.push(`ciudad: "${emp.ciudad}" -> "${patch.ciudad}"`);
+      if (patch.nit) cambios.push(`NIT: "${emp.nit}" -> "${patch.nit}"`);
+      if (patch.direccion) cambios.push(`direccion: "${emp.direccion}" -> "${patch.direccion}"`);
+      onProgress?.(`Empresa limpiada (${emp.nombre}): ${cambios.join(', ')}`);
     }
     const contactos = await listarContactos(emp.id);
     for (const cont of contactos) {

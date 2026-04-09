@@ -16,6 +16,15 @@ const aplicarAjuste = (v, tipo, p) => {
   if (tipo === 'Incremento') return Math.round(v * (1 + p / 100));
   return v;
 };
+// Pista de cliente: mostrar variación vs Cliente Final (baseline)
+const obtenerPistaCliente = (clienteTipo) => {
+  const base = CLIENTE_FACTORES['Cliente Final Contado'] || 1;
+  const actual = CLIENTE_FACTORES[clienteTipo] || 1;
+  const ratio = actual / base;
+  const deltaPct = Math.round((ratio - 1) * 100);
+  if (deltaPct === 0) return 'Cliente Final (base)';
+  return `${clienteTipo} (${deltaPct > 0 ? '+' : ''}${deltaPct}%) vs Cliente Final`;
+};
 const getRangoIndex = (ranges, valor) => {
   for (let i = 0; i < ranges.length - 1; i++) if (valor > ranges[i] && valor <= ranges[i + 1]) return i;
   if (valor <= ranges[0]) return 0; return ranges.length - 2;
@@ -363,7 +372,7 @@ export default function CotizadorApp(){
                       </div>
                       <div className="mt-1 text-[11px] md:text-xs flex flex-wrap gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
                         <span>{producto.ancho && producto.alto ? `${producto.ancho}×${producto.alto} mm` : 'Sin medidas'}</span>
-                        <span>Cliente: {producto.cliente}</span>
+                        <span>Cliente: {obtenerPistaCliente(producto.cliente)}</span>
                         <span>Precio: {precioHeader.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span>
                         {extrasHeader>0 && <span>Extras: ${extrasHeader.toLocaleString()}</span>}
                         <span>Cant: {producto.cantidad}</span>

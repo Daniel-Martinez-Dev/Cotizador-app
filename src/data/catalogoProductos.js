@@ -87,6 +87,30 @@ const PRODUCT_CATALOG = {
         </ul>
       </div>`
   },
+  'Puertas Seccionales': {
+    tipoCalculo: 'matriz',
+    requiereMedidas: true,
+    extrasKey: 'Puertas Seccionales',
+    factorBaseCliente: 'Cliente Final Contado',
+    descripcionGeneral: 'Respetados señores. Enviamos para su consideración nuestra propuesta para la venta de puertas seccionales; tienen entre otros los siguientes elementos:',
+    lineaTabla: (p, medidasLinea) => `PUERTA SECCIONAL${medidasLinea}`,
+    especificacionesHTML: `
+      <div>
+        <h4>Elementos incluidos</h4>
+        <ul>
+          <li>Panel de 4cm tipo sándwich de acero galvanizado con aislamiento de poliuretano.</li>
+          <li>Ventana de polipropileno grande en uno de los paneles.</li>
+          <li>Sistema de rieles.</li>
+          <li>Freno de seguridad de guayas.</li>
+          <li>Ménsula paracaídas.</li>
+          <li>Sistema de protección a través de bolsa de aire para retroceso de la puerta en caso de golpe accidental en la parte baja.</li>
+          <li>Motor con 7 metros de cadena.</li>
+          <li>Caja de control.</li>
+          <li>Control remoto opcional sin costo adicional.</li>
+          <li>Sistema de herrajes para un correcto funcionamiento de la puerta; contiene bisagras, tornillería, rodachinas, entre otros.</li>
+        </ul>
+      </div>`
+  },
   'Abrigo Retráctil Estándar': {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
@@ -152,9 +176,9 @@ const PRODUCT_CATALOG = {
     requiereMedidas: false,
     descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de sistemas de señalización luminosa (semáforos) para operaciones de cargue y descargue en muelles, mejorando la seguridad operativa y flujo logístico.',
     variantes: [
-      { id: 'sencillo', nombre: 'SEMÁFORO SENCILLO PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y UN SEMÁFORO)', precio: 560000 },
-      { id: 'doble', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y DOS SEMÁFOROS)', precio: 850000 },
-      { id: 'doble_sensor', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA CON SENSOR DE MASAS (UNA CAJA DE CONTROL, DOS SEMÁFOROS Y EL SENSOR)', precio: 950000 }
+      { id: 'sencillo', nombre: 'SEMÁFORO SENCILLO PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y UN SEMÁFORO)', precio: 570000 },
+      { id: 'doble', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y DOS SEMÁFOROS)', precio: 870000 },
+      { id: 'doble_sensor', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA CON SENSOR DE MASAS (UNA CAJA DE CONTROL, DOS SEMÁFOROS Y EL SENSOR)', precio: 970000 }
     ],
     lineaTabla: (p) => {
       const v = PRODUCT_CATALOG['Semáforo para Muelles de Carga'].variantes.find(v=> v.id === p.varianteSemaforo) || PRODUCT_CATALOG['Semáforo para Muelles de Carga'].variantes[0];
@@ -215,7 +239,7 @@ const PRODUCT_CATALOG = {
           <li>Montaje fijo en pared / estructura (sin instalación ni flete).</li>
         </ul>
       </div>` ,
-    getPrecioBase: () => ({ precio: 580000, fueraDeRango: false })
+    getPrecioBase: () => ({ precio: 590000, fueraDeRango: false })
   },
   'Canastilla de Seguridad': {
     tipoCalculo: 'especial',
@@ -368,6 +392,15 @@ export function getPrecioProducto(producto, { matricesOverride } = {}){
   const { tipo, ancho, alto, cliente, ajusteTipo, ajusteValor } = producto;
   const cfg = getConfigProducto(tipo);
   let base=0; let fuera=false;
+
+  const getFactorCliente = () => {
+    const factor = CLIENTE_FACTORES[cliente] || 1;
+    const baselineKey = cfg?.factorBaseCliente;
+    if (!baselineKey) return factor;
+    const baseline = CLIENTE_FACTORES[baselineKey] || 1;
+    if (!baseline) return factor;
+    return factor / baseline;
+  };
   // Productos con función personalizada (componentes o especial / fijos)
   if(cfg?.getPrecioBase){
     // Si requiere medidas pero faltan, retornar vacío
@@ -381,13 +414,20 @@ export function getPrecioProducto(producto, { matricesOverride } = {}){
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
+    if(!fuera){ base = Math.round(base * getFactorCliente()); }
+  } else if(tipo==='Abrigo Retráctil Inflable'){
+    // Para abrigos retráctiles (inflable), el precio no varía por tipo de cliente
+    const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
+    const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
+    base = r.precio||0; fuera = r.fueraDeRango;
+    if(!fuera){ base = Math.round(base * getFactorCliente()); }
   } else {
     if(!ancho || !alto) return { base:0, ajustado:0, fueraDeRango:false };
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     if(!matriz) return { base:0, ajustado:0, fueraDeRango:false };
     const r = buscarPrecio(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
-    if(!fuera){ base = Math.round(base * (CLIENTE_FACTORES[cliente] || 1)); }
+    if(!fuera){ base = Math.round(base * getFactorCliente()); }
   }
   if(fuera) return { base:0, ajustado:0, fueraDeRango:true };
   let ajustado = aplicarAjuste(base, ajusteTipo, parseFloat(ajusteValor)||0);
