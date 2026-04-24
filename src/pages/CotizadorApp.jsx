@@ -115,7 +115,7 @@ export default function CotizadorApp(){
 
   const handleAgregarProducto = ()=>{ setProductos(p=> [...p, crearProductoInicial()]); setAlertas(a=> [...a,false]); };
   const handleEliminarProducto = (i)=>{ setProductos(p=> p.filter((_,idx)=> idx!==i)); setAlertas(a=> a.filter((_,idx)=> idx!==i)); };
-  const handleChangeProducto = (i,campo,valor)=>{ setProductos(p=> { const n=[...p]; n[i][campo]=valor; if(campo==='tipo'){ n[i].extras=[]; n[i].extrasCantidades={}; n[i].extrasPersonalizados=[]; n[i].extrasPersonalizadosCant={}; n[i].precioManual=''; n[i].precioEditado=''; n[i].componentes=[]; n[i].cliente='Cliente Final Contado'; } if(campo==='cliente'){ n[i].precioManual=''; n[i].precioEditado=''; } return n;}); };
+  const handleChangeProducto = (i,campo,valor)=>{ setProductos(p=> { const n=[...p]; n[i][campo]=valor; if(campo==='tipo'){ n[i].extras=[]; n[i].extrasCantidades={}; n[i].extrasPersonalizados=[]; n[i].extrasPersonalizadosCant={}; n[i].precioManual=''; n[i].precioEditado=''; n[i].componentes = valor === 'Sello de Andén' ? ['sello completo'] : []; n[i].cliente='Cliente Final Contado'; } if(campo==='cliente'){ n[i].precioManual=''; n[i].precioEditado=''; } return n;}); };
   const handleToggleExtra = (i, extra)=>{
     setProductos(prev=> prev.map((prod, idx)=>{
       if(idx!==i) return prod;
@@ -435,7 +435,50 @@ export default function CotizadorApp(){
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ajuste (%)</label><div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div></div>
-                      {producto.tipo==='Sello de Andén' && (<div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Componentes Sello</label><div className="flex flex-wrap gap-4 text-xs">{['cortina','postes laterales','travesaño','sello completo'].map(comp=> (<label key={comp} className="inline-flex items-center gap-1"><input type="checkbox" checked={producto.componentes?.includes(comp)} onChange={()=>{ const nuevos=[...(producto.componentes||[])]; if(nuevos.includes(comp)){ nuevos.splice(nuevos.indexOf(comp),1);} else { nuevos.push(comp);} handleChangeProducto(i,'componentes', nuevos); }} /><span className="capitalize">{comp}</span></label>))}</div></div>)}
+                      {producto.tipo==='Sello de Andén' && (
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="block text-xs font-semibold tracking-wide uppercase">Componentes Sello</label>
+                          <div className="flex flex-wrap gap-4 text-xs">
+                            {['cortina','postes laterales','travesaño','sello completo'].map(comp=> {
+                              const componentesActuales = producto.componentes || [];
+                              const tieneSelloCompleto = componentesActuales.includes('sello completo');
+                              const checked = componentesActuales.includes(comp);
+
+                              return (
+                                <label
+                                  key={comp}
+                                  className="inline-flex items-center gap-1"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={()=>{
+                                      const actuales = [...(producto.componentes || [])];
+
+                                      // 'sello completo' es excluyente
+                                      if (comp === 'sello completo') {
+                                        const nuevos = actuales.includes('sello completo')
+                                          ? actuales.filter(c => c !== 'sello completo')
+                                          : ['sello completo'];
+                                        handleChangeProducto(i, 'componentes', nuevos);
+                                        return;
+                                      }
+
+                                      // Si se selecciona un componente parcial, quitar 'sello completo'
+                                      const sinCompleto = actuales.filter(c => c !== 'sello completo');
+                                      const nuevos = sinCompleto.includes(comp)
+                                        ? sinCompleto.filter(c => c !== comp)
+                                        : [...sinCompleto, comp];
+                                      handleChangeProducto(i, 'componentes', nuevos);
+                                    }}
+                                  />
+                                  <span className="capitalize">{comp}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {alertas[i] && (<div className="p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded text-xs">Medidas fuera de rango. Ingrese un precio manual:<input type="number" className="w-full border p-2 rounded mt-2 bg-white dark:bg-gris-800 dark:border-gris-600" value={producto.precioEditado} placeholder="Precio manual" onChange={e=> handleChangeProducto(i,'precioEditado', e.target.value)} /></div>)}
                     <div className="space-y-3">
