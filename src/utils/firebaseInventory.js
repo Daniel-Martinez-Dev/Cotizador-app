@@ -12,13 +12,56 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 
 const ITEMS_COL = "inventario_items";
 const SUPPLIERS_COL = "inventario_proveedores";
 const MOVEMENTS_COL = "inventario_movimientos";
 
-const sanitizeNIT = (nit) => (nit ?? "").toString().replace(/[\"“”]/g, "").trim();
+const sanitizeText = (v) => {
+  if (v === null || typeof v === "undefined") return "";
+  return String(v)
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const sanitizeNIT = (nit) => {
+  if (nit === null || typeof nit === "undefined") return "";
+  if (typeof nit === "number" && Number.isFinite(nit)) return String(Math.trunc(nit));
+  let s = String(nit).replace(/[\"“”]/g, "").trim();
+  if (!s) return "";
+  s = s.replace(/\s+/g, "");
+
+  if (/^\d+(?:\.\d+)?e\+\d+$/i.test(s)) {
+    const asNum = Number(s);
+    if (Number.isFinite(asNum)) s = String(Math.trunc(asNum));
+  }
+
+  s = s.replace(/[^0-9]/g, "");
+  return s;
+};
+
+const sanitizePhone = (phone) => {
+  if (phone === null || typeof phone === "undefined") return "";
+  if (typeof phone === "number" && Number.isFinite(phone)) {
+    const n = Math.trunc(phone);
+    return n === 0 ? "" : String(n);
+  }
+  let s = String(phone).trim();
+  if (!s) return "";
+  s = s.replace(/\s+/g, "");
+
+  if (/^\d+(?:\.\d+)?e\+\d+$/i.test(s)) {
+    const asNum = Number(s);
+    if (Number.isFinite(asNum)) s = String(Math.trunc(asNum));
+  }
+
+  s = s.replace(/[^0-9]/g, "");
+  if (!s || s === "0") return "";
+  return s;
+};
 
 const normalizeStringArray = (arr) => (
   Array.isArray(arr) ? arr.map((v) => String(v || "").trim()).filter(Boolean) : []
@@ -28,8 +71,8 @@ const normalizeSedes = (sedes) => {
   if (!Array.isArray(sedes)) return [];
   return sedes
     .map((s) => ({
-      direccion: (s?.direccion || "").trim(),
-      ciudad: (s?.ciudad || "").trim(),
+      direccion: sanitizeText(s?.direccion),
+      ciudad: sanitizeText(s?.ciudad),
     }))
     .filter((s) => s.direccion || s.ciudad);
 };
@@ -38,44 +81,69 @@ const normalizeContactos = (contactos) => {
   if (!Array.isArray(contactos)) return [];
   return contactos
     .map((c) => ({
-      nombre: (c?.nombre || "").trim(),
-      telefono: (c?.telefono || "").trim(),
-      correo: (c?.correo || "").trim(),
+      nombre: sanitizeText(c?.nombre),
+      telefono: sanitizePhone(c?.telefono),
+      correo: sanitizeText(c?.correo),
     }))
     .filter((c) => c.nombre || c.telefono || c.correo);
 };
 
-export async function crearProveedor(data) {
-  await waitForAuth();
-  const razonSocial = (data.razonSocial || data.nombre || "").trim();
+const buildProveedorDoc = (data) => {
+  const razonSocial = sanitizeText(data.razonSocial || data.nombre);
   const nit = sanitizeNIT(data.nit);
   const sedes = normalizeSedes(data.sedes);
   const contactos = normalizeContactos(data.contactos);
   const productoTipos = normalizeStringArray(data.productoTipos);
   const materiasPrimas = normalizeStringArray(data.materiasPrimas);
   const primerContacto = contactos[0] || {};
-  const ref = await addDoc(collection(db, SUPPLIERS_COL), {
+  return {
     // Legacy + compatibilidad UI
     nombre: razonSocial,
-    contacto: (data.contacto || primerContacto.nombre || "").trim(),
-    telefono: (data.telefono || primerContacto.telefono || "").trim(),
-    email: (data.email || primerContacto.correo || "").trim(),
+    contacto: sanitizeText(data.contacto || primerContacto.nombre),
+    telefono: sanitizePhone(data.telefono || primerContacto.telefono),
+    email: sanitizeText(data.email || primerContacto.correo),
 
     // Nuevo esquema
     razonSocial,
     nit,
     sedes,
     contactos,
-    modalidadEntrega: data.modalidadEntrega || "",
-    tipoPago: data.tipoPago || "",
+    modalidadEntrega: sanitizeText(data.modalidadEntrega),
+    tipoPago: sanitizeText(data.tipoPago),
     productoTipos,
     materiasPrimas,
 
     leadTimeDias: Number(data.leadTimeDias || 0),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+};
+
+export async function crearProveedor(data) {
+  await waitForAuth();
+  const ref = await addDoc(collection(db, SUPPLIERS_COL), buildProveedorDoc(data));
   return ref.id;
+}
+
+export async function crearProveedoresBulk(list) {
+  await waitForAuth();
+  const rows = Array.isArray(list) ? list : [];
+  if (rows.length === 0) return { created: 0 };
+
+  // Firestore batch limit: 500 ops. Usamos margen.
+  const CHUNK = 400;
+  let created = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    const slice = rows.slice(i, i + CHUNK);
+    for (const r of slice) {
+      const ref = doc(collection(db, SUPPLIERS_COL));
+      batch.set(ref, buildProveedorDoc(r));
+      created += 1;
+    }
+    await batch.commit();
+  }
+  return { created };
 }
 
 export async function listarProveedores() {
