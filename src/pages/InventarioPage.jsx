@@ -1,11 +1,13 @@
 import React from "react";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 import { PRODUCTOS_ACTIVOS } from "../data/catalogoProductos";
 import { compressImageFileToDataURL, dataUrlSizeLabel } from "../utils/imageCompress";
 import {
   actualizarItemInventario,
   crearItemInventario,
   crearProveedor,
+  crearProveedoresBulk,
   actualizarProveedor,
   eliminarProveedor,
   eliminarItemInventario,
@@ -33,7 +35,7 @@ export default function InventarioPage() {
   const [provForm, setProvForm] = React.useState({
     razonSocial: "",
     nit: "",
-    leadTimeDias: 0,
+    leadTimeDias: "",
     sedes: [emptySede],
     contactos: [emptyContacto],
     modalidadEntrega: "", // envio_nacional | envio_bogota | recoger
@@ -41,7 +43,7 @@ export default function InventarioPage() {
     materiaPrimaItemIds: [], // inventario_items ids
   });
   const [editingProveedorId, setEditingProveedorId] = React.useState("");
-  const [itemForm, setItemForm] = React.useState({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: 0, stockMinimo: 0, ubicacion: "", costoUnitario: 0, proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
+  const [itemForm, setItemForm] = React.useState({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
   const [editingItemId, setEditingItemId] = React.useState("");
   const [productoSearch, setProductoSearch] = React.useState("");
   const [provMateriaSearch, setProvMateriaSearch] = React.useState("");
@@ -63,6 +65,19 @@ export default function InventarioPage() {
 
   const [proveedoresSearch, setProveedoresSearch] = React.useState("");
 
+  const [selectedItemId, setSelectedItemId] = React.useState("");
+  const [selectedProveedorId, setSelectedProveedorId] = React.useState("");
+  const [showSelectedItemMovs, setShowSelectedItemMovs] = React.useState(true);
+  const [showSelectedProveedorItems, setShowSelectedProveedorItems] = React.useState(true);
+  const [itemsSort, setItemsSort] = React.useState({ key: "nombre", dir: "asc" });
+  const [provSort, setProvSort] = React.useState({ key: "razonSocial", dir: "asc" });
+
+  const [provImportFileName, setProvImportFileName] = React.useState("");
+  const [provImportPreview, setProvImportPreview] = React.useState([]);
+  const [provImportRows, setProvImportRows] = React.useState([]);
+  const [provImportBusy, setProvImportBusy] = React.useState(false);
+  const [provImportSummary, setProvImportSummary] = React.useState(null);
+
   const [movGeneralLoaded, setMovGeneralLoaded] = React.useState(false);
   const [movGeneralLoading, setMovGeneralLoading] = React.useState(false);
   const [movGeneralSearch, setMovGeneralSearch] = React.useState("");
@@ -72,6 +87,45 @@ export default function InventarioPage() {
 
   const toggleSection = (key) => {
     setSectionsOpen((p) => ({ ...p, [key]: !p[key] }));
+  };
+
+  const toggleSort = (stateSetter, current, key) => {
+    stateSetter((p) => {
+      if (p.key !== key) return { key, dir: "asc" };
+      return { key, dir: p.dir === "asc" ? "desc" : "asc" };
+    });
+  };
+
+  const sortArrow = (sortState, key) => {
+    if (sortState.key !== key) return "";
+    return sortState.dir === "asc" ? " ▲" : " ▼";
+  };
+
+  const formatCOP = React.useMemo(() => {
+    try {
+      const fmt = new Intl.NumberFormat("es-CO", {
+        style: "currency",
+        currency: "COP",
+        maximumFractionDigits: 0,
+      });
+      return (n) => fmt.format(Number(n || 0));
+    } catch {
+      return (n) => `$ ${Number(n || 0)}`;
+    }
+  }, []);
+
+  const parseDigits = (value) => {
+    const s = String(value ?? "");
+    const digits = s.replace(/\D+/g, "");
+    return digits;
+  };
+
+  const compareValues = (a, b) => {
+    if (a === b) return 0;
+    if (a === null || typeof a === "undefined") return -1;
+    if (b === null || typeof b === "undefined") return 1;
+    if (typeof a === "number" && typeof b === "number") return a - b;
+    return String(a).localeCompare(String(b));
   };
 
   const load = async () => {
@@ -92,7 +146,222 @@ export default function InventarioPage() {
     load();
   }, []);
 
-  const sanitizeNIT = (nit) => (nit ?? "").toString().replace(/[\"“”]/g, "").trim();
+  const sanitizeText = (v) => {
+    if (v === null || typeof v === 'undefined') return '';
+    return String(v)
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const sanitizeNIT = (nit) => {
+    if (nit === null || typeof nit === "undefined") return "";
+    if (typeof nit === "number" && Number.isFinite(nit)) return String(Math.trunc(nit));
+    let s = String(nit).replace(/[\"“”]/g, "").trim();
+    if (!s) return "";
+    s = s.replace(/\s+/g, "");
+
+    // Algunos CSV/Excel exportan números como notación científica.
+    if (/^\d+(?:\.\d+)?e\+\d+$/i.test(s)) {
+      const asNum = Number(s);
+      if (Number.isFinite(asNum)) s = String(Math.trunc(asNum));
+    }
+
+    // Normalizar separadores comunes (puntos/guiones), dejando solo dígitos.
+    s = s.replace(/[^0-9]/g, "");
+    return s;
+  };
+
+  const sanitizePhone = (phone) => {
+    if (phone === null || typeof phone === 'undefined') return '';
+    if (typeof phone === 'number' && Number.isFinite(phone)) {
+      const n = Math.trunc(phone);
+      return n === 0 ? '' : String(n);
+    }
+    let s = String(phone).trim();
+    if (!s) return '';
+    s = s.replace(/\s+/g, '');
+
+    if (/^\d+(?:\.\d+)?e\+\d+$/i.test(s)) {
+      const asNum = Number(s);
+      if (Number.isFinite(asNum)) s = String(Math.trunc(asNum));
+    }
+
+    s = s.replace(/[^0-9]/g, '');
+    if (!s || s === '0') return '';
+    return s;
+  };
+
+  const normalizeHeader = (s) => (s || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_\-./\\]+/g, " ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/([a-z])([0-9])/g, "$1 $2")
+    .replace(/([0-9])([a-z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const getRowValue = (row, candidates) => {
+    if (!row) return "";
+    const keys = Object.keys(row);
+    const keyByNorm = {};
+    for (const k of keys) keyByNorm[normalizeHeader(k)] = k;
+    for (const c of candidates) {
+      const real = keyByNorm[normalizeHeader(c)];
+      if (!real) continue;
+      const v = row[real];
+      if (v === null || typeof v === 'undefined') continue;
+      const s = sanitizeText(v);
+      if (s) return s;
+    }
+    return "";
+  };
+
+  const normalizeModalidadEntrega = (s) => {
+    const v = (s || "").toString().toLowerCase();
+    if (!v) return "";
+    if (v.includes('recog') || v.includes('retiro') || v.includes('bodega')) return 'recoger';
+    if (v.includes('bogota') || v.includes('bogotá')) return 'envio_bogota';
+    if (v.includes('nacion') || v.includes('envio') || v.includes('envío') || v.includes('transport')) return 'envio_nacional';
+    return "";
+  };
+
+  const normalizeTipoPago = (s) => {
+    const v = (s || "").toString().toLowerCase();
+    if (!v) return "";
+    if (v.includes('credit')) return 'credito';
+    if (v.includes('pedir') || v.includes('anticip')) return 'al_pedir';
+    if (v.includes('recog') || v.includes('retiro')) return 'al_recoger';
+    if (v.includes('contado')) return 'al_pedir';
+    return "";
+  };
+
+  const parseProveedorRow = (row) => {
+    const razonSocial = sanitizeText(getRowValue(row, [
+      'razon social', 'razón social', 'proveedor', 'empresa', 'nombre', 'nombre proveedor', 'razon_social', 'razonSocial'
+    ]));
+    const nit = sanitizeNIT(getRowValue(row, [
+      'nit', 'n.i.t', 'n i t', 'nit.',
+      'identificacion', 'identificación',
+      'numero nit', 'número nit',
+      'nit proveedor', 'nit empresa'
+    ]));
+    const leadTimeStr = getRowValue(row, ['lead time', 'leadtime', 'tiempo entrega', 'dias entrega', 'días entrega', 'lead_time_dias']);
+    const leadTimeDias = leadTimeStr ? Number(String(leadTimeStr).replace(/[^0-9.-]/g, '')) : 0;
+
+    const modalidadEntrega = normalizeModalidadEntrega(getRowValue(row, ['modalidad entrega', 'entrega', 'envio', 'envío', 'modo entrega']));
+    const tipoPago = normalizeTipoPago(getRowValue(row, ['tipo pago', 'pago', 'condicion pago', 'condición pago', 'terminos pago', 'términos pago']));
+
+    const direccion = sanitizeText(getRowValue(row, ['direccion', 'dirección', 'direccion sede', 'dirección sede', 'direccion 1', 'dirección 1']));
+    const ciudad = sanitizeText(getRowValue(row, ['ciudad', 'ciudad sede', 'ciudad 1']));
+
+    const contactoNombre = sanitizeText(getRowValue(row, ['contacto', 'nombre contacto', 'contacto 1', 'nombre contacto 1']));
+    const contactoTelefono = getRowValue(row, [
+      'telefono', 'teléfono', 'celular', 'movil', 'móvil',
+      'telefono contacto', 'teléfono contacto',
+      'telefono 1', 'teléfono 1', 'telefono1', 'tel1', 'tel 1'
+    ]);
+    const contactoCorreo = sanitizeText(getRowValue(row, ['correo', 'email', 'e-mail', 'correo contacto', 'email contacto', 'correo 1', 'email 1']));
+
+    const contactoTelefonoNorm = sanitizePhone(contactoTelefono);
+
+    const contactos = (contactoNombre || contactoTelefono || contactoCorreo)
+      ? [{ nombre: contactoNombre, telefono: contactoTelefonoNorm, correo: contactoCorreo }]
+      : [];
+    const sedes = (direccion || ciudad)
+      ? [{ direccion, ciudad }]
+      : [];
+
+    return {
+      razonSocial,
+      nit,
+      leadTimeDias: Number.isNaN(leadTimeDias) ? 0 : leadTimeDias,
+      sedes,
+      contactos,
+      modalidadEntrega,
+      tipoPago,
+    };
+  };
+
+  const onProvImportFile = async (file) => {
+    setProvImportSummary(null);
+    setProvImportRows([]);
+    setProvImportPreview([]);
+    setProvImportFileName(file?.name || "");
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) return toast.error('El archivo no tiene hojas');
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+
+      const parsed = [];
+      const errors = [];
+      for (let idx = 0; idx < json.length; idx += 1) {
+        const r = json[idx];
+        const p = parseProveedorRow(r);
+        if (!p.razonSocial && !p.nit) continue; // fila vacía
+        if (!p.razonSocial) {
+          errors.push({ row: idx + 2, reason: 'Falta razón social' });
+          continue;
+        }
+        if (!p.nit) {
+          errors.push({ row: idx + 2, reason: 'Falta NIT' });
+          continue;
+        }
+        parsed.push(p);
+      }
+
+      setProvImportRows(parsed);
+      setProvImportPreview(parsed.slice(0, 5));
+      setProvImportSummary({ total: json.length, valid: parsed.length, skipped: errors.length, errors: errors.slice(0, 10) });
+      if (parsed.length === 0) toast.error('No se encontraron filas válidas para importar');
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo leer el archivo');
+    }
+  };
+
+  const runProvImport = async () => {
+    try {
+      if (!provImportRows.length) return toast.error('No hay filas para importar');
+      setProvImportBusy(true);
+
+      const existingByNit = new Set((proveedores || []).map((p) => sanitizeNIT(p.nit)).filter(Boolean));
+      const unique = [];
+      let dup = 0;
+      const seen = new Set();
+      for (const r of provImportRows) {
+        const nit = sanitizeNIT(r.nit);
+        if (!nit) continue;
+        if (seen.has(nit)) { dup += 1; continue; }
+        seen.add(nit);
+        if (existingByNit.has(nit)) { dup += 1; continue; }
+        unique.push(r);
+      }
+
+      if (unique.length === 0) {
+        toast.error('Todo ya existe (duplicados por NIT)');
+        return;
+      }
+
+      const res = await crearProveedoresBulk(unique);
+      toast.success(`Importados: ${res.created}. Duplicados omitidos: ${dup}`);
+      setProvImportSummary((p) => ({ ...(p || {}), imported: res.created, duplicates: dup }));
+      await load();
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.message || 'No se pudo importar');
+    } finally {
+      setProvImportBusy(false);
+    }
+  };
 
   const validarProveedorForm = (form) => {
     if (!form.razonSocial?.trim()) return "Razón social requerida";
@@ -116,7 +385,7 @@ export default function InventarioPage() {
     setProvForm({
       razonSocial: "",
       nit: "",
-      leadTimeDias: 0,
+      leadTimeDias: "",
       sedes: [emptySede],
       contactos: [emptyContacto],
       modalidadEntrega: "",
@@ -139,7 +408,7 @@ export default function InventarioPage() {
   };
 
   const resetItemForm = () => {
-    setItemForm({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: 0, stockMinimo: 0, ubicacion: "", costoUnitario: 0, proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
+    setItemForm({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
     setEditingItemId("");
     setProductoSearch("");
     setProveedorSearch("");
@@ -234,7 +503,7 @@ export default function InventarioPage() {
     setProvForm({
       razonSocial: prov.razonSocial || prov.nombre || "",
       nit: sanitizeNIT(prov.nit || ""),
-      leadTimeDias: Number(prov.leadTimeDias ?? 0),
+      leadTimeDias: String(Number(prov.leadTimeDias ?? 0)),
       sedes,
       contactos,
       modalidadEntrega: prov.modalidadEntrega || "",
@@ -320,10 +589,10 @@ export default function InventarioPage() {
       productoTipos,
       categoria: item.categoria || "",
       unidad: item.unidad || "",
-      stockActual: Number(item.stockActual ?? item.stockActual ?? 0),
-      stockMinimo: Number(item.stockMinimo ?? 0),
+      stockActual: String(Number(item.stockActual ?? 0)),
+      stockMinimo: String(Number(item.stockMinimo ?? 0)),
       ubicacion: item.ubicacion || "",
-      costoUnitario: Number(item.costoUnitario ?? 0),
+      costoUnitario: String(Number(item.costoUnitario ?? 0)),
       proveedorId: proveedorIds[0] || (item.proveedorId || ""),
       proveedorIds,
       fotoDataUrl: item.fotoDataUrl || "",
@@ -592,6 +861,64 @@ export default function InventarioPage() {
     });
   }, [items, itemsSearch, proveedorNameById]);
 
+  const sortedItems = React.useMemo(() => {
+    const list = Array.isArray(filteredItems) ? filteredItems.slice() : [];
+    const dir = itemsSort.dir === "desc" ? -1 : 1;
+    const get = (i) => {
+      if (!i) return "";
+      if (itemsSort.key === "nombre") return i.nombre || "";
+      if (itemsSort.key === "sku") return i.sku || "";
+      if (itemsSort.key === "categoria") return i.categoria || "";
+      if (itemsSort.key === "ubicacion") return i.ubicacion || "";
+      if (itemsSort.key === "unidad") return i.unidad || "";
+      if (itemsSort.key === "stockActual") return Number(i.stockActual || 0);
+      if (itemsSort.key === "stockMinimo") return Number(i.stockMinimo || 0);
+      if (itemsSort.key === "costoUnitario") return Number(i.costoUnitario || 0);
+      if (itemsSort.key === "proveedores") {
+        const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
+        return ids.map((id) => proveedorNameById[id] || "").filter(Boolean).join(" · ");
+      }
+      return i.nombre || "";
+    };
+    return list.sort((a, b) => dir * compareValues(get(a), get(b)));
+  }, [filteredItems, itemsSort, proveedorNameById]);
+
+  const sortedProveedores = React.useMemo(() => {
+    const list = Array.isArray(filteredProveedores) ? filteredProveedores.slice() : [];
+    const dir = provSort.dir === "desc" ? -1 : 1;
+    const get = (p) => {
+      if (!p) return "";
+      if (provSort.key === "razonSocial") return (p.razonSocial || p.nombre || "");
+      if (provSort.key === "nit") return p.nit || "";
+      if (provSort.key === "leadTimeDias") return Number(p.leadTimeDias || 0);
+      if (provSort.key === "modalidadEntrega") return p.modalidadEntrega || "";
+      if (provSort.key === "tipoPago") return p.tipoPago || "";
+      if (provSort.key === "contacto") return p.contacto || (Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || "") : "");
+      return (p.razonSocial || p.nombre || "");
+    };
+    return list.sort((a, b) => dir * compareValues(get(a), get(b)));
+  }, [filteredProveedores, provSort]);
+
+  const selectedItem = selectedItemId ? itemById[selectedItemId] : null;
+  const selectedProveedor = selectedProveedorId ? (proveedores || []).find((p) => p.id === selectedProveedorId) : null;
+
+  const selectedItemProveedorNames = React.useMemo(() => {
+    if (!selectedItem) return [];
+    const ids = Array.isArray(selectedItem.proveedorIds)
+      ? selectedItem.proveedorIds
+      : (selectedItem.proveedorId ? [selectedItem.proveedorId] : []);
+    return ids.map((id) => proveedorNameById[id] || "").filter(Boolean);
+  }, [selectedItem, proveedorNameById]);
+
+  const selectedProveedorItemList = React.useMemo(() => {
+    if (!selectedProveedor) return [];
+    const provId = selectedProveedor.id;
+    return (Array.isArray(items) ? items : []).filter((it) => {
+      const ids = Array.isArray(it.proveedorIds) ? it.proveedorIds : (it.proveedorId ? [it.proveedorId] : []);
+      return ids.includes(provId);
+    });
+  }, [selectedProveedor, items]);
+
   const startMovimiento = (item, tipo) => {
     setMov({ itemId: item.id, tipo, cantidad: 1, nota: "" });
   };
@@ -651,6 +978,21 @@ export default function InventarioPage() {
     }
   };
 
+  const ensureMovimientosForItem = async (itemId) => {
+    if (!itemId) return;
+    if (Array.isArray(movimientosCache[itemId])) return;
+    try {
+      setMovimientosLoadingItemId(itemId);
+      const lista = await listarMovimientosPorItem(itemId, { max: 50 });
+      setMovimientosCache((c) => ({ ...c, [itemId]: lista }));
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudieron cargar los movimientos");
+    } finally {
+      setMovimientosLoadingItemId("");
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4">
       <h1 className="text-xl font-semibold">Inventario</h1>
@@ -697,161 +1039,259 @@ export default function InventarioPage() {
             {loading ? (
               <div className="text-sm opacity-70 mt-3">Cargando…</div>
             ) : (
-              <div className="mt-4 space-y-2">
-                {filteredItems.length === 0 ? (
-                  <div className="text-sm opacity-70">Sin resultados.</div>
-                ) : filteredItems
-                  .slice()
-                  .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')))
-                  .map((i) => {
-                    const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
-                    const provNames = ids.map((id) => proveedorNameById[id] || '—').filter(Boolean);
-                    const low = Number(i.stockActual || 0) < Number(i.stockMinimo || 0);
-                    const openMov = mov.itemId === i.id;
-                    const openHist = movimientosOpenItemId === i.id;
-                    const histLoading = movimientosLoadingItemId === i.id;
-                    const hist = movimientosCache[i.id];
-                    return (
-                      <div key={i.id} className="rounded border border-gray-200 dark:border-gris-700 px-3 py-3">
-                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium truncate" title={i.nombre || ''}>{i.nombre || '—'}</div>
-                            <div className="text-xs opacity-70">
-                              SKU: {i.sku || '—'}{i.categoria ? ` · Cat: ${i.categoria}` : ''}{i.ubicacion ? ` · Ubic: ${i.ubicacion}` : ''}
+              <>
+                {sortedItems.length === 0 ? (
+                  <div className="text-sm opacity-70 mt-4">Sin resultados.</div>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left opacity-70">
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'nombre')}>Nombre{sortArrow(itemsSort, 'nombre')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'sku')}>SKU{sortArrow(itemsSort, 'sku')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'categoria')}>Categoría{sortArrow(itemsSort, 'categoria')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockActual')}>Stock{sortArrow(itemsSort, 'stockActual')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockMinimo')}>Mín{sortArrow(itemsSort, 'stockMinimo')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'unidad')}>Unidad{sortArrow(itemsSort, 'unidad')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'ubicacion')}>Ubicación{sortArrow(itemsSort, 'ubicacion')}</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'proveedores')}>Proveedores{sortArrow(itemsSort, 'proveedores')}</th>
+                          <th className="py-2">Productos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedItems.map((i) => {
+                          const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
+                          const provNames = ids.map((id) => proveedorNameById[id] || '—').filter(Boolean);
+                          const low = Number(i.stockActual || 0) < Number(i.stockMinimo || 0);
+                          const isSelected = selectedItemId === i.id;
+                          return (
+                            <tr
+                              key={i.id}
+                              onClick={() => {
+                                setSelectedProveedorId('');
+                                setSelectedItemId(i.id);
+                                ensureMovimientosForItem(i.id);
+                              }}
+                              className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer'}`}
+                            >
+                              <td className="py-2 pr-3">
+                                <div className="font-medium truncate max-w-[260px]" title={i.nombre || ''}>{i.nombre || '—'}</div>
+                              </td>
+                              <td className="py-2 pr-3 whitespace-nowrap">{i.sku || '—'}</td>
+                              <td className="py-2 pr-3 whitespace-nowrap">{i.categoria || '—'}</td>
+                              <td className={`py-2 pr-3 whitespace-nowrap ${low ? 'text-red-600 dark:text-red-300 font-medium' : ''}`}>{i.stockActual ?? 0}</td>
+                              <td className="py-2 pr-3 whitespace-nowrap">{i.stockMinimo ?? 0}</td>
+                              <td className="py-2 pr-3 whitespace-nowrap">{i.unidad || '—'}</td>
+                              <td className="py-2 pr-3 whitespace-nowrap">{i.ubicacion || '—'}</td>
+                              <td className="py-2 pr-3">
+                                <div className="truncate max-w-[260px]" title={provNames.join(' · ')}>
+                                  {provNames.length ? provNames.join(' · ') : '—'}
+                                </div>
+                              </td>
+                              <td className="py-2">
+                                <div className="truncate max-w-[280px]" title={Array.isArray(i.productoTipos) ? i.productoTipos.join(' · ') : (i.productoTipo || '')}>
+                                  {Array.isArray(i.productoTipos) ? (i.productoTipos.filter(Boolean).join(' · ') || '—') : (i.productoTipo || '—')}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {selectedItem && (
+                  <div className="fixed inset-0 z-50">
+                    <div
+                      className="absolute inset-0 bg-black/40"
+                      onClick={() => { setSelectedItemId(''); setShowSelectedItemMovs(true); cancelMovimiento(); }}
+                    />
+                    <div className="absolute inset-0 p-4 flex items-center justify-center">
+                      <div
+                        role="dialog"
+                        aria-modal="true"
+                        className="w-full max-w-xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
+                      >
+                        <div className="p-4 border-b border-gray-200 dark:border-gris-700 relative">
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedItemId(''); setShowSelectedItemMovs(true); cancelMovimiento(); }}
+                            className="absolute top-3 right-3 h-9 w-9 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                            aria-label="Cerrar"
+                            title="Cerrar"
+                          >
+                            <span className="text-base leading-none">✕</span>
+                          </button>
+
+                          <div className="text-sm font-medium">Ficha del item</div>
+                          <div className="text-lg font-semibold mt-1 break-words">{selectedItem.nombre || '—'}</div>
+                          <div className="text-xs opacity-70 mt-1">
+                            SKU: {selectedItem.sku || '—'}{selectedItem.categoria ? ` · Cat: ${selectedItem.categoria}` : ''}{selectedItem.ubicacion ? ` · Ubic: ${selectedItem.ubicacion}` : ''}
+                          </div>
+                        </div>
+
+                        <div className="p-4 overflow-y-auto">
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                              <div className="text-xs opacity-70">Stock</div>
+                              <div className="text-sm font-medium">{selectedItem.stockActual ?? 0} {selectedItem.unidad || ''}</div>
+                              <div className="text-xs opacity-70">Mínimo: {selectedItem.stockMinimo ?? 0}</div>
                             </div>
-                            <div className={`text-xs ${low ? 'text-red-600 dark:text-red-300' : 'opacity-70'}`}>
-                              Stock: {i.stockActual ?? 0} {i.unidad || ''} · Mín: {i.stockMinimo ?? 0}
+                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                              <div className="text-xs opacity-70">Costo unitario</div>
+                              <div className="text-sm font-medium">{formatCOP(selectedItem.costoUnitario ?? 0)}</div>
+                              <div className="text-xs opacity-70">Ubicación: {selectedItem.ubicacion || '—'}</div>
                             </div>
-                            <div className="text-xs opacity-70">
-                              Proveedores: {provNames.length ? provNames.slice(0, 3).join(' · ') + (provNames.length > 3 ? `…(+${provNames.length - 3})` : '') : '—'}
-                            </div>
-                            <div className="text-xs opacity-70">
-                              Productos: {Array.isArray(i.productoTipos) ? (i.productoTipos.filter(Boolean).join(' · ') || '—') : (i.productoTipo || '—')}
+                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                              <div className="text-xs opacity-70">Proveedores</div>
+                              <div className="text-sm">{selectedItemProveedorNames.length ? selectedItemProveedorNames.join(' · ') : '—'}</div>
+                              <div className="text-xs opacity-70 mt-1">Productos: {Array.isArray(selectedItem.productoTipos) ? (selectedItem.productoTipos.filter(Boolean).join(' · ') || '—') : (selectedItem.productoTipo || '—')}</div>
                             </div>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                          {selectedItem.fotoDataUrl ? (
+                            <div className="mt-3 flex items-start gap-3">
+                              <img
+                                src={selectedItem.fotoDataUrl}
+                                alt={selectedItem.nombre || 'foto'}
+                                className="w-24 h-24 object-cover rounded border border-gray-200 dark:border-gris-700"
+                              />
+                              <div className="text-xs opacity-70">
+                                <div>Imagen: {selectedItem.fotoFileName || '—'}</div>
+                                <div>Tamaño: {dataUrlSizeLabel(selectedItem.fotoDataUrl)}</div>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="mt-4 flex flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startMovimiento(selectedItem, 'ingreso')}
+                                className="text-xs px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white"
+                              >Ingreso</button>
+                              <button
+                                type="button"
+                                onClick={() => startMovimiento(selectedItem, 'salida')}
+                                className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
+                              >Salida</button>
+                              <button
+                                type="button"
+                                onClick={() => setShowSelectedItemMovs((v) => !v)}
+                                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                              >{showSelectedItemMovs ? 'Ocultar movimientos' : 'Mostrar movimientos'}</button>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => startMovimiento(i, 'ingreso')}
-                              className="text-xs px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white"
-                            >
-                              Ingreso
-                            </button>
+                              onClick={async () => {
+                                try {
+                                  setMovimientosLoadingItemId(selectedItem.id);
+                                  const lista = await listarMovimientosPorItem(selectedItem.id, { max: 50 });
+                                  setMovimientosCache((c) => ({ ...c, [selectedItem.id]: lista }));
+                                } catch (e) {
+                                  console.error(e);
+                                  toast.error('No se pudo refrescar');
+                                } finally {
+                                  setMovimientosLoadingItemId("");
+                                }
+                              }}
+                              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                            >Refrescar movimientos</button>
+                          </div>
+
+                          {mov.itemId === selectedItem.id && (
+                            <form onSubmit={submitMovimiento} className="mt-3 grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-2 items-end bg-gray-50 dark:bg-gris-700/50 border border-gray-200 dark:border-gris-600 rounded p-3">
+                              <div>
+                                <label className="text-xs text-gray-600 dark:text-gray-300">Cantidad ({mov.tipo})</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={mov.cantidad}
+                                  onChange={(e) => setMov((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                                  className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-600 dark:text-gray-300">Nota (opcional)</label>
+                                <input
+                                  value={mov.nota}
+                                  onChange={(e) => setMov((p) => ({ ...p, nota: e.target.value }))}
+                                  className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                                  placeholder="Factura, orden, responsable..."
+                                />
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <button type="button" onClick={cancelMovimiento} className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700">Cancelar</button>
+                                <button type="submit" className="text-xs px-3 py-2 rounded bg-trafico text-black">Registrar</button>
+                              </div>
+                            </form>
+                          )}
+
+                          {showSelectedItemMovs && (
+                            <div className="mt-3 rounded border border-gray-200 dark:border-gris-600 bg-white/60 dark:bg-gris-800/40 p-3">
+                              <div className="text-sm font-medium">Últimos movimientos</div>
+                              {movimientosLoadingItemId === selectedItem.id ? (
+                                <div className="text-sm opacity-70 mt-2">Cargando…</div>
+                              ) : (Array.isArray(movimientosCache[selectedItem.id]) && movimientosCache[selectedItem.id].length === 0) ? (
+                                <div className="text-sm opacity-70 mt-2">Sin movimientos.</div>
+                              ) : Array.isArray(movimientosCache[selectedItem.id]) ? (
+                                <div className="mt-2 overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-left opacity-70">
+                                        <th className="py-1 pr-3">Fecha</th>
+                                        <th className="py-1 pr-3">Tipo</th>
+                                        <th className="py-1 pr-3">Cant.</th>
+                                        <th className="py-1 pr-3">Stock</th>
+                                        <th className="py-1">Nota</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {movimientosCache[selectedItem.id].map((m) => (
+                                        <tr key={m.id} className="border-t border-gray-200/60 dark:border-gris-600/60">
+                                          <td className="py-1 pr-3 whitespace-nowrap">{formatMovimientoFecha(m.createdAt)}</td>
+                                          <td className="py-1 pr-3">{m.tipo === 'salida' ? 'Salida' : 'Ingreso'}</td>
+                                          <td className="py-1 pr-3">{m.cantidad ?? ''}</td>
+                                          <td className="py-1 pr-3">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} → ${m.stockDespues}` : ''}</td>
+                                          <td className="py-1">{m.nota || ''}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="text-sm opacity-70 mt-2">Selecciona “Refrescar movimientos”.</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
+                          <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                             <button
                               type="button"
-                              onClick={() => startMovimiento(i, 'salida')}
-                              className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
+                              onClick={() => { setShowAdmin(true); setActiveCreate('materia'); startEditarItem(selectedItem); }}
+                              className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
                             >
-                              Salida
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => startEditarItem(i)}
-                              className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
-                            >
+                              <span aria-hidden>✎</span>
                               Editar
                             </button>
                             <button
                               type="button"
-                              onClick={() => toggleMovimientos(i.id)}
-                              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                              onClick={() => handleEliminarItem(selectedItem)}
+                              className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
                             >
-                              {openHist ? 'Ocultar movimientos' : 'Movimientos'}
+                              <span aria-hidden>🗑</span>
+                              Eliminar
                             </button>
                           </div>
                         </div>
-
-                        {openMov && (
-                          <form onSubmit={submitMovimiento} className="mt-3 grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-2 items-end bg-gray-50 dark:bg-gris-700/50 border border-gray-200 dark:border-gris-600 rounded p-3">
-                            <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-300">Cantidad ({mov.tipo})</label>
-                              <input
-                                type="number"
-                                min={1}
-                                value={mov.cantidad}
-                                onChange={(e) => setMov((p) => ({ ...p, cantidad: Number(e.target.value) }))}
-                                className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-gray-600 dark:text-gray-300">Nota (opcional)</label>
-                              <input
-                                value={mov.nota}
-                                onChange={(e) => setMov((p) => ({ ...p, nota: e.target.value }))}
-                                className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                                placeholder="Factura, orden, responsable..."
-                              />
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <button type="button" onClick={cancelMovimiento} className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700">Cancelar</button>
-                              <button type="submit" className="text-xs px-3 py-2 rounded bg-trafico text-black">Registrar</button>
-                            </div>
-                          </form>
-                        )}
-
-                        {openHist && (
-                          <div className="mt-3 rounded border border-gray-200 dark:border-gris-600 bg-white/60 dark:bg-gris-800/40 p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm font-medium">Últimos movimientos</div>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    setMovimientosLoadingItemId(i.id);
-                                    const lista = await listarMovimientosPorItem(i.id, { max: 50 });
-                                    setMovimientosCache((c) => ({ ...c, [i.id]: lista }));
-                                  } catch (e) {
-                                    console.error(e);
-                                    toast.error('No se pudo refrescar');
-                                  } finally {
-                                    setMovimientosLoadingItemId("");
-                                  }
-                                }}
-                                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                              >
-                                Refrescar
-                              </button>
-                            </div>
-
-                            {histLoading ? (
-                              <div className="text-sm opacity-70 mt-2">Cargando…</div>
-                            ) : (Array.isArray(hist) && hist.length === 0) ? (
-                              <div className="text-sm opacity-70 mt-2">Sin movimientos.</div>
-                            ) : Array.isArray(hist) ? (
-                              <div className="mt-2 overflow-x-auto">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="text-left opacity-70">
-                                      <th className="py-1 pr-3">Fecha</th>
-                                      <th className="py-1 pr-3">Tipo</th>
-                                      <th className="py-1 pr-3">Cant.</th>
-                                      <th className="py-1 pr-3">Stock</th>
-                                      <th className="py-1">Nota</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {hist.map((m) => (
-                                      <tr key={m.id} className="border-t border-gray-200/60 dark:border-gris-600/60">
-                                        <td className="py-1 pr-3 whitespace-nowrap">{formatMovimientoFecha(m.createdAt)}</td>
-                                        <td className="py-1 pr-3">{m.tipo === 'salida' ? 'Salida' : 'Ingreso'}</td>
-                                        <td className="py-1 pr-3">{m.cantidad ?? ''}</td>
-                                        <td className="py-1 pr-3">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} → ${m.stockDespues}` : ''}</td>
-                                        <td className="py-1">{m.nota || ''}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-sm opacity-70 mt-2">Cargando…</div>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-              </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -869,6 +1309,72 @@ export default function InventarioPage() {
           </button>
         </div>
 
+        <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+          <div className="text-sm font-medium">Importar proveedores (Excel/CSV)</div>
+          <div className="text-[11px] opacity-70 mt-1">Lee la primera hoja. Requiere columnas para Razón social y NIT (nombres flexibles).</div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
+            <div>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => onProvImportFile(e.target.files?.[0])}
+                className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+              />
+              {provImportFileName && (
+                <div className="text-[11px] opacity-70 mt-1">Archivo: {provImportFileName}</div>
+              )}
+              {provImportSummary && (
+                <div className="text-[11px] opacity-70 mt-1">
+                  Filas: {provImportSummary.total ?? 0} · Válidas: {provImportSummary.valid ?? 0} · Omitidas: {provImportSummary.skipped ?? 0}
+                  {typeof provImportSummary.imported !== 'undefined' ? ` · Importadas: ${provImportSummary.imported}` : ''}
+                  {typeof provImportSummary.duplicates !== 'undefined' ? ` · Duplicados(NIT): ${provImportSummary.duplicates}` : ''}
+                </div>
+              )}
+              {provImportSummary?.errors?.length ? (
+                <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
+                  Primeros errores: {provImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' · ')}
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={runProvImport}
+              disabled={provImportBusy || provImportRows.length === 0}
+              className={`text-xs px-3 py-2 rounded ${provImportBusy || provImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
+            >
+              {provImportBusy ? 'Importando…' : 'Importar a Firebase'}
+            </button>
+          </div>
+
+          {provImportPreview.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left opacity-70">
+                    <th className="py-1 pr-3">Razón social</th>
+                    <th className="py-1 pr-3">NIT</th>
+                    <th className="py-1 pr-3">Lead time</th>
+                    <th className="py-1 pr-3">Ciudad</th>
+                    <th className="py-1">Contacto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {provImportPreview.map((p, idx) => (
+                    <tr key={idx} className="border-t border-gray-200/60 dark:border-gris-600/60">
+                      <td className="py-1 pr-3">{p.razonSocial}</td>
+                      <td className="py-1 pr-3">{p.nit}</td>
+                      <td className="py-1 pr-3">{p.leadTimeDias ?? 0}</td>
+                      <td className="py-1 pr-3">{Array.isArray(p.sedes) ? (p.sedes[0]?.ciudad || '') : ''}</td>
+                      <td className="py-1">{Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {sectionsOpen.proveedores && (
           <>
             <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
@@ -884,45 +1390,176 @@ export default function InventarioPage() {
               <div className="text-xs opacity-70 pt-2">Mostrando: {filteredProveedores.length} / {proveedores.length}</div>
             </div>
 
-            <div className="mt-4 space-y-2">
-              {filteredProveedores.length === 0 ? (
-                <div className="text-sm opacity-70">Sin resultados.</div>
-              ) : filteredProveedores
-                .slice()
-                .sort((a, b) => String((a.razonSocial || a.nombre) || '').localeCompare(String((b.razonSocial || b.nombre) || '')))
-                .map((p) => (
-                  <div key={p.id} className="rounded border border-gray-200 dark:border-gris-700 px-3 py-3">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" title={p.razonSocial || p.nombre || ''}>{p.razonSocial || p.nombre || '—'}</div>
-                        <div className="text-xs opacity-70">NIT: {p.nit || '—'} · Lead time: {Number(p.leadTimeDias ?? 0)} días</div>
-                        <div className="text-xs opacity-70">Entrega: {p.modalidadEntrega || '—'} · Pago: {p.tipoPago || '—'}</div>
-                        <div className="text-xs opacity-70">
-                          Contacto: {p.contacto || (Array.isArray(p.contactos) && p.contactos[0]?.nombre) || '—'}
-                          {p.telefono || (Array.isArray(p.contactos) && p.contactos[0]?.telefono) ? ` · Tel: ${p.telefono || p.contactos[0]?.telefono}` : ''}
-                          {p.email || (Array.isArray(p.contactos) && p.contactos[0]?.correo) ? ` · Email: ${p.email || p.contactos[0]?.correo}` : ''}
+            {sortedProveedores.length === 0 ? (
+              <div className="text-sm opacity-70 mt-4">Sin resultados.</div>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left opacity-70">
+                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'razonSocial')}>Razón social{sortArrow(provSort, 'razonSocial')}</th>
+                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'nit')}>NIT{sortArrow(provSort, 'nit')}</th>
+                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'leadTimeDias')}>Lead time{sortArrow(provSort, 'leadTimeDias')}</th>
+                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'modalidadEntrega')}>Entrega{sortArrow(provSort, 'modalidadEntrega')}</th>
+                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'tipoPago')}>Pago{sortArrow(provSort, 'tipoPago')}</th>
+                      <th className="py-2 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'contacto')}>Contacto{sortArrow(provSort, 'contacto')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedProveedores.map((p) => {
+                      const isSelected = selectedProveedorId === p.id;
+                      const contacto = p.contacto || (Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : '');
+                      return (
+                        <tr
+                          key={p.id}
+                          onClick={() => { setSelectedItemId(''); setSelectedProveedorId(p.id); }}
+                          className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer'}`}
+                        >
+                          <td className="py-2 pr-3">
+                            <div className="font-medium truncate max-w-[320px]" title={p.razonSocial || p.nombre || ''}>{p.razonSocial || p.nombre || '—'}</div>
+                          </td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{p.nit || '—'}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{Number(p.leadTimeDias ?? 0)} días</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{p.modalidadEntrega || '—'}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{p.tipoPago || '—'}</td>
+                          <td className="py-2">
+                            <div className="truncate max-w-[340px]" title={contacto}>{contacto || '—'}</div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {selectedProveedor && (
+              <div className="fixed inset-0 z-50">
+                <div
+                  className="absolute inset-0 bg-black/40"
+                  onClick={() => { setSelectedProveedorId(''); setShowSelectedProveedorItems(true); }}
+                />
+                <div className="absolute inset-0 p-4 flex items-center justify-center">
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    className="w-full max-w-xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
+                  >
+                    <div className="p-4 border-b border-gray-200 dark:border-gris-700 relative">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedProveedorId(''); setShowSelectedProveedorItems(true); }}
+                        className="absolute top-3 right-3 h-9 w-9 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                        aria-label="Cerrar"
+                        title="Cerrar"
+                      >
+                        <span className="text-base leading-none">✕</span>
+                      </button>
+
+                      <div className="text-sm font-medium">Ficha del proveedor</div>
+                      <div className="text-lg font-semibold mt-1 break-words">{selectedProveedor.razonSocial || selectedProveedor.nombre || '—'}</div>
+                      <div className="text-xs opacity-70 mt-1">NIT: {selectedProveedor.nit || '—'} · Lead time: {Number(selectedProveedor.leadTimeDias ?? 0)} días</div>
+                      <div className="text-xs opacity-70">Entrega: {selectedProveedor.modalidadEntrega || '—'} · Pago: {selectedProveedor.tipoPago || '—'}</div>
+                    </div>
+
+                    <div className="p-4 overflow-y-auto">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                          <div className="text-xs opacity-70">Contactos</div>
+                          <div className="text-sm mt-1">
+                            {Array.isArray(selectedProveedor.contactos) && selectedProveedor.contactos.length ? (
+                              selectedProveedor.contactos.slice(0, 3).map((c, idx) => (
+                                <div key={idx} className="text-xs">
+                                  {c.nombre || '—'}{c.telefono ? ` · ${c.telefono}` : ''}{c.correo ? ` · ${c.correo}` : ''}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-xs">{selectedProveedor.contacto || '—'}{selectedProveedor.telefono ? ` · ${selectedProveedor.telefono}` : ''}{selectedProveedor.email ? ` · ${selectedProveedor.email}` : ''}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                          <div className="text-xs opacity-70">Sedes</div>
+                          <div className="text-sm mt-1">
+                            {Array.isArray(selectedProveedor.sedes) && selectedProveedor.sedes.length ? (
+                              selectedProveedor.sedes.slice(0, 3).map((s, idx) => (
+                                <div key={idx} className="text-xs">{s.direccion || '—'}{s.ciudad ? ` · ${s.ciudad}` : ''}</div>
+                              ))
+                            ) : (
+                              <div className="text-xs">—</div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <div className="text-xs opacity-70">Items asociados: {selectedProveedorItemList.length}</div>
                         <button
                           type="button"
-                          onClick={() => { setShowAdmin(true); setActiveCreate('proveedor'); startEditarProveedor(p); }}
-                          className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
+                          onClick={() => setShowSelectedProveedorItems((v) => !v)}
+                          className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                        >{showSelectedProveedorItems ? 'Ocultar items' : 'Mostrar items'}</button>
+                      </div>
+
+                      {showSelectedProveedorItems && (
+                        <div className="mt-2 overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-left opacity-70">
+                                <th className="py-1 pr-3">Item</th>
+                                <th className="py-1 pr-3">SKU</th>
+                                <th className="py-1 pr-3">Stock</th>
+                                <th className="py-1">Ubicación</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedProveedorItemList.slice(0, 50).map((it) => (
+                                <tr
+                                  key={it.id}
+                                  onClick={() => {
+                                    setSelectedProveedorId('');
+                                    setSelectedItemId(it.id);
+                                    ensureMovimientosForItem(it.id);
+                                  }}
+                                  className="border-t border-gray-200/60 dark:border-gris-600/60 hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer"
+                                >
+                                  <td className="py-1 pr-3 font-medium">{it.nombre || '—'}</td>
+                                  <td className="py-1 pr-3">{it.sku || '—'}</td>
+                                  <td className="py-1 pr-3">{it.stockActual ?? 0}</td>
+                                  <td className="py-1">{it.ubicacion || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 border-t border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => { setShowAdmin(true); setActiveCreate('proveedor'); startEditarProveedor(selectedProveedor); }}
+                          className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
                         >
+                          <span aria-hidden>✎</span>
                           Editar
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleEliminarProveedor(p)}
-                          className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
+                          onClick={() => handleEliminarProveedor(selectedProveedor)}
+                          className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
                         >
+                          <span aria-hidden>🗑</span>
                           Eliminar
                         </button>
                       </div>
                     </div>
                   </div>
-                ))}
-            </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </section>
@@ -1116,7 +1753,7 @@ export default function InventarioPage() {
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">Lead time (días)</label>
-              <input type="number" min={0} value={provForm.leadTimeDias} onChange={(e)=>setProvForm(p=>({...p, leadTimeDias:Number(e.target.value)}))}
+              <input type="number" min={0} value={provForm.leadTimeDias} onChange={(e)=>setProvForm(p=>({...p, leadTimeDias:e.target.value}))}
                 className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700" />
             </div>
 
@@ -1532,17 +2169,21 @@ export default function InventarioPage() {
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">Stock actual</label>
-              <input type="number" min={0} value={itemForm.stockActual} onChange={(e)=>setItemForm(p=>({...p, stockActual:Number(e.target.value)}))}
+              <input type="number" min={0} value={itemForm.stockActual} onChange={(e)=>setItemForm(p=>({...p, stockActual:e.target.value}))}
                 className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700" />
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">Stock mínimo</label>
-              <input type="number" min={0} value={itemForm.stockMinimo} onChange={(e)=>setItemForm(p=>({...p, stockMinimo:Number(e.target.value)}))}
+              <input type="number" min={0} value={itemForm.stockMinimo} onChange={(e)=>setItemForm(p=>({...p, stockMinimo:e.target.value}))}
                 className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700" />
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">Costo unitario</label>
-              <input type="number" min={0} value={itemForm.costoUnitario} onChange={(e)=>setItemForm(p=>({...p, costoUnitario:Number(e.target.value)}))}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={itemForm.costoUnitario === "" ? "" : formatCOP(Number(itemForm.costoUnitario))}
+                onChange={(e)=>setItemForm(p=>({...p, costoUnitario: parseDigits(e.target.value)}))}
                 className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700" />
             </div>
             <div className="md:col-span-2">
