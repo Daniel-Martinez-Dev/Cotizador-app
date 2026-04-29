@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "skills": [
+    ".claude/skills/frontend-patterns",
+    ".claude/skills/backend-patterns",
+    ".claude/skills/api-design",
+    ".claude/skills/coding-standards",
+    ".claude/skills/continuous-learning",
+    ".claude/skills/token-optimization",
+    ".claude/skills/memory-persistence",
+    ".claude/skills/verification-loop"
+  ]
+}

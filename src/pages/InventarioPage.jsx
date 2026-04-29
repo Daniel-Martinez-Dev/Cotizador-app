@@ -6,6 +6,7 @@ import { compressImageFileToDataURL, dataUrlSizeLabel } from "../utils/imageComp
 import {
   actualizarItemInventario,
   crearItemInventario,
+  crearItemsInventarioBulk,
   crearProveedor,
   crearProveedoresBulk,
   actualizarProveedor,
@@ -18,17 +19,21 @@ import {
   listarMovimientosGeneral,
   actualizarMovimientoInventario,
   eliminarMovimientoInventario,
+  obtenerProveedorPorId,
 } from "../utils/firebaseInventory";
 
 export default function InventarioPage() {
-  const [activeCreate, setActiveCreate] = React.useState("materia"); // materia | proveedor
-  const [showAdmin, setShowAdmin] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState("materiales"); // materiales | proveedores | movimientos
+  const [showItemModal, setShowItemModal] = React.useState(false);
+  const [showProveedorModal, setShowProveedorModal] = React.useState(false);
+  const [showMovimientoModal, setShowMovimientoModal] = React.useState(false);
+  const [showProveedorOverlay, setShowProveedorOverlay] = React.useState(false);
   const [sectionsOpen, setSectionsOpen] = React.useState({
     inventario: true,
     proveedores: true,
     movimientos: true,
-    proveedoresRecientes: true,
-    itemsRecientes: true,
+    importProveedores: true,
+    importItems: true,
   });
   const emptySede = React.useMemo(() => ({ direccion: "", ciudad: "" }), []);
   const emptyContacto = React.useMemo(() => ({ nombre: "", telefono: "", correo: "" }), []);
@@ -55,10 +60,11 @@ export default function InventarioPage() {
   );
 
   const [proveedores, setProveedores] = React.useState([]);
+  const [extraProveedores, setExtraProveedores] = React.useState({});
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [itemsSearch, setItemsSearch] = React.useState("");
-  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "" });
+  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "" });
   const [movimientosOpenItemId, setMovimientosOpenItemId] = React.useState("");
   const [movimientosLoadingItemId, setMovimientosLoadingItemId] = React.useState("");
   const [movimientosCache, setMovimientosCache] = React.useState({}); // itemId -> movimientos[]
@@ -77,6 +83,11 @@ export default function InventarioPage() {
   const [provImportRows, setProvImportRows] = React.useState([]);
   const [provImportBusy, setProvImportBusy] = React.useState(false);
   const [provImportSummary, setProvImportSummary] = React.useState(null);
+
+  const [itemImportFileName, setItemImportFileName] = React.useState("");
+  const [itemImportRows, setItemImportRows] = React.useState([]);
+  const [itemImportBusy, setItemImportBusy] = React.useState(false);
+  const [itemImportSummary, setItemImportSummary] = React.useState(null);
 
   const [movGeneralLoaded, setMovGeneralLoaded] = React.useState(false);
   const [movGeneralLoading, setMovGeneralLoading] = React.useState(false);
@@ -145,6 +156,19 @@ export default function InventarioPage() {
   React.useEffect(() => {
     load();
   }, []);
+
+  React.useEffect(() => {
+    const hasModal = showItemModal || showProveedorModal || showMovimientoModal || showProveedorOverlay;
+    if (!hasModal) {
+      document.body.style.overflow = "";
+      return undefined;
+    }
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [showItemModal, showProveedorModal, showMovimientoModal, showProveedorOverlay]);
 
   const sanitizeText = (v) => {
     if (v === null || typeof v === 'undefined') return '';
@@ -287,6 +311,33 @@ export default function InventarioPage() {
     };
   };
 
+  const parseItemRow = (row) => {
+    const nombre = sanitizeText(getRowValue(row, [
+      'item', 'nombre', 'material', 'materia prima', 'materia_prima'
+    ]));
+    const productosRaw = sanitizeText(getRowValue(row, [
+      'productos', 'producto', 'producto(s)', 'linea', 'linea producto'
+    ]));
+    const categoria = sanitizeText(getRowValue(row, [
+      'categoria', 'categoría', 'tipo'
+    ]));
+    const unidad = sanitizeText(getRowValue(row, [
+      'unidad', 'u', 'unidad medida', 'unidad_medida'
+    ]));
+
+    const productoTipos = productosRaw
+      ? productosRaw.split(/[,;|]+/).map((p) => sanitizeText(p)).filter(Boolean)
+      : [];
+
+    return {
+      nombre,
+      productoTipos,
+      categoria,
+      unidad,
+      proveedorIds: [],
+    };
+  };
+
   const onProvImportFile = async (file) => {
     setProvImportSummary(null);
     setProvImportRows([]);
@@ -363,6 +414,68 @@ export default function InventarioPage() {
     }
   };
 
+  const onItemImportFile = async (file) => {
+    setItemImportSummary(null);
+    setItemImportRows([]);
+    setItemImportFileName(file?.name || "");
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) return toast.error('El archivo no tiene hojas');
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+
+      const parsed = [];
+      const errors = [];
+      for (let idx = 0; idx < json.length; idx += 1) {
+        const r = json[idx];
+        const p = parseItemRow(r);
+        if (!p.nombre) {
+          errors.push({ row: idx + 2, reason: 'Falta item' });
+          continue;
+        }
+        parsed.push({ ...p, rowId: `row-${idx}` });
+      }
+
+      setItemImportRows(parsed);
+      setItemImportSummary({ total: json.length, valid: parsed.length, skipped: errors.length, errors: errors.slice(0, 10) });
+      if (parsed.length === 0) toast.error('No se encontraron filas validas para importar');
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo leer el archivo');
+    }
+  };
+
+  const runItemImport = async () => {
+    try {
+      if (!itemImportRows.length) return toast.error('No hay filas para importar');
+      setItemImportBusy(true);
+
+      const payload = itemImportRows.map((r) => ({
+        nombre: r.nombre,
+        productoTipos: r.productoTipos,
+        categoria: r.categoria,
+        unidad: r.unidad,
+        stockActual: 0,
+        stockMinimo: 0,
+        costoUnitario: 0,
+        proveedorIds: Array.isArray(r.proveedorIds) ? r.proveedorIds : [],
+      }));
+
+      const res = await crearItemsInventarioBulk(payload);
+      toast.success(`Items importados: ${res.created}`);
+      setItemImportSummary((p) => ({ ...(p || {}), imported: res.created }));
+      await load();
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.message || 'No se pudo importar');
+    } finally {
+      setItemImportBusy(false);
+    }
+  };
+
   const validarProveedorForm = (form) => {
     if (!form.razonSocial?.trim()) return "Razón social requerida";
     if (!sanitizeNIT(form.nit)) return "NIT requerido";
@@ -394,6 +507,7 @@ export default function InventarioPage() {
     });
     setEditingProveedorId("");
     setProvMateriaSearch("");
+    setShowProveedorModal(false);
   };
 
   const validarItemForm = (form) => {
@@ -412,6 +526,7 @@ export default function InventarioPage() {
     setEditingItemId("");
     setProductoSearch("");
     setProveedorSearch("");
+    setShowItemModal(false);
   };
 
   const submitProveedor = async (e) => {
@@ -511,7 +626,8 @@ export default function InventarioPage() {
       materiaPrimaItemIds,
     });
     setProvMateriaSearch("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setActiveTab("proveedores");
+    setShowProveedorModal(true);
   };
 
   const handleEliminarProveedor = async (prov) => {
@@ -601,7 +717,8 @@ export default function InventarioPage() {
     });
     setProductoSearch("");
     setProveedorSearch("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setActiveTab("materiales");
+    setShowItemModal(true);
   };
 
   const toggleProductoTipo = (tipo) => {
@@ -663,20 +780,22 @@ export default function InventarioPage() {
 
   const goCrearMateriaPrimaDesdeBusqueda = () => {
     const suggestion = (provMateriaSearch || "").trim();
-    setActiveCreate("materia");
     if (suggestion) {
       setItemForm((p) => ({ ...p, nombre: p.nombre?.trim() ? p.nombre : suggestion }));
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setActiveTab("materiales");
+    setShowProveedorModal(false);
+    setShowItemModal(true);
   };
 
   const goCrearProveedorDesdeBusqueda = () => {
     const suggestion = (proveedorSearch || "").trim();
-    setActiveCreate("proveedor");
     if (suggestion) {
       setProvForm((p) => ({ ...p, razonSocial: p.razonSocial?.trim() ? p.razonSocial : suggestion }));
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setActiveTab("proveedores");
+    setShowItemModal(false);
+    setShowProveedorModal(true);
   };
 
   const handleFotoChange = async (file) => {
@@ -716,6 +835,29 @@ export default function InventarioPage() {
     }
     return map;
   }, [proveedores]);
+
+  const proveedorById = React.useMemo(() => {
+    const map = {};
+    for (const p of proveedores) {
+      map[p.id] = p;
+    }
+    return map;
+  }, [proveedores]);
+
+  const proveedorByIdAll = React.useMemo(() => {
+    return { ...proveedorById, ...extraProveedores };
+  }, [proveedorById, extraProveedores]);
+
+  const proveedorLabelById = React.useMemo(() => {
+    const map = {};
+    for (const p of proveedores) {
+      map[p.id] = p.razonSocial || p.nombre || p.id;
+    }
+    for (const [id, prov] of Object.entries(extraProveedores)) {
+      map[id] = prov?.razonSocial || prov?.nombre || map[id] || id;
+    }
+    return map;
+  }, [proveedores, extraProveedores]);
 
   const itemById = React.useMemo(() => {
     const map = {};
@@ -762,11 +904,13 @@ export default function InventarioPage() {
         String(m?.cantidad ?? ''),
         String(m?.stockAntes ?? ''),
         String(m?.stockDespues ?? ''),
+        proveedorLabelById[m?.proveedorId] || '',
+        String(m?.costoUnitario ?? ''),
         m?.nota,
       ].filter(Boolean).join(' ').toLowerCase();
       return terms.every((t) => blob.includes(t));
     });
-  }, [movGeneral, movGeneralSearch, itemById]);
+  }, [movGeneral, movGeneralSearch, itemById, proveedorLabelById]);
 
   const loadMovGeneral = async () => {
     setMovGeneralLoading(true);
@@ -847,7 +991,7 @@ export default function InventarioPage() {
     if (terms.length === 0) return items;
     return (Array.isArray(items) ? items : []).filter((i) => {
       const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
-      const provNames = ids.map((id) => proveedorNameById[id] || "").filter(Boolean).join(" ");
+      const provNames = ids.map((id) => proveedorLabelById[id] || "").filter(Boolean).join(" ");
       const blob = [
         i.nombre,
         i.sku,
@@ -860,6 +1004,15 @@ export default function InventarioPage() {
       return terms.every((t) => blob.includes(t));
     });
   }, [items, itemsSearch, proveedorNameById]);
+
+  const lowStockItems = React.useMemo(() => {
+    return (Array.isArray(items) ? items : []).filter((i) => {
+      const actual = Number(i.stockActual ?? 0);
+      const minimo = Number(i.stockMinimo ?? 0);
+      if (Number.isNaN(actual) || Number.isNaN(minimo)) return false;
+      return minimo > 0 && actual < minimo;
+    });
+  }, [items]);
 
   const sortedItems = React.useMemo(() => {
     const list = Array.isArray(filteredItems) ? filteredItems.slice() : [];
@@ -900,15 +1053,36 @@ export default function InventarioPage() {
   }, [filteredProveedores, provSort]);
 
   const selectedItem = selectedItemId ? itemById[selectedItemId] : null;
-  const selectedProveedor = selectedProveedorId ? (proveedores || []).find((p) => p.id === selectedProveedorId) : null;
+  const selectedProveedor = selectedProveedorId ? proveedorByIdAll[selectedProveedorId] : null;
 
-  const selectedItemProveedorNames = React.useMemo(() => {
+  const selectedItemProveedorIds = React.useMemo(() => {
     if (!selectedItem) return [];
-    const ids = Array.isArray(selectedItem.proveedorIds)
+    return Array.isArray(selectedItem.proveedorIds)
       ? selectedItem.proveedorIds
       : (selectedItem.proveedorId ? [selectedItem.proveedorId] : []);
-    return ids.map((id) => proveedorNameById[id] || "").filter(Boolean);
-  }, [selectedItem, proveedorNameById]);
+  }, [selectedItem]);
+
+  const loadProveedorIfMissing = React.useCallback(async (id) => {
+    if (!id) return;
+    if (proveedorByIdAll[id]) return;
+    try {
+      const prov = await obtenerProveedorPorId(id);
+      if (!prov) return;
+      setExtraProveedores((prev) => ({ ...prev, [id]: prov }));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [proveedorByIdAll]);
+
+  React.useEffect(() => {
+    for (const id of selectedItemProveedorIds) {
+      loadProveedorIfMissing(id);
+    }
+  }, [selectedItemProveedorIds, loadProveedorIfMissing]);
+
+  React.useEffect(() => {
+    if (selectedProveedorId) loadProveedorIfMissing(selectedProveedorId);
+  }, [selectedProveedorId, loadProveedorIfMissing]);
 
   const selectedProveedorItemList = React.useMemo(() => {
     if (!selectedProveedor) return [];
@@ -920,10 +1094,24 @@ export default function InventarioPage() {
   }, [selectedProveedor, items]);
 
   const startMovimiento = (item, tipo) => {
-    setMov({ itemId: item.id, tipo, cantidad: 1, nota: "" });
+    const ids = Array.isArray(item.proveedorIds)
+      ? item.proveedorIds
+      : (item.proveedorId ? [item.proveedorId] : []);
+    setMov({
+      itemId: item.id,
+      tipo,
+      cantidad: 1,
+      nota: "",
+      proveedorId: ids[0] || "",
+      costoUnitario: tipo === "ingreso" ? String(Number(item.costoUnitario ?? "")) : "",
+    });
+    setShowMovimientoModal(true);
   };
 
-  const cancelMovimiento = () => setMov({ itemId: "", tipo: "", cantidad: 1, nota: "" });
+  const cancelMovimiento = () => {
+    setMov({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "" });
+    setShowMovimientoModal(false);
+  };
 
   const submitMovimiento = async (e) => {
     e.preventDefault();
@@ -931,7 +1119,18 @@ export default function InventarioPage() {
       if (!mov.itemId) return;
       const cantidad = Number(mov.cantidad || 0);
       if (Number.isNaN(cantidad) || cantidad <= 0) return toast.error("Cantidad inválida");
-      await registrarMovimientoInventario(mov.itemId, { tipo: mov.tipo, cantidad, nota: mov.nota });
+      if (mov.tipo === "ingreso") {
+        if (!mov.proveedorId) return toast.error("Selecciona el proveedor");
+        const costoUnitario = Number(mov.costoUnitario || 0);
+        if (Number.isNaN(costoUnitario) || costoUnitario <= 0) return toast.error("Costo unitario inválido");
+      }
+      await registrarMovimientoInventario(mov.itemId, {
+        tipo: mov.tipo,
+        cantidad,
+        nota: mov.nota,
+        proveedorId: mov.tipo === "ingreso" ? mov.proveedorId : "",
+        costoUnitario: mov.tipo === "ingreso" ? Number(mov.costoUnitario || 0) : 0,
+      });
       toast.success(mov.tipo === 'salida' ? 'Salida registrada' : 'Ingreso registrado');
       // refrescar historial si está abierto
       if (movimientosOpenItemId === mov.itemId) {
@@ -995,15 +1194,82 @@ export default function InventarioPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <h1 className="text-xl font-semibold">Inventario</h1>
-      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-        Base inicial: materia prima + proveedores (lead time).
-      </p>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Inventario</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+            Base inicial: materia prima + proveedores (lead time).
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => { resetItemForm(); setShowItemModal(true); setActiveTab("materiales"); }}
+            className="text-xs px-3 py-2 rounded bg-trafico text-black hover:opacity-90"
+          >
+            Nuevo material
+          </button>
+          <button
+            type="button"
+            onClick={() => { resetProveedorForm(); setShowProveedorModal(true); setActiveTab("proveedores"); }}
+            className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+          >
+            Nuevo proveedor
+          </button>
+          {activeTab === "movimientos" && (
+            <button
+              type="button"
+              onClick={loadMovGeneral}
+              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+            >
+              {movGeneralLoaded ? "Refrescar movimientos" : "Cargar movimientos"}
+            </button>
+          )}
+        </div>
+      </div>
 
-      <section className="mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
+      {lowStockItems.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <div className="text-sm font-medium text-amber-900 dark:text-amber-100">
+            Alertas de stock bajo: {lowStockItems.length}
+          </div>
+          <div className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+            {lowStockItems.slice(0, 4).map((i) => i.nombre || "-").join(" - ")}
+            {lowStockItems.length > 4 ? " - ..." : ""}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {[
+          { key: "materiales", label: "Materiales" },
+          { key: "proveedores", label: "Proveedores" },
+          { key: "movimientos", label: "Movimientos" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`text-xs px-4 py-2 rounded-full border ${activeTab === tab.key
+              ? "bg-black text-white border-black dark:bg-white dark:text-black dark:border-white"
+              : "border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gris-700"}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <section className={`${activeTab === "materiales" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="font-medium">Listado de inventario</div>
+          <div className="font-medium">Materiales</div>
           <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => toggleSection('importItems')}
+              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+            >
+              {sectionsOpen.importItems ? 'Ocultar importacion' : 'Mostrar importacion'}
+            </button>
             <button
               type="button"
               onClick={() => toggleSection('inventario')}
@@ -1011,15 +1277,74 @@ export default function InventarioPage() {
             >
               {sectionsOpen.inventario ? 'Ocultar listado' : 'Mostrar listado'}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowAdmin((v) => !v)}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {showAdmin ? 'Ocultar creación/edición' : 'Crear/editar materia prima y proveedores'}
-            </button>
           </div>
         </div>
+
+        {sectionsOpen.importItems && (
+          <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+            <div className="text-sm font-medium">Importar materiales (Excel/CSV)</div>
+            <div className="text-[11px] opacity-70 mt-1">Columnas esperadas: ITEM, PRODUCTOS, CATEGORIA, UNIDAD.</div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
+              <div>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => onItemImportFile(e.target.files?.[0])}
+                  className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                />
+                {itemImportFileName && (
+                  <div className="text-[11px] opacity-70 mt-1">Archivo: {itemImportFileName}</div>
+                )}
+                {itemImportSummary && (
+                  <div className="text-[11px] opacity-70 mt-1">
+                    Filas: {itemImportSummary.total ?? 0} - Validas: {itemImportSummary.valid ?? 0} - Omitidas: {itemImportSummary.skipped ?? 0}
+                    {typeof itemImportSummary.imported !== 'undefined' ? ` - Importadas: ${itemImportSummary.imported}` : ''}
+                  </div>
+                )}
+                {itemImportSummary?.errors?.length ? (
+                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
+                    Primeros errores: {itemImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' - ')}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={runItemImport}
+                disabled={itemImportBusy || itemImportRows.length === 0}
+                className={`text-xs px-3 py-2 rounded ${itemImportBusy || itemImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
+              >
+                {itemImportBusy ? 'Importando...' : 'Importar a Firebase'}
+              </button>
+            </div>
+
+            {itemImportRows.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <div className="text-[11px] opacity-70 mb-2">Selecciona proveedores por item antes de importar.</div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left opacity-70">
+                      <th className="py-1 pr-3">Item</th>
+                      <th className="py-1 pr-3">Productos</th>
+                      <th className="py-1 pr-3">Categoria</th>
+                      <th className="py-1 pr-3">Unidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itemImportRows.map((r) => (
+                      <tr key={r.rowId} className="border-t border-gray-200/60 dark:border-gris-600/60">
+                        <td className="py-1 pr-3">{r.nombre}</td>
+                        <td className="py-1 pr-3">{Array.isArray(r.productoTipos) ? r.productoTipos.join(' | ') : ''}</td>
+                        <td className="py-1 pr-3">{r.categoria || '—'}</td>
+                        <td className="py-1 pr-3">{r.unidad || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {sectionsOpen.inventario && (
           <>
@@ -1047,21 +1372,20 @@ export default function InventarioPage() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-left opacity-70">
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'nombre')}>Nombre{sortArrow(itemsSort, 'nombre')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'sku')}>SKU{sortArrow(itemsSort, 'sku')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'categoria')}>Categoría{sortArrow(itemsSort, 'categoria')}</th>
+                          <th className="py-2 pr-3">Estado</th>
+                          <th className="py-2 pr-3">Foto</th>
+                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'nombre')}>Material{sortArrow(itemsSort, 'nombre')}</th>
                           <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockActual')}>Stock{sortArrow(itemsSort, 'stockActual')}</th>
                           <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockMinimo')}>Mín{sortArrow(itemsSort, 'stockMinimo')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'unidad')}>Unidad{sortArrow(itemsSort, 'unidad')}</th>
                           <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'ubicacion')}>Ubicación{sortArrow(itemsSort, 'ubicacion')}</th>
                           <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'proveedores')}>Proveedores{sortArrow(itemsSort, 'proveedores')}</th>
-                          <th className="py-2">Productos</th>
+                          <th className="py-2">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {sortedItems.map((i) => {
                           const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
-                          const provNames = ids.map((id) => proveedorNameById[id] || '—').filter(Boolean);
+                          const provNames = ids.map((id) => proveedorLabelById[id] || '—').filter(Boolean);
                           const low = Number(i.stockActual || 0) < Number(i.stockMinimo || 0);
                           const isSelected = selectedItemId === i.id;
                           return (
@@ -1072,16 +1396,32 @@ export default function InventarioPage() {
                                 setSelectedItemId(i.id);
                                 ensureMovimientosForItem(i.id);
                               }}
-                              className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer'}`}
+                              className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top cursor-pointer ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20'}`}
                             >
                               <td className="py-2 pr-3">
-                                <div className="font-medium truncate max-w-[260px]" title={i.nombre || ''}>{i.nombre || '—'}</div>
+                                <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium ${low ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'}`}>
+                                  {low ? 'Bajo' : 'Ok'}
+                                </span>
                               </td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{i.sku || '—'}</td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{i.categoria || '—'}</td>
-                              <td className={`py-2 pr-3 whitespace-nowrap ${low ? 'text-red-600 dark:text-red-300 font-medium' : ''}`}>{i.stockActual ?? 0}</td>
+                              <td className="py-2 pr-3">
+                                {i.fotoDataUrl ? (
+                                  <img
+                                    src={i.fotoDataUrl}
+                                    alt={i.nombre || 'foto'}
+                                    className="h-10 w-10 rounded object-cover border border-gray-200 dark:border-gris-600"
+                                  />
+                                ) : (
+                                  <div className="h-10 w-10 rounded border border-dashed border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800" />
+                                )}
+                              </td>
+                              <td className="py-2 pr-3">
+                                <div className="font-medium truncate max-w-[260px]" title={i.nombre || ''}>{i.nombre || '—'}</div>
+                                <div className="text-[11px] opacity-70">SKU: {i.sku || '—'}{i.categoria ? ` · ${i.categoria}` : ''}</div>
+                              </td>
+                              <td className={`py-2 pr-3 whitespace-nowrap ${low ? 'text-red-600 dark:text-red-300 font-medium' : ''}`}>
+                                {i.stockActual ?? 0} {i.unidad || ''}
+                              </td>
                               <td className="py-2 pr-3 whitespace-nowrap">{i.stockMinimo ?? 0}</td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{i.unidad || '—'}</td>
                               <td className="py-2 pr-3 whitespace-nowrap">{i.ubicacion || '—'}</td>
                               <td className="py-2 pr-3">
                                 <div className="truncate max-w-[260px]" title={provNames.join(' · ')}>
@@ -1089,8 +1429,17 @@ export default function InventarioPage() {
                                 </div>
                               </td>
                               <td className="py-2">
-                                <div className="truncate max-w-[280px]" title={Array.isArray(i.productoTipos) ? i.productoTipos.join(' · ') : (i.productoTipo || '')}>
-                                  {Array.isArray(i.productoTipos) ? (i.productoTipos.filter(Boolean).join(' · ') || '—') : (i.productoTipo || '—')}
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'ingreso'); }}
+                                    className="text-xs px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white"
+                                  >+</button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'salida'); }}
+                                    className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white"
+                                  >-</button>
                                 </div>
                               </td>
                             </tr>
@@ -1107,11 +1456,11 @@ export default function InventarioPage() {
                       className="absolute inset-0 bg-black/40"
                       onClick={() => { setSelectedItemId(''); setShowSelectedItemMovs(true); cancelMovimiento(); }}
                     />
-                    <div className="absolute inset-0 p-4 flex items-center justify-center">
+                    <div className="absolute inset-0 p-4 flex items-start justify-center">
                       <div
                         role="dialog"
                         aria-modal="true"
-                        className="w-full max-w-xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
+                        className="w-full max-w-3xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
                       >
                         <div className="p-4 border-b border-gray-200 dark:border-gris-700 relative">
                           <button
@@ -1131,8 +1480,8 @@ export default function InventarioPage() {
                           </div>
                         </div>
 
-                        <div className="p-4 overflow-y-auto">
-                          <div className="grid grid-cols-1 gap-3">
+                        <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
                               <div className="text-xs opacity-70">Stock</div>
                               <div className="text-sm font-medium">{selectedItem.stockActual ?? 0} {selectedItem.unidad || ''}</div>
@@ -1145,7 +1494,27 @@ export default function InventarioPage() {
                             </div>
                             <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
                               <div className="text-xs opacity-70">Proveedores</div>
-                              <div className="text-sm">{selectedItemProveedorNames.length ? selectedItemProveedorNames.join(' · ') : '—'}</div>
+                              <div className="text-sm flex flex-wrap gap-1.5">
+                                {selectedItemProveedorIds.length ? (
+                                  selectedItemProveedorIds.map((id) => {
+                                    const prov = proveedorById[id];
+                                    const label = prov?.razonSocial || prov?.nombre || proveedorNameById[id] || id;
+                                    return (
+                                      <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => { setSelectedProveedorId(id); setShowProveedorOverlay(true); }}
+                                        className="text-xs px-2 py-1 rounded-full border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700"
+                                        title="Ver proveedor"
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })
+                                ) : (
+                                  <span>Sin proveedores</span>
+                                )}
+                              </div>
                               <div className="text-xs opacity-70 mt-1">Productos: {Array.isArray(selectedItem.productoTipos) ? (selectedItem.productoTipos.filter(Boolean).join(' · ') || '—') : (selectedItem.productoTipo || '—')}</div>
                             </div>
                           </div>
@@ -1164,24 +1533,22 @@ export default function InventarioPage() {
                             </div>
                           ) : null}
 
-                          <div className="mt-4 flex flex-col gap-2">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => startMovimiento(selectedItem, 'ingreso')}
-                                className="text-xs px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white"
-                              >Ingreso</button>
-                              <button
-                                type="button"
-                                onClick={() => startMovimiento(selectedItem, 'salida')}
-                                className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
-                              >Salida</button>
-                              <button
-                                type="button"
-                                onClick={() => setShowSelectedItemMovs((v) => !v)}
-                                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                              >{showSelectedItemMovs ? 'Ocultar movimientos' : 'Mostrar movimientos'}</button>
-                            </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startMovimiento(selectedItem, 'ingreso')}
+                              className="text-xs px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white"
+                            >Ingreso</button>
+                            <button
+                              type="button"
+                              onClick={() => startMovimiento(selectedItem, 'salida')}
+                              className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
+                            >Salida</button>
+                            <button
+                              type="button"
+                              onClick={() => setShowSelectedItemMovs((v) => !v)}
+                              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                            >{showSelectedItemMovs ? 'Ocultar movimientos' : 'Mostrar movimientos'}</button>
                             <button
                               type="button"
                               onClick={async () => {
@@ -1200,39 +1567,11 @@ export default function InventarioPage() {
                             >Refrescar movimientos</button>
                           </div>
 
-                          {mov.itemId === selectedItem.id && (
-                            <form onSubmit={submitMovimiento} className="mt-3 grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-2 items-end bg-gray-50 dark:bg-gris-700/50 border border-gray-200 dark:border-gris-600 rounded p-3">
-                              <div>
-                                <label className="text-xs text-gray-600 dark:text-gray-300">Cantidad ({mov.tipo})</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={mov.cantidad}
-                                  onChange={(e) => setMov((p) => ({ ...p, cantidad: Number(e.target.value) }))}
-                                  className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs text-gray-600 dark:text-gray-300">Nota (opcional)</label>
-                                <input
-                                  value={mov.nota}
-                                  onChange={(e) => setMov((p) => ({ ...p, nota: e.target.value }))}
-                                  className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                                  placeholder="Factura, orden, responsable..."
-                                />
-                              </div>
-                              <div className="flex gap-2 justify-end">
-                                <button type="button" onClick={cancelMovimiento} className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700">Cancelar</button>
-                                <button type="submit" className="text-xs px-3 py-2 rounded bg-trafico text-black">Registrar</button>
-                              </div>
-                            </form>
-                          )}
-
                           {showSelectedItemMovs && (
                             <div className="mt-3 rounded border border-gray-200 dark:border-gris-600 bg-white/60 dark:bg-gris-800/40 p-3">
-                              <div className="text-sm font-medium">Últimos movimientos</div>
+                              <div className="text-sm font-medium">Ultimos movimientos</div>
                               {movimientosLoadingItemId === selectedItem.id ? (
-                                <div className="text-sm opacity-70 mt-2">Cargando…</div>
+                                <div className="text-sm opacity-70 mt-2">Cargando...</div>
                               ) : (Array.isArray(movimientosCache[selectedItem.id]) && movimientosCache[selectedItem.id].length === 0) ? (
                                 <div className="text-sm opacity-70 mt-2">Sin movimientos.</div>
                               ) : Array.isArray(movimientosCache[selectedItem.id]) ? (
@@ -1244,6 +1583,8 @@ export default function InventarioPage() {
                                         <th className="py-1 pr-3">Tipo</th>
                                         <th className="py-1 pr-3">Cant.</th>
                                         <th className="py-1 pr-3">Stock</th>
+                                        <th className="py-1 pr-3">Proveedor</th>
+                                        <th className="py-1 pr-3">Costo</th>
                                         <th className="py-1">Nota</th>
                                       </tr>
                                     </thead>
@@ -1253,7 +1594,9 @@ export default function InventarioPage() {
                                           <td className="py-1 pr-3 whitespace-nowrap">{formatMovimientoFecha(m.createdAt)}</td>
                                           <td className="py-1 pr-3">{m.tipo === 'salida' ? 'Salida' : 'Ingreso'}</td>
                                           <td className="py-1 pr-3">{m.cantidad ?? ''}</td>
-                                          <td className="py-1 pr-3">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} → ${m.stockDespues}` : ''}</td>
+                                          <td className="py-1 pr-3">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} -> ${m.stockDespues}` : ''}</td>
+                                          <td className="py-1 pr-3">{proveedorLabelById[m.proveedorId] || '—'}</td>
+                                          <td className="py-1 pr-3">{m.costoUnitario ? formatCOP(m.costoUnitario) : '—'}</td>
                                           <td className="py-1">{m.nota || ''}</td>
                                         </tr>
                                       ))}
@@ -1261,7 +1604,7 @@ export default function InventarioPage() {
                                   </table>
                                 </div>
                               ) : (
-                                <div className="text-sm opacity-70 mt-2">Selecciona “Refrescar movimientos”.</div>
+                                <div className="text-sm opacity-70 mt-2">Selecciona "Refrescar movimientos".</div>
                               )}
                             </div>
                           )}
@@ -1271,7 +1614,7 @@ export default function InventarioPage() {
                           <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
                             <button
                               type="button"
-                              onClick={() => { setShowAdmin(true); setActiveCreate('materia'); startEditarItem(selectedItem); }}
+                              onClick={() => startEditarItem(selectedItem)}
                               className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
                             >
                               <span aria-hidden>✎</span>
@@ -1297,83 +1640,94 @@ export default function InventarioPage() {
         )}
       </section>
 
-      <section className="mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
+      <section className={`${activeTab === "proveedores" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
         <div className="flex items-center justify-between gap-3">
           <div className="font-medium">Proveedores</div>
-          <button
-            type="button"
-            onClick={() => toggleSection('proveedores')}
-            className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-          >
-            {sectionsOpen.proveedores ? 'Ocultar listado' : 'Mostrar listado'}
-          </button>
-        </div>
-
-        <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-          <div className="text-sm font-medium">Importar proveedores (Excel/CSV)</div>
-          <div className="text-[11px] opacity-70 mt-1">Lee la primera hoja. Requiere columnas para Razón social y NIT (nombres flexibles).</div>
-          <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-            <div>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={(e) => onProvImportFile(e.target.files?.[0])}
-                className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
-              />
-              {provImportFileName && (
-                <div className="text-[11px] opacity-70 mt-1">Archivo: {provImportFileName}</div>
-              )}
-              {provImportSummary && (
-                <div className="text-[11px] opacity-70 mt-1">
-                  Filas: {provImportSummary.total ?? 0} · Válidas: {provImportSummary.valid ?? 0} · Omitidas: {provImportSummary.skipped ?? 0}
-                  {typeof provImportSummary.imported !== 'undefined' ? ` · Importadas: ${provImportSummary.imported}` : ''}
-                  {typeof provImportSummary.duplicates !== 'undefined' ? ` · Duplicados(NIT): ${provImportSummary.duplicates}` : ''}
-                </div>
-              )}
-              {provImportSummary?.errors?.length ? (
-                <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
-                  Primeros errores: {provImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' · ')}
-                </div>
-              ) : null}
-            </div>
-
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={runProvImport}
-              disabled={provImportBusy || provImportRows.length === 0}
-              className={`text-xs px-3 py-2 rounded ${provImportBusy || provImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
+              onClick={() => toggleSection('importProveedores')}
+              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
             >
-              {provImportBusy ? 'Importando…' : 'Importar a Firebase'}
+              {sectionsOpen.importProveedores ? 'Ocultar importacion' : 'Mostrar importacion'}
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleSection('proveedores')}
+              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+            >
+              {sectionsOpen.proveedores ? 'Ocultar listado' : 'Mostrar listado'}
             </button>
           </div>
-
-          {provImportPreview.length > 0 && (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left opacity-70">
-                    <th className="py-1 pr-3">Razón social</th>
-                    <th className="py-1 pr-3">NIT</th>
-                    <th className="py-1 pr-3">Lead time</th>
-                    <th className="py-1 pr-3">Ciudad</th>
-                    <th className="py-1">Contacto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {provImportPreview.map((p, idx) => (
-                    <tr key={idx} className="border-t border-gray-200/60 dark:border-gris-600/60">
-                      <td className="py-1 pr-3">{p.razonSocial}</td>
-                      <td className="py-1 pr-3">{p.nit}</td>
-                      <td className="py-1 pr-3">{p.leadTimeDias ?? 0}</td>
-                      <td className="py-1 pr-3">{Array.isArray(p.sedes) ? (p.sedes[0]?.ciudad || '') : ''}</td>
-                      <td className="py-1">{Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {sectionsOpen.importProveedores && (
+          <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+            <div className="text-sm font-medium">Importar proveedores (Excel/CSV)</div>
+            <div className="text-[11px] opacity-70 mt-1">Lee la primera hoja. Requiere columnas para Razon social y NIT (nombres flexibles).</div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
+              <div>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => onProvImportFile(e.target.files?.[0])}
+                  className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
+                />
+                {provImportFileName && (
+                  <div className="text-[11px] opacity-70 mt-1">Archivo: {provImportFileName}</div>
+                )}
+                {provImportSummary && (
+                  <div className="text-[11px] opacity-70 mt-1">
+                    Filas: {provImportSummary.total ?? 0} - Validas: {provImportSummary.valid ?? 0} - Omitidas: {provImportSummary.skipped ?? 0}
+                    {typeof provImportSummary.imported !== 'undefined' ? ` - Importadas: ${provImportSummary.imported}` : ''}
+                    {typeof provImportSummary.duplicates !== 'undefined' ? ` - Duplicados(NIT): ${provImportSummary.duplicates}` : ''}
+                  </div>
+                )}
+                {provImportSummary?.errors?.length ? (
+                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
+                    Primeros errores: {provImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' - ')}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={runProvImport}
+                disabled={provImportBusy || provImportRows.length === 0}
+                className={`text-xs px-3 py-2 rounded ${provImportBusy || provImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
+              >
+                {provImportBusy ? 'Importando...' : 'Importar a Firebase'}
+              </button>
+            </div>
+
+            {provImportPreview.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left opacity-70">
+                      <th className="py-1 pr-3">Razon social</th>
+                      <th className="py-1 pr-3">NIT</th>
+                      <th className="py-1 pr-3">Lead time</th>
+                      <th className="py-1 pr-3">Ciudad</th>
+                      <th className="py-1">Contacto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {provImportPreview.map((p, idx) => (
+                      <tr key={idx} className="border-t border-gray-200/60 dark:border-gris-600/60">
+                        <td className="py-1 pr-3">{p.razonSocial}</td>
+                        <td className="py-1 pr-3">{p.nit}</td>
+                        <td className="py-1 pr-3">{p.leadTimeDias ?? 0}</td>
+                        <td className="py-1 pr-3">{Array.isArray(p.sedes) ? (p.sedes[0]?.ciudad || '') : ''}</td>
+                        <td className="py-1">{Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {sectionsOpen.proveedores && (
           <>
@@ -1393,7 +1747,7 @@ export default function InventarioPage() {
             {sortedProveedores.length === 0 ? (
               <div className="text-sm opacity-70 mt-4">Sin resultados.</div>
             ) : (
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4 rounded-lg border border-gray-200 dark:border-gris-700 overflow-auto max-h-[420px]">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-left opacity-70">
@@ -1412,7 +1766,11 @@ export default function InventarioPage() {
                       return (
                         <tr
                           key={p.id}
-                          onClick={() => { setSelectedItemId(''); setSelectedProveedorId(p.id); }}
+                          onClick={() => {
+                            setSelectedItemId('');
+                            setSelectedProveedorId(p.id);
+                            setShowProveedorOverlay(true);
+                          }}
                           className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer'}`}
                         >
                           <td className="py-2 pr-3">
@@ -1432,139 +1790,11 @@ export default function InventarioPage() {
                 </table>
               </div>
             )}
-
-            {selectedProveedor && (
-              <div className="fixed inset-0 z-50">
-                <div
-                  className="absolute inset-0 bg-black/40"
-                  onClick={() => { setSelectedProveedorId(''); setShowSelectedProveedorItems(true); }}
-                />
-                <div className="absolute inset-0 p-4 flex items-center justify-center">
-                  <div
-                    role="dialog"
-                    aria-modal="true"
-                    className="w-full max-w-xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
-                  >
-                    <div className="p-4 border-b border-gray-200 dark:border-gris-700 relative">
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedProveedorId(''); setShowSelectedProveedorItems(true); }}
-                        className="absolute top-3 right-3 h-9 w-9 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
-                        aria-label="Cerrar"
-                        title="Cerrar"
-                      >
-                        <span className="text-base leading-none">✕</span>
-                      </button>
-
-                      <div className="text-sm font-medium">Ficha del proveedor</div>
-                      <div className="text-lg font-semibold mt-1 break-words">{selectedProveedor.razonSocial || selectedProveedor.nombre || '—'}</div>
-                      <div className="text-xs opacity-70 mt-1">NIT: {selectedProveedor.nit || '—'} · Lead time: {Number(selectedProveedor.leadTimeDias ?? 0)} días</div>
-                      <div className="text-xs opacity-70">Entrega: {selectedProveedor.modalidadEntrega || '—'} · Pago: {selectedProveedor.tipoPago || '—'}</div>
-                    </div>
-
-                    <div className="p-4 overflow-y-auto">
-                      <div className="grid grid-cols-1 gap-3">
-                        <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                          <div className="text-xs opacity-70">Contactos</div>
-                          <div className="text-sm mt-1">
-                            {Array.isArray(selectedProveedor.contactos) && selectedProveedor.contactos.length ? (
-                              selectedProveedor.contactos.slice(0, 3).map((c, idx) => (
-                                <div key={idx} className="text-xs">
-                                  {c.nombre || '—'}{c.telefono ? ` · ${c.telefono}` : ''}{c.correo ? ` · ${c.correo}` : ''}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="text-xs">{selectedProveedor.contacto || '—'}{selectedProveedor.telefono ? ` · ${selectedProveedor.telefono}` : ''}{selectedProveedor.email ? ` · ${selectedProveedor.email}` : ''}</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                          <div className="text-xs opacity-70">Sedes</div>
-                          <div className="text-sm mt-1">
-                            {Array.isArray(selectedProveedor.sedes) && selectedProveedor.sedes.length ? (
-                              selectedProveedor.sedes.slice(0, 3).map((s, idx) => (
-                                <div key={idx} className="text-xs">{s.direccion || '—'}{s.ciudad ? ` · ${s.ciudad}` : ''}</div>
-                              ))
-                            ) : (
-                              <div className="text-xs">—</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <div className="text-xs opacity-70">Items asociados: {selectedProveedorItemList.length}</div>
-                        <button
-                          type="button"
-                          onClick={() => setShowSelectedProveedorItems((v) => !v)}
-                          className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                        >{showSelectedProveedorItems ? 'Ocultar items' : 'Mostrar items'}</button>
-                      </div>
-
-                      {showSelectedProveedorItems && (
-                        <div className="mt-2 overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-left opacity-70">
-                                <th className="py-1 pr-3">Item</th>
-                                <th className="py-1 pr-3">SKU</th>
-                                <th className="py-1 pr-3">Stock</th>
-                                <th className="py-1">Ubicación</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedProveedorItemList.slice(0, 50).map((it) => (
-                                <tr
-                                  key={it.id}
-                                  onClick={() => {
-                                    setSelectedProveedorId('');
-                                    setSelectedItemId(it.id);
-                                    ensureMovimientosForItem(it.id);
-                                  }}
-                                  className="border-t border-gray-200/60 dark:border-gris-600/60 hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer"
-                                >
-                                  <td className="py-1 pr-3 font-medium">{it.nombre || '—'}</td>
-                                  <td className="py-1 pr-3">{it.sku || '—'}</td>
-                                  <td className="py-1 pr-3">{it.stockActual ?? 0}</td>
-                                  <td className="py-1">{it.ubicacion || '—'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-4 border-t border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
-                      <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={() => { setShowAdmin(true); setActiveCreate('proveedor'); startEditarProveedor(selectedProveedor); }}
-                          className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
-                        >
-                          <span aria-hidden>✎</span>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarProveedor(selectedProveedor)}
-                          className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
-                        >
-                          <span aria-hidden>🗑</span>
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
       </section>
 
-      <section className="mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
+      <section className={`${activeTab === "movimientos" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="font-medium">Movimientos (general)</div>
           <div className="flex gap-2">
@@ -1618,6 +1848,8 @@ export default function InventarioPage() {
                         <th className="py-2 pr-3">Tipo</th>
                         <th className="py-2 pr-3">Cant.</th>
                         <th className="py-2 pr-3">Stock</th>
+                        <th className="py-2 pr-3">Proveedor</th>
+                        <th className="py-2 pr-3">Costo</th>
                         <th className="py-2 pr-3">Nota</th>
                         <th className="py-2">Acciones</th>
                       </tr>
@@ -1663,6 +1895,8 @@ export default function InventarioPage() {
                           ) : (m.cantidad ?? '')}
                         </td>
                         <td className="py-2 pr-3 whitespace-nowrap">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} → ${m.stockDespues}` : ''}</td>
+                        <td className="py-2 pr-3">{proveedorNameById[m.proveedorId] || '—'}</td>
+                        <td className="py-2 pr-3">{m.costoUnitario ? formatCOP(m.costoUnitario) : '—'}</td>
                         <td className="py-2 pr-3">
                           {isEditing ? (
                             <form onSubmit={(e) => submitEditarMovimiento(e, m)}>
@@ -1715,32 +1949,232 @@ export default function InventarioPage() {
         )}
       </section>
 
-      <div className={`${showAdmin ? '' : 'hidden'} mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-2`}>
-        <div className="inline-flex rounded border border-gray-200 dark:border-gris-700 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setActiveCreate("materia")}
-            className={`px-4 py-2 text-sm ${activeCreate === 'materia' ? 'bg-trafico text-black' : 'bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gris-700'}`}
-          >
-            Crear materia prima
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveCreate("proveedor")}
-            className={`px-4 py-2 text-sm border-l border-gray-200 dark:border-gris-700 ${activeCreate === 'proveedor' ? 'bg-trafico text-black' : 'bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gris-700'}`}
-          >
-            Crear proveedor
-          </button>
+      {showMovimientoModal && mov.itemId && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={cancelMovimiento} />
+          <div className="absolute inset-0 p-4 flex items-center justify-center">
+            <div className="w-full max-w-sm rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Movimiento rapido</div>
+                  <div className="text-xs opacity-70">Tipo: {mov.tipo === 'salida' ? 'Salida' : 'Ingreso'}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelMovimiento}
+                  className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                >
+                  <span className="text-base leading-none">✕</span>
+                </button>
+              </div>
+              <form onSubmit={submitMovimiento} className="p-4 grid grid-cols-1 gap-3">
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Cantidad</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={mov.cantidad}
+                    onChange={(e) => setMov((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                    className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                  />
+                </div>
+                {mov.tipo === "ingreso" && (
+                  <>
+                    <div>
+                      <label className="text-xs text-gray-600 dark:text-gray-300">Proveedor</label>
+                      <select
+                        value={mov.proveedorId}
+                        onChange={(e) => setMov((p) => ({ ...p, proveedorId: e.target.value }))}
+                        className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                      >
+                        <option value="">Selecciona proveedor</option>
+                        {proveedores.map((p) => (
+                          <option key={p.id} value={p.id}>{p.razonSocial || p.nombre || p.id}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 dark:text-gray-300">Costo unitario</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={mov.costoUnitario === "" ? "" : formatCOP(Number(mov.costoUnitario))}
+                        onChange={(e) => setMov((p) => ({ ...p, costoUnitario: parseDigits(e.target.value) }))}
+                        className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                      />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Nota (opcional)</label>
+                  <input
+                    value={mov.nota}
+                    onChange={(e) => setMov((p) => ({ ...p, nota: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                    placeholder="Factura, orden, responsable..."
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={cancelMovimiento} className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700">Cancelar</button>
+                  <button type="submit" className="text-xs px-3 py-2 rounded bg-trafico text-black">Registrar</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
-        <div className="text-xs opacity-70 text-gray-700 dark:text-gray-200">
-          Tip: si no existe, usa el botón “Crear …” dentro del buscador.
-        </div>
-      </div>
+      )}
 
-      <div className={`${showAdmin ? '' : 'hidden'} grid grid-cols-1 gap-5 mt-5`}>
-        <section className={`${activeCreate === 'proveedor' ? '' : 'hidden'} bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
-          <div className="font-medium">{editingProveedorId ? "Editar proveedor" : "Nuevo proveedor"}</div>
-          <form onSubmit={submitProveedor} className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+      {showProveedorOverlay && selectedProveedorId && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowProveedorOverlay(false)} />
+          <div className="absolute inset-0 p-4 flex items-start justify-center">
+            <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">Proveedor</div>
+                  <div className="text-lg font-semibold mt-1 break-words">
+                    {selectedProveedor
+                      ? (selectedProveedor.razonSocial || selectedProveedor.nombre || '—')
+                      : 'Cargando...'}
+                  </div>
+                  {selectedProveedor && (
+                    <>
+                      <div className="text-xs opacity-70 mt-1">NIT: {selectedProveedor.nit || '—'} - Lead time: {Number(selectedProveedor.leadTimeDias ?? 0)} dias</div>
+                      <div className="text-xs opacity-70">Entrega: {selectedProveedor.modalidadEntrega || '—'} - Pago: {selectedProveedor.tipoPago || '—'}</div>
+                    </>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProveedorOverlay(false)}
+                  className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                >
+                  <span className="text-base leading-none">✕</span>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
+                {selectedProveedor ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                        <div className="text-xs opacity-70">Contactos</div>
+                        <div className="text-sm mt-1">
+                          {Array.isArray(selectedProveedor.contactos) && selectedProveedor.contactos.length ? (
+                            selectedProveedor.contactos.slice(0, 3).map((c, idx) => (
+                              <div key={idx} className="text-xs">
+                                {c.nombre || '—'}{c.telefono ? ` - ${c.telefono}` : ''}{c.correo ? ` - ${c.correo}` : ''}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs">{selectedProveedor.contacto || '—'}{selectedProveedor.telefono ? ` - ${selectedProveedor.telefono}` : ''}{selectedProveedor.email ? ` - ${selectedProveedor.email}` : ''}</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
+                        <div className="text-xs opacity-70">Sedes</div>
+                        <div className="text-sm mt-1">
+                          {Array.isArray(selectedProveedor.sedes) && selectedProveedor.sedes.length ? (
+                            selectedProveedor.sedes.slice(0, 3).map((s, idx) => (
+                              <div key={idx} className="text-xs">{s.direccion || '—'}{s.ciudad ? ` - ${s.ciudad}` : ''}</div>
+                            ))
+                          ) : (
+                            <div className="text-xs">—</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="text-xs opacity-70">Items asociados: {selectedProveedorItemList.length}</div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSelectedProveedorItems((v) => !v)}
+                        className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+                      >{showSelectedProveedorItems ? 'Ocultar items' : 'Mostrar items'}</button>
+                    </div>
+
+                    {showSelectedProveedorItems && (
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left opacity-70">
+                              <th className="py-1 pr-3">Item</th>
+                              <th className="py-1 pr-3">SKU</th>
+                              <th className="py-1 pr-3">Stock</th>
+                              <th className="py-1">Ubicacion</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedProveedorItemList.slice(0, 50).map((it) => (
+                              <tr
+                                key={it.id}
+                                onClick={() => {
+                                  setShowProveedorOverlay(false);
+                                  setSelectedItemId(it.id);
+                                  ensureMovimientosForItem(it.id);
+                                }}
+                                className="border-t border-gray-200/60 dark:border-gris-600/60 hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer"
+                              >
+                                <td className="py-1 pr-3 font-medium">{it.nombre || '—'}</td>
+                                <td className="py-1 pr-3">{it.sku || '—'}</td>
+                                <td className="py-1 pr-3">{it.stockActual ?? 0}</td>
+                                <td className="py-1">{it.ubicacion || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setShowProveedorOverlay(false); startEditarProveedor(selectedProveedor); }}
+                        className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
+                      >
+                        <span aria-hidden>✎</span>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEliminarProveedor(selectedProveedor)}
+                        className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
+                      >
+                        <span aria-hidden>🗑</span>
+                        Eliminar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm opacity-70">Cargando proveedor...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProveedorModal && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={resetProveedorForm} />
+          <div className="absolute inset-0 p-4 flex items-start justify-center">
+            <div className="w-full max-w-4xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">{editingProveedorId ? "Editar proveedor" : "Nuevo proveedor"}</div>
+                  <div className="text-xs opacity-70">Completa los datos basicos y asocia materiales si aplica.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetProveedorForm}
+                  className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                >
+                  <span className="text-base leading-none">✕</span>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
+                <form onSubmit={submitProveedor} className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
               <label className="text-xs text-gray-600 dark:text-gray-300">Razón social</label>
               <input value={provForm.razonSocial} onChange={(e)=>setProvForm(p=>({...p, razonSocial:e.target.value}))}
@@ -1973,67 +2407,39 @@ export default function InventarioPage() {
               </div>
             </div>
 
-            <div className="md:col-span-2 flex items-center justify-end gap-2">
-              {editingProveedorId && (
-                <button type="button" onClick={resetProveedorForm} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gris-600">Cancelar</button>
-              )}
-              <button type="submit" className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">{editingProveedorId ? "Guardar" : "Crear"}</button>
+                  <div className="md:col-span-2 flex items-center justify-end gap-2">
+                    {editingProveedorId && (
+                      <button type="button" onClick={resetProveedorForm} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gris-600">Cancelar</button>
+                    )}
+                    <button type="submit" className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">{editingProveedorId ? "Guardar" : "Crear"}</button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </form>
-
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-medium">Proveedores recientes</div>
-              <button
-                type="button"
-                onClick={() => toggleSection('proveedoresRecientes')}
-                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-              >
-                {sectionsOpen.proveedoresRecientes ? 'Ocultar' : 'Mostrar'}
-              </button>
-            </div>
-            {sectionsOpen.proveedoresRecientes && (
-              loading ? <div className="text-sm opacity-70 mt-2">Cargando…</div> : (
-                <div className="mt-2 space-y-2">
-                  {proveedores.length === 0 ? <div className="text-sm opacity-70">Sin proveedores</div> : proveedores.map(p => (
-                    <div key={p.id} className="rounded border border-gray-200 dark:border-gris-700 px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium truncate" title={(p.razonSocial || p.nombre) || ''}>{p.razonSocial || p.nombre}</div>
-                          {p.nit && <div className="text-xs opacity-70">NIT: {sanitizeNIT(p.nit)}</div>}
-                          <div className="text-xs opacity-70">Lead time: {p.leadTimeDias ?? 0} días</div>
-                          {p.modalidadEntrega && <div className="text-xs opacity-70">Entrega: {p.modalidadEntrega === 'recoger' ? 'Recoger' : (p.modalidadEntrega === 'envio_bogota' ? 'Envío Bogotá' : 'Envío nacional')}</div>}
-                          {p.tipoPago && <div className="text-xs opacity-70">Pago: {p.tipoPago === 'credito' ? 'Crédito' : (p.tipoPago === 'al_pedir' ? 'Al pedir' : 'Al recoger')}</div>}
-                          {Array.isArray(p.sedes) && p.sedes.length > 0 && (
-                            <div className="text-xs opacity-70">Sedes: {p.sedes.length}</div>
-                          )}
-                          {Array.isArray(p.contactos) && p.contactos.length > 0 ? (
-                            <div className="text-xs opacity-70">Contactos: {p.contactos.length}</div>
-                          ) : ((p.contacto || p.telefono || p.email) ? (
-                            <div className="text-xs opacity-70">
-                              {[p.contacto, p.telefono, p.email].filter(Boolean).join(' · ')}
-                            </div>
-                          ) : null)}
-                          <div className="text-xs opacity-70">
-                            Materia prima asociada: {items.filter((it) => (Array.isArray(it.proveedorIds) ? it.proveedorIds : (it.proveedorId ? [it.proveedorId] : [])).includes(p.id)).length}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2 flex-shrink-0">
-                          <button type="button" onClick={()=>startEditarProveedor(p)} className="text-xs px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white">Editar</button>
-                          <button type="button" onClick={()=>handleEliminarProveedor(p)} className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white">Eliminar</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
           </div>
-        </section>
+        </div>
+      )}
 
-        <section className={`${activeCreate === 'materia' ? '' : 'hidden'} bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
-          <div className="font-medium">{editingItemId ? "Editar item de materia prima" : "Nuevo item de materia prima"}</div>
-          <form onSubmit={submitItem} className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+      {showItemModal && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={resetItemForm} />
+          <div className="absolute inset-0 p-4 flex items-start justify-center">
+            <div className="w-full max-w-4xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">{editingItemId ? "Editar material" : "Nuevo material"}</div>
+                  <div className="text-xs opacity-70">Define stock, ubicacion, proveedores e imagen.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetItemForm}
+                  className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
+                >
+                  <span className="text-base leading-none">✕</span>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
+                <form onSubmit={submitItem} className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
               <label className="text-xs text-gray-600 dark:text-gray-300">Producto(s) asociado(s)</label>
               <div className="mt-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 p-3">
@@ -2274,87 +2680,18 @@ export default function InventarioPage() {
                 </div>
               </div>
             </div>
-            <div className="md:col-span-2 flex items-center justify-end gap-2">
-              {editingItemId && (
-                <button type="button" onClick={resetItemForm} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gris-600">Cancelar</button>
-              )}
-              <button type="submit" className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">{editingItemId ? "Guardar" : "Crear"}</button>
+                  <div className="md:col-span-2 flex items-center justify-end gap-2">
+                    {editingItemId && (
+                      <button type="button" onClick={resetItemForm} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gris-600">Cancelar</button>
+                    )}
+                    <button type="submit" className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm">{editingItemId ? "Guardar" : "Crear"}</button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </form>
-
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-medium">Items recientes</div>
-              <button
-                type="button"
-                onClick={() => toggleSection('itemsRecientes')}
-                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-              >
-                {sectionsOpen.itemsRecientes ? 'Ocultar' : 'Mostrar'}
-              </button>
-            </div>
-            {sectionsOpen.itemsRecientes && (
-              loading ? <div className="text-sm opacity-70 mt-2">Cargando…</div> : (
-                <div className="mt-2 space-y-2">
-                  {items.length === 0 ? <div className="text-sm opacity-70">Sin items</div> : items.map(i => (
-                    <div key={i.id} className="rounded border border-gray-200 dark:border-gris-700 px-3 py-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex items-start gap-3">
-                        {i.fotoDataUrl ? (
-                          <img
-                            src={i.fotoDataUrl}
-                            alt={i.nombre || "foto"}
-                            className="h-12 w-12 object-cover rounded border border-gray-200 dark:border-gris-600 bg-white flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="h-12 w-12 rounded border border-dashed border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 flex-shrink-0" />
-                        )}
-
-                        <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" title={i.nombre || ''}>{i.nombre}</div>
-                        <div className="text-xs opacity-70">
-                          Productos: {Array.isArray(i.productoTipos) ? (i.productoTipos.filter(Boolean).join(' · ') || '—') : (i.productoTipo || '—')}
-                        </div>
-                        <div className="text-xs opacity-70">
-                          SKU: {i.sku || "—"}
-                          {i.categoria ? ` · Cat: ${i.categoria}` : ""}
-                          {i.ubicacion ? ` · Ubic: ${i.ubicacion}` : ""}
-                        </div>
-                        <div className="text-xs opacity-70">
-                          Stock: {i.stockActual ?? 0} {i.unidad || ""}
-                          {typeof i.stockMinimo !== 'undefined' ? ` · Mín: ${i.stockMinimo ?? 0}` : ""}
-                          {typeof i.costoUnitario !== 'undefined' ? ` · Costo: $${Number(i.costoUnitario ?? 0).toLocaleString()}` : ""}
-                          {(() => {
-                            const ids = Array.isArray(i.proveedorIds)
-                              ? i.proveedorIds
-                              : (i.proveedorId ? [i.proveedorId] : []);
-                            if (!ids.length) return "";
-                            const names = ids
-                              .map((id) => {
-                                const p = proveedores.find((x) => x.id === id);
-                                return p ? (p.razonSocial || p.nombre) : "—";
-                              })
-                              .filter(Boolean);
-                            const shown = names.slice(0, 2).join(' · ');
-                            const more = names.length > 2 ? `…(+${names.length - 2})` : "";
-                            return ` · Prov: ${shown}${more ? ' ' + more : ''}`;
-                          })()}
-                        </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 flex-shrink-0">
-                        <button type="button" onClick={()=>startEditarItem(i)} className="text-xs px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white">Editar</button>
-                        <button type="button" onClick={()=>handleEliminarItem(i)} className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white">Eliminar</button>
-                      </div>
-                    </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
           </div>
-        </section>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -88,6 +89,40 @@ const normalizeContactos = (contactos) => {
     .filter((c) => c.nombre || c.telefono || c.correo);
 };
 
+const buildItemDoc = (data) => {
+  const productoTipos = Array.isArray(data.productoTipos)
+    ? data.productoTipos.map((v) => String(v || "").trim()).filter(Boolean)
+    : (data.productoTipo ? [String(data.productoTipo).trim()].filter(Boolean) : []);
+
+  const proveedorIds = Array.isArray(data.proveedorIds)
+    ? data.proveedorIds.map((v) => String(v || "").trim()).filter(Boolean)
+    : (data.proveedorId ? [String(data.proveedorId).trim()].filter(Boolean) : []);
+
+  return {
+    sku: (data.sku || "").trim(),
+    nombre: (data.nombre || "").trim(),
+    // Nuevo esquema: un item puede estar asociado a varios productos del cotizador.
+    productoTipos,
+    // Campo legacy (primero) para compatibilidad con datos antiguos
+    productoTipo: productoTipos[0] || (data.productoTipo || "").trim(),
+    categoria: (data.categoria || "").trim(),
+    unidad: (data.unidad || "").trim(),
+    stockActual: Number(data.stockActual || 0),
+    stockMinimo: Number(data.stockMinimo || 0),
+    ubicacion: (data.ubicacion || "").trim(),
+    costoUnitario: Number(data.costoUnitario || 0),
+    // Relación varios-a-varios (nuevo)
+    proveedorIds,
+    // Campo legacy (primero) para compatibilidad con datos antiguos/UI
+    proveedorId: proveedorIds[0] || (data.proveedorId || ""),
+    fotoDataUrl: typeof data.fotoDataUrl === "string" ? data.fotoDataUrl : "",
+    fotoFileName: (data.fotoFileName || "").trim(),
+    fotoMimeType: (data.fotoMimeType || "").trim(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+};
+
 const buildProveedorDoc = (data) => {
   const razonSocial = sanitizeText(data.razonSocial || data.nombre);
   const nit = sanitizeNIT(data.nit);
@@ -165,6 +200,24 @@ export async function listarProveedores() {
   });
 }
 
+export async function obtenerProveedorPorId(id) {
+  await waitForAuth();
+  if (!id) return null;
+  const snap = await getDoc(doc(db, SUPPLIERS_COL, id));
+  if (!snap.exists()) return null;
+  const data = snap.data() || {};
+  return {
+    id: snap.id,
+    ...data,
+    nit: sanitizeNIT(data.nit),
+    razonSocial: (data.razonSocial || data.nombre || "").trim(),
+    sedes: normalizeSedes(data.sedes),
+    contactos: normalizeContactos(data.contactos),
+    productoTipos: normalizeStringArray(data.productoTipos),
+    materiasPrimas: normalizeStringArray(data.materiasPrimas),
+  };
+}
+
 export async function actualizarProveedor(id, data) {
   await waitForAuth();
   const patch = { ...data };
@@ -192,38 +245,28 @@ export async function actualizarProveedor(id, data) {
 
 export async function crearItemInventario(data) {
   await waitForAuth();
-  const productoTipos = Array.isArray(data.productoTipos)
-    ? data.productoTipos.map((v) => String(v || "").trim()).filter(Boolean)
-    : (data.productoTipo ? [String(data.productoTipo).trim()].filter(Boolean) : []);
-
-  const proveedorIds = Array.isArray(data.proveedorIds)
-    ? data.proveedorIds.map((v) => String(v || "").trim()).filter(Boolean)
-    : (data.proveedorId ? [String(data.proveedorId).trim()].filter(Boolean) : []);
-
-  const ref = await addDoc(collection(db, ITEMS_COL), {
-    sku: (data.sku || "").trim(),
-    nombre: (data.nombre || "").trim(),
-    // Nuevo esquema: un item puede estar asociado a varios productos del cotizador.
-    productoTipos,
-    // Campo legacy (primero) para compatibilidad con datos antiguos
-    productoTipo: productoTipos[0] || (data.productoTipo || "").trim(),
-    categoria: (data.categoria || "").trim(),
-    unidad: (data.unidad || "").trim(),
-    stockActual: Number(data.stockActual || 0),
-    stockMinimo: Number(data.stockMinimo || 0),
-    ubicacion: (data.ubicacion || "").trim(),
-    costoUnitario: Number(data.costoUnitario || 0),
-    // Relación varios-a-varios (nuevo)
-    proveedorIds,
-    // Campo legacy (primero) para compatibilidad con datos antiguos/UI
-    proveedorId: proveedorIds[0] || (data.proveedorId || ""),
-    fotoDataUrl: typeof data.fotoDataUrl === "string" ? data.fotoDataUrl : "",
-    fotoFileName: (data.fotoFileName || "").trim(),
-    fotoMimeType: (data.fotoMimeType || "").trim(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const ref = await addDoc(collection(db, ITEMS_COL), buildItemDoc(data));
   return ref.id;
+}
+
+export async function crearItemsInventarioBulk(list) {
+  await waitForAuth();
+  const rows = Array.isArray(list) ? list : [];
+  if (rows.length === 0) return { created: 0 };
+
+  const CHUNK = 400;
+  let created = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    const slice = rows.slice(i, i + CHUNK);
+    for (const r of slice) {
+      const ref = doc(collection(db, ITEMS_COL));
+      batch.set(ref, buildItemDoc(r));
+      created += 1;
+    }
+    await batch.commit();
+  }
+  return { created };
 }
 
 export async function listarItemsInventario() {
@@ -298,6 +341,13 @@ export async function registrarMovimientoInventario(itemId, data) {
   if (!itemId) throw new Error("itemId requerido");
   if (Number.isNaN(cantidad) || cantidad <= 0) throw new Error("Cantidad inválida");
 
+  const proveedorId = String(data?.proveedorId || "").trim();
+  const costoUnitario = Number(data?.costoUnitario || 0);
+  if (tipo === "ingreso") {
+    if (!proveedorId) throw new Error("proveedorId requerido");
+    if (Number.isNaN(costoUnitario) || costoUnitario <= 0) throw new Error("Costo unitario inválido");
+  }
+
   const nota = (data?.nota || "").toString().trim();
   const delta = tipo === "salida" ? -Math.abs(cantidad) : Math.abs(cantidad);
 
@@ -315,12 +365,14 @@ export async function registrarMovimientoInventario(itemId, data) {
     const prevMovimientoId = String(item.lastMovimientoId || "");
     const prevMovimientoAt = item.lastMovimientoAt || null;
 
-    tx.update(itemRef, {
+    const itemPatch = {
       stockActual: stockDespues,
       lastMovimientoId: movRef.id,
       lastMovimientoAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (tipo === "ingreso") itemPatch.costoUnitario = costoUnitario;
+    tx.update(itemRef, itemPatch);
     tx.set(movRef, {
       itemId,
       tipo,
@@ -329,6 +381,8 @@ export async function registrarMovimientoInventario(itemId, data) {
       stockAntes,
       stockDespues,
       nota,
+      proveedorId: proveedorId || "",
+      costoUnitario: tipo === "ingreso" ? costoUnitario : 0,
       prevMovimientoId,
       prevMovimientoAt,
       createdAt: serverTimestamp(),
