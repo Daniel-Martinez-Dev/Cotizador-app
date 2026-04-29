@@ -254,6 +254,14 @@ export default function CotizadorApp(){
   }
 
   const handleSubmit = async ()=>{
+    // Validar productos con alerta sin precio manual
+    const sinPrecio = productos.findIndex((p,i)=> alertas[i] && !p.precioEditado && !p.precioManual);
+    if(sinPrecio >= 0){
+      setCollapsed(prev=> prev.map((c,i)=> i===sinPrecio ? false : c));
+      setTimeout(()=>{ document.getElementById(`producto-card-${sinPrecio}`)?.scrollIntoView({ behavior:'smooth', block:'center' }); }, 100);
+      toast.error('Ingresa un precio manual para el producto con medidas fuera de rango');
+      return;
+    }
     setCreandoEntidad(true);
     try {
       await ensureEmpresaContacto();
@@ -293,14 +301,15 @@ export default function CotizadorApp(){
   const previewTotal = previewAjustado + previewIVA;
 
   return (
-    <div className="max-w-7xl mx-auto p-4 lg:p-6 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-24 md:pb-6 text-gray-900 dark:text-gray-100">
       {quoteData?.modoEdicion && (
-        <div className="mb-4 p-4 rounded-md border border-yellow-400/40 bg-yellow-50 dark:bg-gris-800 dark:border-trafico/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
-          <div>
-            <p className="text-sm font-semibold tracking-wide">Editando cotización #{quoteData.numero || '—'}</p>
-            <p className="text-[11px] mt-1 opacity-80">Al generar PDF o guardar, se sobrescribe la existente.</p>
+        <div className="mb-4 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-3 shadow-sm">
+          <span className="text-2xl flex-shrink-0">✏️</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Modo edición — Cotización #{quoteData.numero || '—'}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">Al generar, se sobrescribirá la cotización existente.</p>
           </div>
-          <button type="button" onClick={()=>{ setQuoteData({}); setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); }} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-2 rounded shadow">Salir modo edición</button>
+          <button type="button" onClick={()=>{ setQuoteData({}); setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); }} className="flex-shrink-0 text-xs text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap">Salir edición</button>
         </div>
       )}
       <h1 className="text-2xl font-bold mb-4">Generar Cotización</h1>
@@ -361,14 +370,32 @@ export default function CotizadorApp(){
             </div>
           </div>
           <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 dark:text-gray-400">{productos.length} {productos.length === 1 ? 'producto' : 'productos'}</p>
+              <div className="flex gap-3 text-xs">
+                <button type="button" onClick={()=> setCollapsed(productos.map(()=> false))} className="text-indigo-600 dark:text-indigo-400 hover:underline">Expandir todo</button>
+                <span className="text-gray-300 dark:text-gris-600">|</span>
+                <button type="button" onClick={()=> setCollapsed(productos.map(()=> true))} className="text-indigo-600 dark:text-indigo-400 hover:underline">Colapsar todo</button>
+              </div>
+            </div>
+            {productos.length === 1 && !productos[0].ancho && !productos[0].alto && (
+              <div className="p-4 border-2 border-dashed border-blue-200 dark:border-blue-800 rounded-xl text-center text-gray-500 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
+                <p className="text-2xl mb-1">📋</p>
+                <p className="font-medium text-sm">Configura tu primer producto</p>
+                <p className="text-xs mt-0.5">Selecciona el tipo, ingresa las medidas y el sistema calculará el precio automáticamente.</p>
+              </div>
+            )}
             {productos.map((producto,i)=>{ const precioHeader=calcularPrecio(producto,i); const extrasHeader=calcularSubtotalExtras(producto); return (
-              <div key={i} className="rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm overflow-hidden transition">
+              <div key={i} id={`producto-card-${i}`} className={`rounded-lg border bg-white dark:bg-gris-900 shadow-sm overflow-hidden transition border-l-4 ${alertas[i] ? 'border-l-amber-400 border-gray-200 dark:border-gris-700' : 'border-l-transparent border-gray-200 dark:border-gris-700'}`}>
                 <div className="flex items-start md:items-center justify-between gap-4 p-4 border-b border-gray-100 dark:border-gris-700">
                   <div className="min-w-0 flex-1">
                     <button type="button" onClick={()=> setCollapsed(c=> c.map((v,idx)=> idx===i ? !v : v))} className="text-left w-full group">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold bg-indigo-600 text-white">{i+1}</span>
-                        <h2 className="font-semibold text-sm md:text-base truncate">{producto.nombrePersonalizado || producto.tipo} {collapsed[i] && <span className="opacity-60 font-normal">(colapsado)</span>}</h2>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold bg-indigo-600 text-white flex-shrink-0">{i+1}</span>
+                        <h2 className="font-semibold text-sm md:text-base truncate">{producto.nombrePersonalizado || producto.tipo}</h2>
+                        {alertas[i] && (
+                          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded-full flex-shrink-0">⚠ Precio requerido</span>
+                        )}
                       </div>
                       <div className="mt-1 text-[11px] md:text-xs flex flex-wrap gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
                         <span>{producto.ancho && producto.alto ? `${producto.ancho}×${producto.alto} mm` : 'Sin medidas'}</span>
@@ -523,12 +550,33 @@ export default function CotizadorApp(){
                 )}
               </div>
             );})}
-            <div><button onClick={handleAgregarProducto} className="mt-2 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded shadow focus:outline-none focus:ring-2 focus:ring-indigo-400">+ Agregar producto</button></div>
+            <button type="button" onClick={handleAgregarProducto} className="w-full mt-1 py-3 border-2 border-dashed border-gray-300 dark:border-gris-600 rounded-xl text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm">
+              <span className="text-base leading-none">+</span> Agregar otro producto
+            </button>
           </div>
         </div>
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
           <div className="lg:sticky lg:top-4 space-y-6">
             <div className="p-5 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm">
+              {productos.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Detalle</p>
+                  <div className="space-y-1">
+                    {productos.map((p,i)=>{
+                      const precio = calcularPrecio(p,i);
+                      const extras = calcularSubtotalExtras(p);
+                      const lineTotal = (precio + extras) * (parseInt(p.cantidad)||1);
+                      return (
+                        <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                          <span className="truncate max-w-[60%]">{p.nombrePersonalizado || p.tipo || `Producto ${i+1}`}{parseInt(p.cantidad)>1 && <span className="text-gray-400 dark:text-gray-500"> ×{p.cantidad}</span>}</span>
+                          <span className="font-mono tabular-nums">{lineTotal.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-gris-700 mt-2 pt-1" />
+                </div>
+              )}
               <h2 className="text-sm font-semibold tracking-wide uppercase mb-3 text-gray-600 dark:text-gray-300">Ajuste general</h2>
               <div className="flex items-center gap-3 mb-4">
                 <select value={ajusteTotalTipo} onChange={e=> setAjusteTotalTipo(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"><option value='Descuento'>Descuento</option><option value='Incremento'>Incremento</option></select>
@@ -552,6 +600,16 @@ export default function CotizadorApp(){
             </div>
           </div>
         </div>
+      </div>
+      {/* Barra fija de resumen en móvil */}
+      <div className="block md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gris-900 border-t border-gray-200 dark:border-gris-700 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">Total estimado</p>
+          <p className="text-base font-bold text-green-600 dark:text-green-400">{previewTotal.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</p>
+        </div>
+        <button type="button" onClick={handleSubmit} disabled={creandoEntidad} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
+          {creandoEntidad ? 'Procesando...' : 'Generar →'}
+        </button>
       </div>
     </div>
   );
