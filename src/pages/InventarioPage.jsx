@@ -1240,10 +1240,24 @@ export default function InventarioPage() {
         </div>
       )}
 
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Total materiales", value: items.length, color: "text-gray-800 dark:text-gray-100" },
+          { label: "Bajo stock", value: lowStockItems.length, color: lowStockItems.length > 0 ? "text-red-600 dark:text-red-300" : "text-emerald-600 dark:text-emerald-300" },
+          { label: "Proveedores", value: proveedores.length, color: "text-gray-800 dark:text-gray-100" },
+          { label: "Valor inventario", value: formatCOP(items.reduce((s, i) => s + Number(i.costoUnitario || 0) * Number(i.stockActual || 0), 0)), color: "text-gray-800 dark:text-gray-100" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 px-4 py-3">
+            <div className="text-[11px] opacity-60 uppercase tracking-wide">{label}</div>
+            <div className={`text-xl font-semibold mt-1 ${color}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-2">
         {[
-          { key: "materiales", label: "Materiales" },
-          { key: "proveedores", label: "Proveedores" },
+          { key: "materiales", label: `Materiales (${items.length})` },
+          { key: "proveedores", label: `Proveedores (${proveedores.length})` },
           { key: "movimientos", label: "Movimientos" },
         ].map((tab) => (
           <button
@@ -1366,9 +1380,15 @@ export default function InventarioPage() {
             ) : (
               <>
                 {sortedItems.length === 0 ? (
-                  <div className="text-sm opacity-70 mt-4">Sin resultados.</div>
+                  <div className="text-center py-12 text-sm opacity-60">
+                    <div className="text-3xl mb-2">📦</div>
+                    {itemsSearch
+                      ? <>Sin materiales que coincidan con <strong>"{itemsSearch}"</strong>.</>
+                      : <>No hay materiales registrados. Crea el primero con el botón <strong>"Nuevo material"</strong>.</>
+                    }
+                  </div>
                 ) : (
-                  <div className="mt-4 overflow-x-auto">
+                  <div className="mt-4 rounded-lg border border-gray-200 dark:border-gris-700 overflow-auto max-h-[420px]">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-left opacity-70">
@@ -1419,7 +1439,15 @@ export default function InventarioPage() {
                                 <div className="text-[11px] opacity-70">SKU: {i.sku || '—'}{i.categoria ? ` · ${i.categoria}` : ''}</div>
                               </td>
                               <td className={`py-2 pr-3 whitespace-nowrap ${low ? 'text-red-600 dark:text-red-300 font-medium' : ''}`}>
-                                {i.stockActual ?? 0} {i.unidad || ''}
+                                <div>{i.stockActual ?? 0} {i.unidad || ''}</div>
+                                {Number(i.stockMinimo || 0) > 0 && (
+                                  <div className="mt-1 h-1.5 w-16 rounded-full bg-gray-200 dark:bg-gris-600 overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${low ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                      style={{ width: `${Math.min(100, Math.round((Number(i.stockActual || 0) / Number(i.stockMinimo)) * 100))}%` }}
+                                    />
+                                  </div>
+                                )}
                               </td>
                               <td className="py-2 pr-3 whitespace-nowrap">{i.stockMinimo ?? 0}</td>
                               <td className="py-2 pr-3 whitespace-nowrap">{i.ubicacion || '—'}</td>
@@ -1429,17 +1457,19 @@ export default function InventarioPage() {
                                 </div>
                               </td>
                               <td className="py-2">
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-1.5">
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'ingreso'); }}
-                                    className="text-xs px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white"
-                                  >+</button>
+                                    className="text-[11px] px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+                                    title="Registrar ingreso"
+                                  >↑ Entrada</button>
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'salida'); }}
-                                    className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white"
-                                  >-</button>
+                                    className="text-[11px] px-2.5 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-medium"
+                                    title="Registrar salida"
+                                  >↓ Salida</button>
                                 </div>
                               </td>
                             </tr>
