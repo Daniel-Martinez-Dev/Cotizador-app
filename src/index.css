@@ -15,18 +15,19 @@
 .dark .bg-yellow-100 { background-color:#4a3a00 !important; }
 .dark .text-yellow-800 { color:#ffd300 !important; }
 
-/* Forzar secciones en modo claro aunque body esté en dark */
-.dark .force-light { background: #ffffff !important; color:#111 !important; }
+/* Homologar tarjetas principales al tema oscuro del panel lateral */
+.dark .force-light { background: #1f2937 !important; color: #e5e7eb !important; border-color: #374151 !important; }
 .dark .force-light :where(p,span,li,ul,ol,div,section,article,h1,h2,h3,h4,h5,h6,strong,em,label,small){ color: inherit; }
 /* Permitir que los botones mantengan sus propias clases (ej: text-white) */
 .dark .force-light button { color: inherit; }
 .dark .force-light button.text-white, .dark .force-light .text-white { color:#fff !important; }
-.dark .force-light input, .dark .force-light select, .dark .force-light textarea { background:#ffffff !important; color:#111 !important; }
-.dark .force-light table thead { background:#f5f5f5 !important; }
-.dark .force-light table tbody tr:nth-child(even){ background:#fafafa !important; }
-.dark .force-light table tbody tr:nth-child(odd){ background:#ffffff !important; }
+.dark .force-light input, .dark .force-light select, .dark .force-light textarea { background:#111827 !important; color:#e5e7eb !important; border-color:#4b5563 !important; }
+.dark .force-light table thead { background:#111827 !important; }
+.dark .force-light table tbody tr:nth-child(even){ background:#1b2332 !important; }
+.dark .force-light table tbody tr:nth-child(odd){ background:#1f2937 !important; }
 
 @keyframes fade-in { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
 .animate-fade-in { animation: fade-in 0.18s ease-out; }
+.animate-fadeIn { animation: fade-in 0.18s ease-out; }
 
 

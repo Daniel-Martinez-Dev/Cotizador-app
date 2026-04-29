@@ -69,7 +69,7 @@ function AppShell() {
       <button
         type="button"
         onClick={handleBack}
-        className="inline-flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-trafico/60"
+        className="inline-flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-trafico/60"
         title="Volver a la pestaña anterior"
       >
         Volver
@@ -99,7 +99,7 @@ function AppShell() {
               <Link
                 key={l.to}
                 to={l.to}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors border border-transparent focus:outline-none focus:ring-2 focus:ring-trafico/60 ${active ? 'bg-trafico text-black' : 'bg-gris-800/60 text-white hover:bg-gris-700 hover:text-trafico'}`}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors border border-transparent focus:outline-none focus:ring-2 focus:ring-trafico/60 ${active ? 'bg-trafico text-black' : 'bg-gris-800/60 text-gray-200 hover:bg-gris-700 hover:text-trafico'}`}
               >{l.label}</Link>
             );
         })}
@@ -135,7 +135,7 @@ function AppShell() {
             <Link
               key={l.to}
               to={l.to}
-              className={`whitespace-nowrap px-3 py-1.5 rounded text-xs font-medium border border-transparent ${active ? 'bg-trafico text-black' : 'bg-gris-800/60 text-white hover:bg-gris-700 hover:text-trafico'}`}
+              className={`whitespace-nowrap px-3 py-1.5 rounded text-xs font-medium border border-transparent ${active ? 'bg-trafico text-black' : 'bg-gris-800/60 text-gray-200 hover:bg-gris-700 hover:text-trafico'}`}
             >{l.label}</Link>
           );
         })}
@@ -150,7 +150,7 @@ function AppShell() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-negro dark:text-white shadow flex items-center gap-4 px-4 h-14 border-b border-gray-200 dark:border-gris-700">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-negro dark:text-gray-200 shadow flex items-center gap-4 px-4 h-14 border-b border-gray-200 dark:border-gris-700">
         <Link to="/dashboard" className="flex items-center gap-3 group">
           <img src={logo} alt="Logo" className="h-10 w-auto select-none" />
           <span className="font-semibold text-sm sm:text-base tracking-wide group-hover:text-trafico dark:group-hover:text-trafico transition-colors">Cotizador Cold Chain Services</span>
@@ -169,7 +169,7 @@ function AppShell() {
         )}
         <button
           onClick={()=>setDark(d=>!d)}
-          className="ml-auto text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-trafico/60"
+          className="ml-auto text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-trafico/60"
           title="Cambiar tema"
         >{dark ? 'Claro' : 'Oscuro'}</button>
         {REQUIRE_LOGIN && (
@@ -178,13 +178,13 @@ function AppShell() {
             <button
               type="button"
               onClick={()=>signOutUser()}
-              className="text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-white"
+              className="text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200"
             >Salir</button>
           </div>
         )}
       </header>
       <MobileNav />
-      <main className="pt-16 md:pt-16 pb-8 bg-gray-50 dark:bg-gris-900 min-h-screen text-gray-900 dark:text-gray-100 transition-colors">
+      <main className="pt-16 md:pt-16 pb-8 bg-gray-50 dark:bg-gris-900 min-h-screen text-gray-900 dark:text-gray-200 transition-colors">
         <Outlet />
       </main>
       {showNuevaModal && (
