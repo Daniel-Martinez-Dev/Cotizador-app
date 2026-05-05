@@ -1,23 +1,24 @@
 // src/utils/tablaPDFParser.jsx
 import React from 'react';
 import { Text, View, StyleSheet } from '@react-pdf/renderer';
+import { pdfTheme } from './pdfTheme';
 
 // Theme centralizado (exportable si luego se reutiliza en otros módulos)
 export const theme = {
   colors: {
-    border: '#ccc',
-    text: '#222222',
-    headerBg: '#1a3357',
-    headerText: '#ffffff',
-  extraBg: '#f9f9f9',        // coincide con HTML para extras
-  summaryBg: '#eaeaea',      // Subtotal / IVA
-  totalBg: '#d7ecff',        // Total final
-  discountBg: '#f1fff1',     // Fondo verde claro para descuento
-  discountText: '#0a7a0a'
+    border: pdfTheme.colors.border,
+    text: pdfTheme.colors.text,
+    headerBg: pdfTheme.colors.headerBg,
+    headerText: pdfTheme.colors.headerText,
+    extraBg: pdfTheme.colors.extraBg,
+    summaryBg: '#F0F6FC',
+    totalBg: pdfTheme.colors.totalBg,
+    discountBg: pdfTheme.colors.discountBg,
+    discountText: pdfTheme.colors.discountText
   },
-  font: { base: 10, header: 10, small: 9 },
-  spacing: { xxs: 2, xs: 4, sm: 6, md: 8 },
-  radius: { sm: 2 }
+  font: { base: pdfTheme.font.base, header: pdfTheme.font.header, small: 9 },
+  spacing: { xxs: 2, xs: 4, sm: 8, md: 10 },
+  radius: { sm: 3 }
 };
 
 const styles = StyleSheet.create({
@@ -35,39 +36,42 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
     alignItems: 'stretch',
-    minHeight: 14,
+    minHeight: 16,
   },
   headerRow: {
     backgroundColor: theme.colors.headerBg,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#0F2238',
   },
   extraRow: {
-    backgroundColor: theme.colors.extraBg,
+    backgroundColor: '#F5F7FB',
   },
   productRow: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   summaryRow: {
-    backgroundColor: theme.colors.summaryBg,
+    backgroundColor: '#F2F6FB',
   },
   totalRow: {
-    backgroundColor: theme.colors.totalBg,
+    backgroundColor: '#E6F2FF',
   },
   descuentoRow: {
-    backgroundColor: theme.colors.discountBg,
+    backgroundColor: '#FFF1F1',
   },
   cell: {
-  flex: 1,
-  paddingVertical: 4,
-  paddingHorizontal: 6,
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 7,
     fontSize: theme.font.base,
     color: theme.colors.text,
   },
   headerCell: {
-  fontSize: theme.font.header,
-  fontWeight: 'bold',
-  color: theme.colors.headerText,
-  paddingVertical: 6,
-  paddingHorizontal: 8,
+    fontSize: theme.font.header,
+    fontWeight: 'bold',
+    color: theme.colors.headerText,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    letterSpacing: 0.4,
   },
   boldCell: {
     fontWeight: 'bold',
@@ -100,9 +104,6 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
   if (!html) return null;
   const { summaryPanel = false, zebra = false, currencyOptions = { locale: 'es-CO', currency: 'COP', forceTwoDecimals: false } } = options;
 
-  let productoIndex = 0;
-  let extraIndex = 0;
-
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const filas = [...doc.querySelectorAll('tr')];
@@ -134,7 +135,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
           !summaryPanel && isSubtotalIvaRow && styles.summaryRow,
           !summaryPanel && isGrandTotalRow && styles.totalRow,
           !summaryPanel && isDescuentoRow && styles.descuentoRow,
-          zebra && !isHeader && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: '#fafbfc' },
+          zebra && !isHeader && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: '#FBFCFE' },
           summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow) && { display: 'none' }
         ]}
       >
@@ -191,7 +192,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
             j === 1 && !isHeader && styles.centerAlign,
             (j === 2 || j === 3) && styles.rightAlign,
             !isHeader && j === 0 && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && styles.boldCell,
-            // sin líneas verticales entre columnas
+            j < celdas.length - 1 && { borderRightWidth: 1, borderRightColor: theme.colors.border },
           ];
 
           return <Text key={j} style={cellStyles} wrap>{content}</Text>;
@@ -209,7 +210,9 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
       });
     }
 
-    bodyRows.push(renderRow(bodyRows.length));
+    if (!summaryPanel || !(isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow)) {
+      bodyRows.push(renderRow(bodyRows.length));
+    }
   });
 
   return (
@@ -217,13 +220,14 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
       <View style={styles.table}>{bodyRows}</View>
       {summaryPanel && summaryRows.length > 0 && (
         <View style={{
-          marginTop: theme.spacing.sm,
+          marginTop: theme.spacing.md,
           marginLeft: 'auto',
           width: '60%', // un poco más ancho para valores largos
           borderWidth: 1,
           borderColor: theme.colors.border,
+          borderRadius: theme.radius.sm,
           padding: theme.spacing.sm,
-          backgroundColor: '#fff'
+          backgroundColor: '#F8FAFC'
         }}>
           {summaryRows.map((r, idx) => {
             const isGrandTotal = r.type === 'total' && /total/i.test(r.label);
@@ -232,23 +236,25 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: idx === summaryRows.length - 1 ? 0 : theme.spacing.xxs
+                marginBottom: idx === summaryRows.length - 1 ? 0 : theme.spacing.xxs,
+                paddingTop: isGrandTotal ? theme.spacing.xs : 0,
+                borderTopWidth: isGrandTotal ? 1 : 0,
+                borderTopColor: isGrandTotal ? '#CBD5E1' : 'transparent'
               }}>
                 <Text style={{
-                  fontSize: isGrandTotal ? theme.font.base + 1 : theme.font.base,
-                  fontWeight: isGrandTotal ? 'bold' : (r.type === 'discount' ? 'normal' : 'normal'),
+                  fontSize: isGrandTotal ? theme.font.base + 2 : theme.font.base,
+                  fontWeight: isGrandTotal ? 'bold' : 'normal',
                   color: r.type === 'discount' ? theme.colors.discountText : theme.colors.text,
                   textAlign: 'right',
                   flex: 2.4,
                   paddingRight: 4
                 }}>{r.label}</Text>
                 <Text style={{
-                  fontSize: isGrandTotal ? theme.font.base + 1 : theme.font.base,
-                  fontWeight: isGrandTotal ? 'bold' : 'bold',
+                  fontSize: isGrandTotal ? theme.font.base + 2 : theme.font.base,
+                  fontWeight: 'bold',
                   color: r.type === 'discount' ? theme.colors.discountText : theme.colors.text,
                   textAlign: 'right',
                   flex: 1.4,
-                  // Evitar que números grandes se corten: permitir wrap suave
                   lineHeight: 1.1
                 }}>{r.value}</Text>
               </View>

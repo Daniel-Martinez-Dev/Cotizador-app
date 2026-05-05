@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, crearEmpresa, actualizarEmpresa, eliminarEmpresa, crearContacto, actualizarContacto, eliminarContacto, obtenerEmpresaPorNIT, buscarContactoPorEmail } from '../utils/firebaseCompanies';
+import { validateNIT, validateEmail, validateText } from '../utils/validateInput';
 import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaBuilding, FaUser, FaSync } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { waitForAuth, getAuthError } from '../firebase';
@@ -55,14 +56,21 @@ export default function CompaniesPage(){
 
   async function handleCrearEmpresa(e){
     e.preventDefault();
-    if(!formEmpresa.nombre.trim()){ toast.error('Nombre requerido'); return; }
-    if(formEmpresa.nit){
-      const existe = await obtenerEmpresaPorNIT(sanitizeNIT(formEmpresa.nit.trim()));
+    const nombre = formEmpresa.nombre.trim();
+    const nit = formEmpresa.nit.trim();
+    const ciudad = formEmpresa.ciudad.trim();
+
+    if(!validateText(nombre, 1, 200)){ toast.error('Nombre inválido (1-200 caracteres)'); return; }
+    if(nit && !validateNIT(nit)){ toast.error('NIT inválido (9-11 dígitos)'); return; }
+    if(ciudad && !validateText(ciudad, 1, 100)){ toast.error('Ciudad inválida (máx 100 caracteres)'); return; }
+
+    if(nit){
+      const existe = await obtenerEmpresaPorNIT(nit);
       if(existe){ toast.error('NIT ya registrado'); return; }
     }
     try {
-  const id = await crearEmpresa({ ...formEmpresa, nit: sanitizeNIT(formEmpresa.nit) });
-      setEmpresas(prev=> [...prev, { id, ...formEmpresa }].sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
+  const id = await crearEmpresa({ nombre, nit, ciudad });
+      setEmpresas(prev=> [...prev, { id, nombre, nit, ciudad }].sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
       toast.success('Empresa creada');
       setFormEmpresa({ nombre:'', nit:'', ciudad:'' });
       setModoNuevaEmpresa(false);
@@ -74,9 +82,16 @@ export default function CompaniesPage(){
   setFormEmpresaEdit({ nombre:emp.nombre||'', nit:sanitizeNIT(emp.nit)||'', ciudad:emp.ciudad||'' });
   }
   async function guardarEdicionEmpresa(empId){
-    if(!formEmpresaEdit.nombre.trim()){ toast.error('Nombre requerido'); return; }
+    const nombre = formEmpresaEdit.nombre.trim();
+    const nit = formEmpresaEdit.nit.trim();
+    const ciudad = formEmpresaEdit.ciudad.trim();
+
+    if(!validateText(nombre, 1, 200)){ toast.error('Nombre inválido (1-200 caracteres)'); return; }
+    if(nit && !validateNIT(nit)){ toast.error('NIT inválido (9-11 dígitos)'); return; }
+    if(ciudad && !validateText(ciudad, 1, 100)){ toast.error('Ciudad inválida (máx 100 caracteres)'); return; }
+
     try {
-  const payload = { ...formEmpresaEdit, nit: sanitizeNIT(formEmpresaEdit.nit) };
+  const payload = { nombre, nit, ciudad };
   await actualizarEmpresa(empId, payload);
   setEmpresas(prev => prev.map(e=> e.id===empId? { ...e, ...payload }: e).sort((a,b)=> a.nombre.localeCompare(b.nombre)) );
       toast.success('Empresa actualizada');
@@ -95,11 +110,18 @@ export default function CompaniesPage(){
   }
   async function handleCrearContacto(e, empresaId){
     e.preventDefault();
-    if(!formContacto.nombre.trim()){ toast.error('Nombre contacto requerido'); return; }
+    const nombre = formContacto.nombre.trim();
+    const email = formContacto.email.trim();
+    const telefono = formContacto.telefono.trim();
+
+    if(!validateText(nombre, 1, 200)){ toast.error('Nombre inválido (1-200 caracteres)'); return; }
+    if(email && !validateEmail(email)){ toast.error('Email inválido'); return; }
+    if(telefono && !validateText(telefono, 10, 20)){ toast.error('Teléfono inválido (10-20 caracteres)'); return; }
+
     let existente = null;
-    if(formContacto.email){ existente = await buscarContactoPorEmail(empresaId, formContacto.email.trim()); if(existente){ toast.error('Email ya existe'); return; } }
+    if(email){ existente = await buscarContactoPorEmail(empresaId, email); if(existente){ toast.error('Email ya existe'); return; } }
     try {
-      await crearContacto(empresaId, formContacto);
+      await crearContacto(empresaId, { nombre, email, telefono });
       toast.success('Contacto creado');
       const lista = await listarContactos(empresaId);
       setContactosCache(c=> ({ ...c, [empresaId]: lista }));
@@ -111,9 +133,16 @@ export default function CompaniesPage(){
     setFormContactoEdit({ nombre: contacto.nombre||'', email: contacto.email||'', telefono: contacto.telefono||'' });
   }
   async function guardarEdicionContacto(empresaId, contactoId){
-    if(!formContactoEdit.nombre.trim()){ toast.error('Nombre requerido'); return; }
+    const nombre = formContactoEdit.nombre.trim();
+    const email = formContactoEdit.email.trim();
+    const telefono = formContactoEdit.telefono.trim();
+
+    if(!validateText(nombre, 1, 200)){ toast.error('Nombre inválido (1-200 caracteres)'); return; }
+    if(email && !validateEmail(email)){ toast.error('Email inválido'); return; }
+    if(telefono && !validateText(telefono, 10, 20)){ toast.error('Teléfono inválido (10-20 caracteres)'); return; }
+
     try {
-      await actualizarContacto(empresaId, contactoId, formContactoEdit);
+      await actualizarContacto(empresaId, contactoId, { nombre, email, telefono });
       const lista = await listarContactos(empresaId);
       setContactosCache(c=> ({ ...c, [empresaId]: lista }));
       toast.success('Contacto actualizado');

@@ -31,13 +31,39 @@ export async function compressImageToDataURL(src, options = {}) {
     }
     ctx.drawImage(img, 0, 0, width, height);
 
-    const dataUrl = canvas.toDataURL(mimeType, quality);
+    const dataUrl = await canvasToDataURL(canvas, mimeType, quality);
+    canvas.width = 0;
+    canvas.height = 0;
     _cache.set(cacheKey, dataUrl);
     return dataUrl;
   } catch (e) {
     console.warn('[compressImageToDataURL] Fallback to original src due to error:', e);
     return src; // fallback: return original
   }
+}
+
+function canvasToDataURL(canvas, mimeType, quality) {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob !== 'function') {
+      try {
+        resolve(canvas.toDataURL(mimeType, quality));
+      } catch (err) {
+        reject(err);
+      }
+      return;
+    }
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('No se pudo generar blob de imagen'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('No se pudo leer blob de imagen'));
+      reader.readAsDataURL(blob);
+    }, mimeType, quality);
+  });
 }
 
 export function computeTargetSize(origW, origH, maxW, maxH) {

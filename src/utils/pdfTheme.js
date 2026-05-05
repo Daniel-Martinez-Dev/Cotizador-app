@@ -1,24 +1,25 @@
 // Tema centralizado para PDF (colores, tipografía, espaciados)
 export const pdfTheme = {
   colors: {
-    border: '#ccc',
-    text: '#222222',
-    headerBg: '#1a3357',
-    headerText: '#ffffff',
-    extraBg: '#f4f4f4',
-    totalBg: '#e6f7ff',
-    discountBg: '#e8f5e9',
-    discountText: '#388e3c',
-    sectionDivider: '#e0e0e0',
-    pageBg: '#ffffff',
-    subtleText: '#666',
+    border: '#D1D9E4',
+    text: '#1E2D3D',
+    headerBg: '#152E4D',
+    headerText: '#F8FAFC',
+    extraBg: '#F8FAFC',
+    totalBg: '#EBF4FF',
+    discountBg: '#F0FDF4',
+    discountText: '#166534',
+    sectionDivider: '#E2E8F0',
+    pageBg: '#FFFFFF',
+    subtleText: '#64748B',
+    accent: '#2271B3',
+    accentLight: '#BFDBFE',
   },
-  font: { base: 9, header: 9, small: 7, h1: 13, h2: 10 },
-  spacing: { xxs: 2, xs: 4, sm: 6, md: 10, lg: 16, xl: 24 },
+  font: { base: 10, header: 10, small: 7.5, h1: 16, h2: 11 },
+  spacing: { xxs: 2, xs: 4, sm: 8, md: 12, lg: 18, xl: 24 },
   page: {
-    // Márgenes reducidos para permitir imágenes más grandes
-    marginHorizontal: 18,
-    marginVertical: 14
+    marginHorizontal: 32,
+    marginVertical: 18
   },
   radius: { sm: 2, md: 4 }
 };

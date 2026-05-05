@@ -113,7 +113,17 @@ export default function CotizadorApp(){
   // Alertas rango
   useEffect(()=>{ const nuevas=productos.map(p=> validarRangoProducto(p,{ matricesOverride })); setAlertas(nuevas); }, [productos, matricesOverride]);
 
-  const handleAgregarProducto = ()=>{ setProductos(p=> [...p, crearProductoInicial()]); setAlertas(a=> [...a,false]); };
+  const handleAgregarProducto = ()=>{
+    const baseCliente = productos[0]?.cliente || 'Cliente Final Contado';
+    const newIndex = productos.length;
+    const nuevoProducto = { ...crearProductoInicial(), cliente: baseCliente };
+    setProductos(p=> [...p, nuevoProducto]);
+    setAlertas(a=> [...a,false]);
+    setCollapsed(prev => [...prev.map(() => true), false]);
+    setTimeout(() => {
+      document.getElementById(`producto-card-${newIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  };
   const handleEliminarProducto = (i)=>{ setProductos(p=> p.filter((_,idx)=> idx!==i)); setAlertas(a=> a.filter((_,idx)=> idx!==i)); };
   const handleChangeProducto = (i,campo,valor)=>{ setProductos(p=> { const n=[...p]; n[i][campo]=valor; if(campo==='tipo'){ n[i].extras=[]; n[i].extrasCantidades={}; n[i].extrasPersonalizados=[]; n[i].extrasPersonalizadosCant={}; n[i].precioManual=''; n[i].precioEditado=''; n[i].componentes = valor === 'Sello de Andén' ? ['sello completo'] : []; n[i].cliente='Cliente Final Contado'; } if(campo==='cliente'){ n[i].precioManual=''; n[i].precioEditado=''; } return n;}); };
   const handleToggleExtra = (i, extra)=>{

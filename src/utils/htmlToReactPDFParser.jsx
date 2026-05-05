@@ -6,53 +6,60 @@ import { pdfTheme } from './pdfTheme';
 const T = pdfTheme;
 // Estilos base unificados para todas las secciones (descripción, condiciones, términos, especificaciones)
 // Objetivo: mismo interlineado y separación vertical mínima y consistente.
-// Reducido para lograr un interlineado más compacto (solicitud del usuario)
-const baseLineHeight = 0.99; // compacto pero legible
-const verticalGap = 1;       // antes 2
-const compactGap = 0;        // ya no usamos margen inferior entre párrafos
+export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1 } = {}) {
+  const scale = typeof fontScale === 'number' && fontScale > 0 ? fontScale : 1;
+  const baseFont = (T.font?.base || 10) * scale;
+  const baseH2 = (T.font?.h2 || (T.font?.base || 10) + 1) * scale;
+  const headingFont = Math.max(baseH2 - 0.5 * scale, baseFont + 0.5 * scale);
+  const headingSmallFont = baseFont + 0.25 * scale;
+  const baseLineHeight = 1.35;
+  const denseLineHeight = 1.2;
+  const readableLineHeight = 1.32;
+  const headingLineHeight = 1.25;
+  const headingSmallLineHeight = 1.25;
+  const verticalGap = 2;
+  const compactGap = 1;
 
-const styles = StyleSheet.create({
-  heading: {
-    fontWeight: 'bold',
-    fontSize: Math.max(T.font.h2 - 0.5, T.font.base + 0.5),
-    marginTop: 0,
-    marginBottom: verticalGap,
-    lineHeight: baseLineHeight,
-  },
-  headingSmall: {
-    fontWeight: 'bold',
-    fontSize: T.font.base + 0.25,
-  marginTop: 2, // reducido para evitar salto de página
-  marginBottom: 1, // ligero espacio bajo subtítulo
-    lineHeight: baseLineHeight,
-  },
-  paragraph: {
-    marginTop: 0,
-    marginBottom: 0, // sin espacio inferior para evitar salto doble
-    lineHeight: baseLineHeight,
-    textAlign: 'justify',
-  },
-  bold: { fontWeight: 'bold' },
-  italic: { fontStyle: 'italic' },
-  list: {
-    marginTop: 0,
-    marginBottom: verticalGap,
-    paddingLeft: 10,
-  },
-  listItem: {
-    marginBottom: 0,
-    flexDirection: 'row',
-  },
-  listItemText: {
-    flex: 1,
-    textAlign: 'justify',
-    lineHeight: baseLineHeight,
-  },
-  bullet: { marginRight: 2 },
-  line: { flexDirection: 'row', flexWrap: 'wrap' }
-});
-
-export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false } = {}) {
+  const styles = StyleSheet.create({
+    heading: {
+      fontWeight: 'bold',
+      fontSize: headingFont,
+      marginTop: 0,
+      marginBottom: verticalGap,
+      lineHeight: headingLineHeight,
+    },
+    headingSmall: {
+      fontWeight: 'bold',
+      fontSize: headingSmallFont,
+      marginTop: 2,
+      marginBottom: 1,
+      lineHeight: headingSmallLineHeight,
+    },
+    paragraph: {
+      fontSize: baseFont,
+      marginTop: 0,
+      marginBottom: compactGap,
+      lineHeight: baseLineHeight,
+    },
+    bold: { fontWeight: 'bold' },
+    italic: { fontStyle: 'italic' },
+    list: {
+      marginTop: 0,
+      marginBottom: verticalGap,
+      paddingLeft: 10,
+    },
+    listItem: {
+      marginBottom: 0,
+      flexDirection: 'row',
+    },
+    listItemText: {
+      flex: 1,
+      fontSize: baseFont,
+      lineHeight: baseLineHeight,
+    },
+    bullet: { marginRight: 2 },
+    line: { flexDirection: 'row', flexWrap: 'wrap' }
+  });
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const root = doc.body;
@@ -61,22 +68,22 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
   let s = compact
     ? {
         ...styles,
-  heading: { ...styles.heading, marginTop: 0, marginBottom: 0 },
-  headingSmall: { ...styles.headingSmall, marginTop: 0, marginBottom: 0 },
-  paragraph: { ...styles.paragraph, marginBottom: 0 },
-  list: { ...styles.list, marginTop: 0, marginBottom: 0 },
+        heading: { ...styles.heading, marginTop: 0.5, marginBottom: 1 },
+        headingSmall: { ...styles.headingSmall, marginTop: 1, marginBottom: 1 },
+        paragraph: { ...styles.paragraph, marginBottom: 0.8 },
+        list: { ...styles.list, marginTop: 0.5, marginBottom: 1 },
       }
     : styles;
 
   if (dense) {
     s = {
       ...s,
-  paragraph: { ...s.paragraph, marginBottom: 0, lineHeight: 0.9 },
-      list: { ...s.list, marginBottom: 0 },
-      listItem: { ...s.listItem, marginBottom: 0 },
-      listItemText: { ...s.listItemText, lineHeight: 0.9 },
-      heading: { ...s.heading, lineHeight: 0.94 },
-      headingSmall: { ...s.headingSmall, lineHeight: 0.94 },
+      paragraph: { ...s.paragraph, marginBottom: 0.5, lineHeight: denseLineHeight },
+      list: { ...s.list, marginBottom: 1 },
+      listItem: { ...s.listItem, marginBottom: 0.3 },
+      listItemText: { ...s.listItemText, lineHeight: denseLineHeight },
+      heading: { ...s.heading, lineHeight: headingLineHeight },
+      headingSmall: { ...s.headingSmall, lineHeight: headingSmallLineHeight },
     };
   }
 
@@ -84,12 +91,12 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
   if (readable) {
     s = {
       ...s,
-  paragraph: { ...s.paragraph, lineHeight: 0.8, marginBottom: 1.0 },
-  list: { ...s.list, marginTop: 0.5, marginBottom: 0.5, paddingLeft: 12 },
-  listItem: { ...s.listItem, marginBottom: 0.2 },
-  listItemText: { ...s.listItemText, lineHeight: 0.8},
-  heading: { ...s.heading, marginBottom: 2.5, lineHeight: 1.04 },
-  headingSmall: { ...s.headingSmall, marginTop: 1.5, marginBottom: 2.5, lineHeight: 1.04 },
+      paragraph: { ...s.paragraph, lineHeight: readableLineHeight, marginBottom: 0.7 },
+      list: { ...s.list, marginTop: 0.4, marginBottom: 0.5, paddingLeft: 10 },
+      listItem: { ...s.listItem, marginBottom: 0.2 },
+      listItemText: { ...s.listItemText, lineHeight: readableLineHeight },
+      heading: { ...s.heading, marginBottom: 1.5, lineHeight: headingLineHeight },
+      headingSmall: { ...s.headingSmall, marginTop: 1, marginBottom: 1.4, lineHeight: headingSmallLineHeight },
     };
   }
 
@@ -107,18 +114,21 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
       // margen uniforme => usar como marginBottom si es pequeño
       const num = parseFloat(styleMap['margin']);
       if (!isNaN(num)) {
-        merged.marginBottom = num <= 2 ? 0 : Math.min(num, 4);
+        merged.marginBottom = num <= 1 ? 0.6 : Math.min(num, 6);
         merged.marginTop = 0; // normalizar para compactar
       }
     }
     // márgenes específicos
     if (styleMap['margin-bottom']) {
       const num = parseFloat(styleMap['margin-bottom']);
-      if (!isNaN(num)) merged.marginBottom = num;
+      if (!isNaN(num)) merged.marginBottom = Math.max(0.6, Math.min(num, 6));
     }
     if (styleMap['line-height']) {
       const lh = parseFloat(styleMap['line-height']);
-      if (!isNaN(lh)) merged.lineHeight = lh;
+      if (!isNaN(lh)) {
+        const computed = lh < 4 ? lh : lh / baseFont;
+        merged.lineHeight = Math.max(1.1, Math.min(computed, 1.8));
+      }
     }
     if (styleMap['font-size']) {
       const fs = parseFloat(styleMap['font-size']);
@@ -160,7 +170,7 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         );
       }
       case "br":
-        return <Text key={index}>""</Text>;
+        return <Text key={index}>{"\n"}</Text>;
       case "strong": {
         // Si solo se permiten subtítulos en negrilla, desactivar bold dentro de listas y párrafos
         const isInList = isInside(node, 'li') || isInside(node, 'ul');
@@ -184,28 +194,45 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
           const isEspec = className.includes('espec-compactas');
           const extraIndent = isEspec ? 4 : 0; // indent base
           if (!isEspec) {
-            // Condiciones / Términos: sin bullets (mantener comportamiento actual)
+            // Condiciones / Términos: render en bloques para evitar solapamiento de líneas.
             return (
-              <View key={index} style={{ marginTop:0, marginBottom:0, paddingLeft: extraIndent }}>
-                {[...node.children].map((liNode, i) => (
-                  <Text key={i} style={{ ...s.paragraph, marginBottom:0 }}>
-                    {parseChildren(liNode)}
-                  </Text>
-                ))}
+              <View key={index} style={{ marginTop: 0.2, marginBottom: 0.2, paddingLeft: extraIndent }}>
+                {[...node.children].map((liNode, i) => {
+                  const headingNode = liNode.querySelector && liNode.querySelector('strong');
+                  const heading = headingNode ? (headingNode.textContent || '').replace(/\s+/g, ' ').trim() : '';
+                  const fullText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
+                  if (!fullText) return null;
+                  const bodyText = heading
+                    ? fullText.replace(new RegExp(`^${escapeRegex(heading)}\\s*`), '')
+                    : fullText;
+
+                  return (
+                    <View key={i} style={{ marginBottom: 0.2 }}>
+                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: s.paragraph.lineHeight }}>
+                        {heading ? <Text style={{ ...s.bold, lineHeight: s.paragraph.lineHeight }}>{heading} </Text> : null}
+                        {bodyText}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             );
           }
           // Especificaciones: mostrar bullets compactos
           return (
-            <View key={index} style={{ marginTop:2, marginBottom:0, paddingLeft: extraIndent }}>
-              {[...node.children].map((liNode, i) => (
-                <View key={i} style={{ flexDirection:'row', marginBottom: s.listItem.marginBottom }}>
-                  <Text style={{ width:6, textAlign:'center', lineHeight: (s.listItemText?.lineHeight || s.paragraph.lineHeight) }}>•</Text>
-                  <Text style={{ ...s.listItemText, flex:1, marginBottom:0 }}>
-                    {parseChildren(liNode)}
-                  </Text>
-                </View>
-              ))}
+            <View key={index} style={{ marginTop:0.5, marginBottom:0.5, paddingLeft: extraIndent }}>
+              {[...node.children].map((liNode, i) => {
+                const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!liText) return null;
+                return (
+                  <View wrap={false} key={i} style={{ flexDirection:'row', marginBottom: s.listItem.marginBottom }}>
+                    <Text style={{ width:6, textAlign:'center', lineHeight: (s.listItemText?.lineHeight || s.paragraph.lineHeight) }}>•</Text>
+                    <Text style={{ ...s.listItemText, flex:1, marginBottom:0.2 }}>
+                      {liText}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           );
         }
@@ -215,7 +242,7 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
           return (
             <View key={index} style={s.list}>
               {liNodes.map((li, i) => (
-                <View key={i} style={s.listItem}>
+                <View wrap={false} key={i} style={s.listItem}>
                   <Text style={s.bullet}>•</Text>
                   <Text style={s.listItemText}>{parseChildren(li)}</Text>
                 </View>
@@ -271,6 +298,61 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         );
       }
       case "div":
+        const className = node.getAttribute && node.getAttribute('class');
+        if (className && className.includes('term-item')) {
+          const children = [...node.children];
+          return (
+            <View key={index} style={{ marginTop: 0.3, marginBottom: 6.0 }}>
+              {children.map((child, i) => {
+                if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
+                  const isTitle = !!child.querySelector && !!child.querySelector('strong');
+                  return (
+                    <View key={i} style={{ marginBottom: isTitle ? 1.8 : 3.2 }}>
+                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
+                        {parseChildren(child)}
+                      </Text>
+                    </View>
+                  );
+                }
+                return (
+                  <View key={i} style={{ marginBottom: 3.2 }}>
+                    {processNode(child, i)}
+                  </View>
+                );
+              })}
+            </View>
+          );
+        }
+        if (className && className.includes('terms-compact')) {
+          return (
+            <View key={index} style={{ marginTop: 0.5, marginBottom: 2.0 }}>
+              {[...node.children].map((child, i) => {
+                const childClass = child.getAttribute && child.getAttribute('class');
+                if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
+                  return (
+                    <View key={i} style={{ marginBottom: 4.0 }}>
+                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
+                        {parseChildren(child)}
+                      </Text>
+                    </View>
+                  );
+                }
+                if (childClass && childClass.includes('terms-compact')) {
+                  return (
+                    <View key={i} style={{ marginBottom: 4.0 }}>
+                      {processNode(child, i)}
+                    </View>
+                  );
+                }
+                return (
+                  <View key={i} style={{ marginBottom: 4.0 }}>
+                    {processNode(child, i)}
+                  </View>
+                );
+              })}
+            </View>
+          );
+        }
         return (
           <View key={index}>
             {parseChildren(node)}
@@ -302,6 +384,8 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
     child.nodeType === 3 ? child.textContent : processNode(child, i)
       );
   };
+
+  const escapeRegex = (txt = '') => txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   return [...root.childNodes].map((node, i) => processNode(node, i));
 }

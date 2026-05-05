@@ -6,7 +6,6 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
   pdf,
   Image
 } from "@react-pdf/renderer";
@@ -18,131 +17,400 @@ import toast from "react-hot-toast";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
-import TablaPDFManual from "./TablaPDFManual";
 import { compressImageToDataURL } from './pdfImageCompression';
-Font.register({ family: 'Helvetica' });
 
-const T = pdfTheme; // alias corto
+// Extra top padding added to page, also needed by the header accent bar to bleed to page edge.
+const PAGE_TOP_EXTRA = 4;
+const yieldToMainThread = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+function normalizarTitulo(txt) {
+  const base = (txt || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return base
+    .replace(/[^A-Za-z0-9\s]/g, ' ')
+    .split(/\s+/).filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join('') || 'Valor';
+}
+
+const T = pdfTheme;
 
 const styles = StyleSheet.create({
   page: {
-  paddingHorizontal: T.page.marginHorizontal,
-  paddingVertical: T.page.marginVertical,
+    paddingHorizontal: T.page.marginHorizontal,
+    paddingTop: T.page.marginVertical + PAGE_TOP_EXTRA,
+    paddingBottom: T.page.marginVertical + 20,
     fontSize: T.font.base,
     fontFamily: 'Helvetica',
     color: T.colors.text,
-    lineHeight: 1.25,
+    lineHeight: 1.35,
     backgroundColor: T.colors.pageBg,
     flexDirection: 'column'
   },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
+  header: {
     marginBottom: T.spacing.sm,
+    paddingBottom: 0,
   },
-  headerBlock: {
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: T.spacing.xs,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    flex: 1.7,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  headerRight: {
     flex: 1,
-    paddingHorizontal: 8,
-    justifyContent: 'center'
-  },
-  headerDivider: {
-    width: 1,
-    backgroundColor: '#1a3357'
+    alignItems: 'flex-end',
   },
   logoBox: {
-    width: 150,
-    paddingRight: 30,
+    width: 120,
     justifyContent: 'center',
     alignItems: 'flex-start'
   },
   logoImg: {
-    width: 140,
-    height: 54,
+    width: 114,
+    height: 40,
     objectFit: 'contain'
   },
-  headerTextLine: {
-    fontSize: 8,
-    color: '#444',
-    marginBottom: 1.5,
-    fontWeight: 'normal'
+  companyBlock: {
+    flex: 1,
+    paddingTop: 2,
   },
-  headerTextBold: { fontWeight: 'bold', fontSize: 9, color: '#222', marginBottom: 2 },
-  rightAlign: { textAlign: 'right' },
+  companyName: {
+    fontWeight: 'bold',
+    fontSize: 10.5,
+    color: T.colors.headerBg,
+    marginBottom: 2,
+  },
+  companyLine: {
+    fontSize: 8.2,
+    color: T.colors.subtleText,
+    marginBottom: 1.5,
+  },
+  quoteMeta: {
+    backgroundColor: T.colors.headerBg,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minWidth: 170,
+  },
+  quoteMetaLine: {
+    fontSize: 8.2,
+    color: T.colors.headerText,
+    marginBottom: 2.5,
+  },
+  quoteMetaLabel: {
+    fontWeight: 'bold',
+    color: '#7EC8F0',
+  },
   title: {
     fontSize: T.font.h1,
     color: T.colors.headerBg,
-  marginTop: 14,
-  marginBottom: T.spacing.xs,
+    backgroundColor: 'transparent',
+    marginTop: T.spacing.xs,
+    marginBottom: 0,
     textAlign: 'center',
     fontWeight: 'bold',
     letterSpacing: 0.8,
-    borderBottomWidth: 1,
-    borderBottomColor: T.colors.headerBg,
-    paddingBottom: 3
+    paddingVertical: 2,
   },
   datosCliente: {
     marginTop: T.spacing.xs,
     marginBottom: T.spacing.md,
-    padding: T.spacing.sm,
-    backgroundColor: '#f7f9fa',
+    padding: T.spacing.md,
+    backgroundColor: '#F7FAFD',
     borderRadius: T.radius.md,
     borderWidth: 1,
     borderColor: T.colors.sectionDivider,
+    borderTopWidth: 3,
+    borderTopColor: T.colors.accent,
   },
+  dataGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+  dataCol: { width: '49%' },
+  dataLine: { fontSize: 9, color: T.colors.text, marginBottom: 2.5 },
   label: {
     fontWeight: 'bold',
     color: T.colors.headerBg,
     marginRight: 3,
   },
+  rightAlign: { textAlign: 'right' },
   sectionTitle: {
     fontSize: T.font.h2,
     color: T.colors.headerBg,
-  marginTop: 1,
-  marginBottom: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: T.colors.sectionDivider,
-    paddingBottom: 1,
-    fontWeight: 'bold'
+    marginTop: 10,
+    marginBottom: 6,
+    fontWeight: 'bold',
+    borderLeftWidth: 4,
+    borderLeftColor: T.colors.accent,
+    paddingLeft: 9,
+    paddingRight: 8,
+    paddingVertical: 4,
+    backgroundColor: 'transparent',
   },
   htmlContent: {
-  marginBottom: T.spacing.xs,
-  paddingRight: 8,
+    marginBottom: T.spacing.sm,
+    paddingRight: 4,
   },
   htmlContentCompact: {
-  marginBottom: T.spacing.xs,
-  paddingRight: 8,
-    fontSize: Math.max(9, (T.font?.base || 12) - 1),
+    marginBottom: T.spacing.sm,
+    paddingRight: 4,
+    fontSize: T.font.base,
   },
-  flexGrowContent: {
-    flexGrow: 1,
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
+  mainColumn: {
+    width: '66%',
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  sideColumn: {
+    width: '32%',
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  imageCard: {
+    padding: 4,
+    borderWidth: 1,
+    borderColor: T.colors.border,
+    borderRadius: 4,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  imageCaption: {
+    marginTop: 3,
+    fontSize: 7.5,
+    color: T.colors.subtleText,
+    textAlign: 'center',
+  },
+  sideImageTitle: {
+    fontSize: 8.5,
+    fontWeight: 'bold',
+    color: T.colors.headerBg,
+    marginBottom: 4,
+  },
+  sideImageCard: {
+    padding: 4,
+    borderWidth: 1,
+    borderColor: T.colors.border,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 4,
+  },
+  sideImage: {
+    width: '100%',
+    height: 150,
+    objectFit: 'contain',
+  },
+  sideImageCaption: {
+    fontSize: 7.2,
+    color: T.colors.subtleText,
+    textAlign: 'center',
+  },
+  flexGrowContent: {},
   footer: {
     fontSize: T.font.small,
     textAlign: 'center',
     color: T.colors.subtleText,
     borderTopWidth: 1,
     borderTopColor: T.colors.sectionDivider,
-    paddingTop: T.spacing.xs,
-    marginTop: 'auto'
+    paddingTop: T.spacing.xs + 1,
+    position: 'absolute',
+    left: T.page.marginHorizontal,
+    right: T.page.marginHorizontal,
+    bottom: T.page.marginVertical - 2,
   },
-  leftPadded: { paddingLeft: 18 },
 });
 
-function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false }) {
+function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1 }) {
   return (
     <View>
-      <Text style={{
-        ...styles.sectionTitle,
-  ...(compact ? { marginTop: 0.5, marginBottom: 0.5, paddingBottom: 0.5 } : null)
-      }}>{titulo}</Text>
+      <Text
+        minPresenceAhead={24}
+        style={{
+          ...styles.sectionTitle,
+          ...(compact ? { marginTop: 2, marginBottom: 2, paddingVertical: 1 } : null)
+        }}
+      >
+        {titulo}
+      </Text>
       <View style={compact ? styles.htmlContentCompact : styles.htmlContent}>
-  {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems })}
+        {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems, fontScale })}
       </View>
     </View>
   );
 }
 
-async function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
+function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
+  return (
+    <View style={styles.header}>
+      {/* Barra de acento de marca */}
+      <View style={{
+        height: 4,
+        backgroundColor: T.colors.accent,
+        marginHorizontal: -T.page.marginHorizontal,
+        marginTop: -(T.page.marginVertical + PAGE_TOP_EXTRA),
+        marginBottom: 10,
+      }} />
+      <View style={styles.headerTop}>
+        <View style={styles.headerLeft}>
+          <View style={styles.logoBox}>
+            <Image src={logoPng} style={styles.logoImg} />
+          </View>
+          <View style={styles.companyBlock}>
+            <Text style={styles.companyName}>Cold Chain Services S.A.S.</Text>
+            <Text style={styles.companyLine}>Cra 4 #1-04, Subachoque, Cundinamarca, Colombia</Text>
+            <Text style={styles.companyLine}>NIT 900434149-6 | www.ccservices.com.co</Text>
+            <Text style={styles.companyLine}>300 858 2709 | santiago.martinez@ccservices.com.co</Text>
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          <View style={styles.quoteMeta}>
+            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Cotización:</Text> #{numeroCotizacion}</Text>
+            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Fecha:</Text> {fecha}</Text>
+            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> 30 días calendario</Text>
+            <Text style={[styles.quoteMetaLine, { marginBottom: 0 }]}><Text style={styles.quoteMetaLabel}>Asesor:</Text> Equipo Comercial CCS</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
+    </View>
+  );
+}
+
+function PdfFooter({ numeroCotizacion }) {
+  return (
+    <Text
+      style={styles.footer}
+      fixed
+      render={({ pageNumber, totalPages }) =>
+        `Cold Chain Services S.A.S. | Carrera 4 #1-04, Subachoque | www.ccservices.com.co  ·  CT#${numeroCotizacion}  ·  Página ${pageNumber} de ${totalPages}`
+      }
+    />
+  );
+}
+
+function ImageSection({ imagenSeleccionada, imagenesMulti, titulo }) {
+  if (!imagenSeleccionada && imagenesMulti.length === 0) return null;
+  const extras = imagenesMulti.slice(0, 2);
+  const total = (imagenSeleccionada ? 1 : 0) + extras.length;
+  let widthPct;
+  if (total === 1) widthPct = '60%';
+  else if (total === 2) widthPct = '48%';
+  else widthPct = '32%';
+
+  return (
+    <View>
+      <Text minPresenceAhead={24} style={styles.sectionTitle}>{titulo}</Text>
+      <View style={styles.imageGrid}>
+        {imagenSeleccionada && (
+          <View style={[styles.imageCard, { width: widthPct, marginHorizontal: total === 1 ? 'auto' : 0 }]}>
+            <Image src={imagenSeleccionada} style={{ width: '100%', height: 165, objectFit: 'contain' }} />
+            <Text style={styles.imageCaption}>Referencia visual principal (no contractual)</Text>
+          </View>
+        )}
+        {extras.map((imgSrc, idx) => (
+          <View key={idx} style={[styles.imageCard, { width: widthPct }]}>
+            <Image src={imgSrc} style={{ width: '100%', height: 165, objectFit: 'contain' }} />
+            <Text style={styles.imageCaption}>Imagen adicional {idx + 1} (referencial)</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ImageAside({ imagenSeleccionada, titulo }) {
+  if (!imagenSeleccionada) return null;
+  return (
+    <View style={styles.sideColumn}>
+      <Text style={styles.sideImageTitle}>{titulo}</Text>
+      <View style={styles.sideImageCard}>
+        <Image src={imagenSeleccionada} style={styles.sideImage} />
+      </View>
+      <Text style={styles.sideImageCaption}>Referencia visual (no contractual)</Text>
+    </View>
+  );
+}
+
+function ValidityCallout() {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, marginBottom: 4 }}>
+      <View style={{
+        backgroundColor: '#EBF4FF',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        borderLeftWidth: 3,
+        borderLeftColor: T.colors.accent,
+        borderRadius: 3,
+        padding: 7,
+        width: '54%',
+      }}>
+        <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
+          Oferta válida por 30 días calendario desde la fecha de emisión.
+        </Text>
+        <Text style={{ fontSize: 7.5, color: '#2C5282' }}>
+          Precios sujetos a variación de TRM y disponibilidad de materiales.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function SignatureBlock() {
+  return (
+    <View wrap={false} minPresenceAhead={28} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: T.colors.sectionDivider }}>
+      <Text style={{ fontSize: 9, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 20, letterSpacing: 0.5 }}>
+        ACEPTACIÓN DE COTIZACIÓN
+      </Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ width: '44%' }}>
+          <View style={{
+            borderWidth: 1,
+            borderColor: T.colors.sectionDivider,
+            borderRadius: 3,
+            backgroundColor: '#FAFCFE',
+            padding: 8,
+            marginBottom: 6,
+            height: 48,
+          }} />
+          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.text, marginBottom: 3 }}>Firma y sello — Cold Chain Services S.A.S.</Text>
+          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
+          <Text style={{ fontSize: 8, color: T.colors.subtleText }}>Cargo: ___________________________________</Text>
+        </View>
+        <View style={{ width: '44%' }}>
+          <View style={{
+            borderWidth: 1,
+            borderColor: T.colors.sectionDivider,
+            borderRadius: 3,
+            backgroundColor: '#FAFCFE',
+            padding: 8,
+            marginBottom: 6,
+            height: 48,
+          }} />
+          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.text, marginBottom: 3 }}>Firma y sello — Cliente</Text>
+          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
+          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Cargo: ___________________________________</Text>
+          <Text style={{ fontSize: 8, color: T.colors.subtleText }}>Fecha de aceptación: _____________________</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
   const {
     nombreCliente,
     cliente,
@@ -160,7 +428,6 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas
   const producto = productos?.[0];
   const tipoProducto = producto?.tipo?.toUpperCase?.() || "PRODUCTO";
   const fecha = new Date().toLocaleDateString("es-CO");
-  const isPuertasRapidas = (producto?.tipo === 'Puertas Rápidas');
 
   const {
     descripcionHTML = "",
@@ -173,171 +440,123 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas
   const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
   const imagenSeleccionadaRaw = imagenesPorProducto[nombreImagen] || null;
   const imagenesMultiRaw = Array.isArray(imagenesSeleccionadas) ? imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean) : [];
-  // Usar imágenes optimizadas si fueron pasadas; si no, usar originales
   const imagenSeleccionada = imagenesOptimizadas?.principal ?? imagenSeleccionadaRaw;
   const imagenesMulti = imagenesOptimizadas?.extras ?? imagenesMultiRaw;
-
-  const footerContent = (
-    <>Cotización generada por COLD CHAIN SERVICES S.A.S. Carrera 4 #1-04, Subachoque, Cundinamarca.{"\n"}
-      www.ccservices.com.co – Tel. 3008582709 – santiago.martinez@ccservices.com.co</>
-  );
+  const hasAnyImage = Boolean(imagenSeleccionada) || imagenesMulti.length > 0;
+  const hasSideImage = Boolean(imagenSeleccionada);
+  const imagenSectionTitle = hasAnyImage ? "2. Imágenes de Referencia" : "";
+  const detalleIndex = hasAnyImage ? 3 : 2;
+  const condicionesIndex = hasAnyImage ? 4 : 3;
+  const terminosIndex = hasAnyImage ? 5 : 4;
+  const showFullImageSection = !hasSideImage && hasAnyImage;
+  const showExtraImagesSection = hasSideImage && imagenesMulti.length > 0;
 
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
-  <View style={styles.headerBar} fixed>
-          <View style={styles.logoBox}>
-            <Image src={logoPng} style={styles.logoImg} />
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
-            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
-            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
-            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
-            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
-          </View>
-        </View>
-        <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
+        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
         <View style={styles.datosCliente}>
-          <View style={{ flexDirection:'row', justifyContent:'space-between' }}>
-            {(nombreCliente || cliente) && (
-              <Text><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
-            )}
-            <Text style={styles.rightAlign}><Text style={styles.label}>Fecha:</Text> {fecha}</Text>
+          <View style={styles.dataGrid}>
+            <View style={styles.dataCol}>
+              {(nombreCliente || cliente) && (
+                <Text style={styles.dataLine}><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
+              )}
+              {(clienteContacto || clienteEmail || clienteTelefono) && (
+                <Text style={styles.dataLine}><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
+              )}
+              {clienteNIT && (
+                <Text style={styles.dataLine}><Text style={styles.label}>NIT:</Text> {clienteNIT}</Text>
+              )}
+            </View>
+            <View style={styles.dataCol}>
+              {clienteCiudad && (
+                <Text style={[styles.dataLine, styles.rightAlign]}><Text style={styles.label}>Ciudad:</Text> {clienteCiudad}</Text>
+              )}
+              {(clienteEmail || clienteTelefono) && (
+                <Text style={[styles.dataLine, styles.rightAlign]}>
+                  <Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}
+                </Text>
+              )}
+              <Text style={[styles.dataLine, styles.rightAlign]}><Text style={styles.label}>Producto:</Text> {tipoProducto}</Text>
+            </View>
           </View>
-          <View style={{ flexDirection:'row', justifyContent:'flex-end' }}>
-            <Text style={styles.rightAlign}><Text style={styles.label}>Cotización No:</Text> {numeroCotizacion}</Text>
-          </View>
-          {(clienteContacto || clienteEmail || clienteTelefono) && (
-            <Text><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
-          )}
-          {clienteNIT && (
-            <Text><Text style={styles.label}>NIT:</Text> {clienteNIT}</Text>
-          )}
-          {clienteCiudad && (
-            <Text><Text style={styles.label}>Ciudad:</Text> {clienteCiudad}</Text>
-          )}
-          {(clienteEmail || clienteTelefono) && (
-            <Text><Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}</Text>
-          )}
         </View>
         <View style={styles.flexGrowContent}>
-          <SeccionHTML titulo="Descripción General" contenido={descripcionHTML} compact dense />
-          <SeccionHTML titulo="Especificaciones Técnicas" contenido={especificacionesHTML} readable onlyBoldHeadings compressShortItems />
-          {(imagenSeleccionada || imagenesMulti.length > 0) && !isPuertasRapidas && (() => {
-            const extras = imagenesMulti.slice(0,2);
-            const total = (imagenSeleccionada ? 1 : 0) + extras.length;
-            // calcular width por imagen
-            let widthPct;
-            if (total === 1) widthPct = '100%';
-            else if (total === 2) widthPct = '48%';
-            else widthPct = '32%';
-            return (
-              <>
-                <Text style={styles.sectionTitle}>Imágenes de Referencia</Text>
-                <View style={{ flexDirection:'row', flexWrap:'wrap', justifyContent: total === 2 ? 'center' : 'space-between' }}>
-                  {imagenSeleccionada && (
-                    <View style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
-                      <Image src={imagenSeleccionada} style={{ width:'100%', height:165, objectFit:'contain' }} />
-                    </View>
-                  )}
-                  {extras.map((imgSrc, idx) => (
-                    <View key={idx} style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
-                      <Image src={imgSrc} style={{ width:'100%', height:165, objectFit:'contain' }} />
-                    </View>
-                  ))}
+          {hasSideImage ? (
+            <>
+              {descripcionHTML ? (
+                <View style={styles.htmlContentCompact}>
+                  {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
                 </View>
-              </>
-            );
-          })()}
+              ) : null}
+              <View style={styles.contentRow}>
+                <View style={styles.mainColumn}>
+                  <Text minPresenceAhead={24} style={styles.sectionTitle}>1. Especificaciones Técnicas</Text>
+                  <View style={styles.htmlContent}>
+                    {parseHtmlToPDFComponents(especificacionesHTML, { compact: true, onlyBoldHeadings: true, compressShortItems: true })}
+                  </View>
+                </View>
+                <ImageAside titulo={imagenSectionTitle} imagenSeleccionada={imagenSeleccionada} />
+              </View>
+            </>
+          ) : (
+            <>
+              {descripcionHTML ? (
+                <View style={styles.htmlContentCompact}>
+                  {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
+                </View>
+              ) : null}
+              <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact onlyBoldHeadings compressShortItems />
+            </>
+          )}
         </View>
-        <Text style={styles.footer} fixed>{footerContent}</Text>
+        <PdfFooter numeroCotizacion={numeroCotizacion} />
       </Page>
 
       <Page size="A4" style={styles.page} wrap>
-        <View style={styles.headerBar} fixed>
-          <View style={styles.logoBox}>
-            <Image src={logoPng} style={styles.logoImg} />
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
-            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
-            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
-            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
-            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
-          </View>
-        </View>
+        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
         <View style={styles.flexGrowContent}>
-          {isPuertasRapidas && (imagenSeleccionada || imagenesMulti.length > 0) && (() => {
-            const extras = imagenesMulti.slice(0,2);
-            const total = (imagenSeleccionada ? 1 : 0) + extras.length;
-            let widthPct;
-            if (total === 1) widthPct = '100%';
-            else if (total === 2) widthPct = '48%';
-            else widthPct = '32%';
-            return (
-              <>
-                <Text style={styles.sectionTitle}>Imágenes de Referencia</Text>
-                <View style={{ flexDirection:'row', flexWrap:'wrap', justifyContent: total === 2 ? 'center' : 'space-between' }}>
-                  {imagenSeleccionada && (
-                    <View style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
-                      <Image src={imagenSeleccionada} style={{ width:'100%', height:165, objectFit:'contain' }} />
-                    </View>
-                  )}
-                  {extras.map((imgSrc, idx) => (
-                    <View key={idx} style={{ width: widthPct, padding:4, border:'1 solid #d0d5db', borderRadius:6, marginBottom:6 }}>
-                      <Image src={imgSrc} style={{ width:'100%', height:165, objectFit:'contain' }} />
-                    </View>
-                  ))}
-                </View>
-              </>
-            );
-          })()}
-          <Text style={styles.sectionTitle}>Detalle de Precios</Text>
+          {showFullImageSection && (
+            <ImageSection
+              titulo={imagenSectionTitle}
+              imagenSeleccionada={imagenSeleccionada}
+              imagenesMulti={imagenesMulti}
+            />
+          )}
+          {showExtraImagesSection && (
+            <ImageSection
+              titulo="Imágenes adicionales"
+              imagenSeleccionada={null}
+              imagenesMulti={imagenesMulti}
+            />
+          )}
+          <Text minPresenceAhead={28} style={styles.sectionTitle}>{detalleIndex}. Detalle Económico</Text>
           {convertirTablaHTMLaComponentes(tablaHTML, { summaryPanel: true, zebra: true, currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true } })}
-          <SeccionHTML titulo="Condiciones Comerciales" contenido={condicionesHTML} compact dense />
+          <ValidityCallout />
+          <SeccionHTML
+            titulo={`${condicionesIndex}. Condiciones Comerciales`}
+            contenido={condicionesHTML}
+            compact
+            dense
+            compressShortItems
+          />
         </View>
-        <Text style={styles.footer} fixed>{footerContent}</Text>
+        <PdfFooter numeroCotizacion={numeroCotizacion} />
       </Page>
 
       <Page size="A4" style={styles.page} wrap>
-        <View style={styles.headerBar} fixed>
-          <View style={styles.logoBox}>
-            <Image src={logoPng} style={styles.logoImg} />
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextBold}>Cold Chain Services S.A.S.</Text>
-            <Text style={styles.headerTextLine}>Cra 4 1#04</Text>
-            <Text style={styles.headerTextLine}>250220, Subachoque, Cundinamarca, Colombia</Text>
-            <Text style={styles.headerTextLine}>Nit: 900434149-6</Text>
-          </View>
-          <View style={styles.headerDivider} />
-          <View style={styles.headerBlock}>
-            <Text style={styles.headerTextLine}>Whatsapp 3008582709</Text>
-            <Text style={styles.headerTextLine}>santiago.martinez@ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>www.ccservices.com.co</Text>
-            <Text style={styles.headerTextLine}>Cel: 3008582709 - 3112360170</Text>
-          </View>
-        </View>
+        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
         <View style={styles.flexGrowContent}>
-          <SeccionHTML titulo="Términos y Condiciones Generales" contenido={terminosHTML} compact dense />
+          <SeccionHTML
+            titulo={`${terminosIndex}. Términos y Condiciones Generales`}
+            contenido={terminosHTML}
+            compact
+            dense
+            fontScale={0.9}
+          />
+          <SignatureBlock />
         </View>
-        <Text style={styles.footer} fixed>{footerContent}</Text>
+        <PdfFooter numeroCotizacion={numeroCotizacion} />
       </Page>
     </Document>
   );
@@ -346,7 +565,6 @@ async function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas
 export async function generarPDFReact(cotizacion, estaEditando) {
   let numeroCotizacion = cotizacion.numero;
 
-  // Guardar solo si es nueva (no edición) y no tiene id existente
   if (!estaEditando || !cotizacion.id) {
     if(!estaEditando){
       numeroCotizacion = await getNextQuoteNumber();
@@ -359,7 +577,6 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     }
   }
 
-  // Preparar imágenes optimizadas (si hay seleccionadas)
   const producto = cotizacion.productos?.[0];
   const nombreImagen = cotizacion.imagenSeleccionada || producto?.imagen || '';
   const imagenSeleccionadaSrc = nombreImagen ? (imagenesPorProducto[nombreImagen] || null) : null;
@@ -369,12 +586,12 @@ export async function generarPDFReact(cotizacion, estaEditando) {
 
   let imagenesOptimizadas = undefined;
   try {
-    const opts = { maxWidth: 1200, maxHeight: 900, quality: 0.6, mimeType: 'image/jpeg' };
-    const principal = imagenSeleccionadaSrc ? await compressImageToDataURL(imagenSeleccionadaSrc, opts) : null;
-    const extras = [];
-    for (const src of imagenesMultiSrc.slice(0, 2)) { // a lo sumo 2 extras en layout
-      extras.push(await compressImageToDataURL(src, opts));
-    }
+    await yieldToMainThread();
+    const opts = { maxWidth: 1000, maxHeight: 760, quality: 0.55, mimeType: 'image/jpeg' };
+    const [principal, ...extras] = await Promise.all([
+      imagenSeleccionadaSrc ? compressImageToDataURL(imagenSeleccionadaSrc, opts) : Promise.resolve(null),
+      ...imagenesMultiSrc.slice(0, 2).map(src => compressImageToDataURL(src, opts)),
+    ]);
     if (principal || extras.length) {
       imagenesOptimizadas = { principal, extras };
     }
@@ -382,33 +599,28 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
   }
 
-  const doc = await PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas });
+  const doc = PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas });
   const asPdf = pdf();
   asPdf.updateContainer(doc);
+  await yieldToMainThread();
   const blob = await asPdf.toBlob();
 
-  // Formato actualizado: CT#X_Producto_Empresa_dd-mm-aaaa.pdf
   const ahora = new Date();
   const dd = String(ahora.getDate()).padStart(2,'0');
   const mm = String(ahora.getMonth()+1).padStart(2,'0');
   const yyyy = String(ahora.getFullYear());
-  const fechaCompacta = `${dd}-${mm}-${yyyy}`; // dd-mm-aaaa
+  const fechaCompacta = `${dd}-${mm}-${yyyy}`;
   const primerProducto = cotizacion.productos?.[0]?.tipo || 'Producto';
-  const normalizarTitulo = (txt)=>{
-    const base = (txt||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    // Dejar solo letras y números, separar por espacios, capitalizar y unir sin espacios
-    return base
-      .replace(/[^A-Za-z0-9\s]/g,' ') // sustituir símbolos por espacio
-      .split(/\s+/).filter(Boolean)
-      .map(w=> w.charAt(0).toUpperCase()+w.slice(1).toLowerCase())
-      .join('') || 'Valor';
-  };
   const prodNorm = normalizarTitulo(primerProducto);
   const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
   const empresaNorm = normalizarTitulo(empresaBase);
   const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
   link.download = nombreArchivo;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
 }
