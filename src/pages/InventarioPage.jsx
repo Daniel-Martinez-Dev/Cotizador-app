@@ -28,12 +28,13 @@ export default function InventarioPage() {
   const [showProveedorModal, setShowProveedorModal] = React.useState(false);
   const [showMovimientoModal, setShowMovimientoModal] = React.useState(false);
   const [showProveedorOverlay, setShowProveedorOverlay] = React.useState(false);
+  const showImportSections = false;
   const [sectionsOpen, setSectionsOpen] = React.useState({
     inventario: true,
     proveedores: true,
     movimientos: true,
-    importProveedores: true,
-    importItems: true,
+    importProveedores: false,
+    importItems: false,
   });
   const emptySede = React.useMemo(() => ({ direccion: "", ciudad: "" }), []);
   const emptyContacto = React.useMemo(() => ({ nombre: "", telefono: "", correo: "" }), []);
@@ -1277,13 +1278,15 @@ export default function InventarioPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="font-medium">Materiales</div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              type="button"
-              onClick={() => toggleSection('importItems')}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {sectionsOpen.importItems ? 'Ocultar importacion' : 'Mostrar importacion'}
-            </button>
+            {showImportSections && (
+              <button
+                type="button"
+                onClick={() => toggleSection('importItems')}
+                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+              >
+                {sectionsOpen.importItems ? 'Ocultar importacion' : 'Mostrar importacion'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => toggleSection('inventario')}
@@ -1294,7 +1297,7 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        {sectionsOpen.importItems && (
+        {showImportSections && sectionsOpen.importItems && (
           <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
             <div className="text-sm font-medium">Importar materiales (Excel/CSV)</div>
             <div className="text-[11px] opacity-70 mt-1">Columnas esperadas: ITEM, PRODUCTOS, CATEGORIA, UNIDAD.</div>
@@ -1674,13 +1677,15 @@ export default function InventarioPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="font-medium">Proveedores</div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => toggleSection('importProveedores')}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {sectionsOpen.importProveedores ? 'Ocultar importacion' : 'Mostrar importacion'}
-            </button>
+            {showImportSections && (
+              <button
+                type="button"
+                onClick={() => toggleSection('importProveedores')}
+                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
+              >
+                {sectionsOpen.importProveedores ? 'Ocultar importacion' : 'Mostrar importacion'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => toggleSection('proveedores')}
@@ -1691,7 +1696,7 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        {sectionsOpen.importProveedores && (
+        {showImportSections && sectionsOpen.importProveedores && (
           <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
             <div className="text-sm font-medium">Importar proveedores (Excel/CSV)</div>
             <div className="text-[11px] opacity-70 mt-1">Lee la primera hoja. Requiere columnas para Razon social y NIT (nombres flexibles).</div>

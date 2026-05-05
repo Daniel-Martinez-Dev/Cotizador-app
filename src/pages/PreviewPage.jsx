@@ -4,6 +4,7 @@ import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
 import { generarPDFReact } from "../utils/pdfReact";
 import { generarSeccionesHTML } from "../utils/htmlSections";
+import { sanitizeHtml } from "../utils/sanitizeHtml";
 import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill";
@@ -20,6 +21,15 @@ export default function PreviewPage() {
   const { imagenSeleccionada, setImagenSeleccionada, imagenesSeleccionadas, setImagenesSeleccionadas } = useQuote();
   const [imagenBase64, setImagenBase64] = useState("");
   const [imagenAmpliada, setImagenAmpliada] = useState(null);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
+
+  const sanitizeSections = (sections = {}) => ({
+    ...sections,
+    descripcionHTML: sanitizeHtml(sections.descripcionHTML || ""),
+    especificacionesHTML: sanitizeHtml(sections.especificacionesHTML || ""),
+    condicionesHTML: sanitizeHtml(sections.condicionesHTML || ""),
+    terminosHTML: sanitizeHtml(sections.terminosHTML || ""),
+  });
 
   useEffect(() => {
     return () => {
@@ -38,8 +48,9 @@ export default function PreviewPage() {
     if (quoteData?.productos) {
       try {
         const generadas = generarSeccionesHTML(quoteData);
-        setSecciones([generadas]);
-        setEdiciones(generadas);
+        const sanitized = sanitizeSections(generadas);
+        setSecciones([sanitized]);
+        setEdiciones(sanitized);
       } catch (error) {
         console.error("Error generando secciones HTML:", error);
       }
@@ -214,7 +225,12 @@ export default function PreviewPage() {
           <ReactQuill
             theme="snow"
             value={ediciones[campo] || ""}
-            onChange={(value) => setEdiciones({ ...ediciones, [campo]: value })}
+            onChange={(value) =>
+              setEdiciones((prev) => ({
+                ...prev,
+                [campo]: sanitizeHtml(value),
+              }))
+            }
             modules={{
               toolbar: [
                 [{ header: [1, 2, 3, false] }],
@@ -237,7 +253,7 @@ export default function PreviewPage() {
         <div>
           <div
             className="mb-3 prose max-w-none text-gray-700"
-            dangerouslySetInnerHTML={{ __html: ediciones[campo] || "" }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(ediciones[campo] || "") }}
           />
           <button
             className="mt-1 text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
@@ -250,11 +266,28 @@ export default function PreviewPage() {
     </div>
   );
 
-  const handleGenerarPDF = () =>
-    generarPDFReact(
-      { ...quoteData, secciones: [ediciones], imagenSeleccionada, imagenesSeleccionadas: imagenesSeleccionadas.filter(Boolean).slice(0, 2) },
-      estaEditando
-    );
+  const handleGenerarPDF = async () => {
+    if (generandoPDF) return;
+    try {
+      setGenerandoPDF(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const safeEdiciones = sanitizeSections(ediciones);
+      await generarPDFReact(
+        {
+          ...quoteData,
+          secciones: [safeEdiciones],
+          imagenSeleccionada,
+          imagenesSeleccionadas: imagenesSeleccionadas.filter(Boolean).slice(0, 2),
+        },
+        estaEditando
+      );
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+      toast.error("No se pudo generar el PDF");
+    } finally {
+      setGenerandoPDF(false);
+    }
+  };
 
   const botonesAccion = (
     <>
@@ -265,10 +298,13 @@ export default function PreviewPage() {
         ✏️ Editar cotización
       </button>
       <button
-        className="w-full bg-green-700 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-green-800 transition-colors flex items-center justify-center gap-2 text-sm"
+        className={`w-full px-4 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm ${
+          generandoPDF ? "bg-green-500 cursor-not-allowed text-white" : "bg-green-700 text-white hover:bg-green-800"
+        }`}
         onClick={handleGenerarPDF}
+        disabled={generandoPDF}
       >
-        ⬇️ Descargar PDF
+        {generandoPDF ? "⏳ Generando PDF..." : "⬇️ Descargar PDF"}
       </button>
       <button
         onClick={() => navigate("/historial")}
@@ -551,10 +587,13 @@ export default function PreviewPage() {
           ✏️ Editar
         </button>
         <button
-          className="flex-1 bg-green-700 text-white px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-green-800 transition-colors"
+          className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            generandoPDF ? "bg-green-500 cursor-not-allowed text-white" : "bg-green-700 text-white hover:bg-green-800"
+          }`}
           onClick={handleGenerarPDF}
+          disabled={generandoPDF}
         >
-          ⬇️ PDF
+          {generandoPDF ? "⏳ PDF..." : "⬇️ PDF"}
         </button>
         <button
           onClick={() => navigate("/historial")}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cotizador Cold Chain</string>
+    <string name="title_activity_main">Cotizador Cold Chain</string>
+    <string name="package_name">com.ccs.cotizador</string>
+    <string name="custom_url_scheme">com.ccs.cotizador</string>
+</resources>

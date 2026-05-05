@@ -7,20 +7,10 @@ import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtra
 export function generarSeccionesHTML(cotizacion) {
   const descripcionHTML = generarDescripcion(cotizacion);
   const especificacionesHTML = generarEspecificaciones(cotizacion);
-
-  // Inserta salto de página antes de la tabla
-  const tablaHTML = `
-    <div style="page-break-before: always;"></div>
-    ${generarTablaPrecios(cotizacion)}
-  `;
+  const tablaHTML = generarTablaPrecios(cotizacion);
 
   const condicionesHTML = generarCondicionesComerciales(cotizacion);
-
-  // Inserta salto de página antes de los términos generales
-  const terminosHTML = `
-    <div style="page-break-before: always;"></div>
-    ${generarTerminosGenerales(cotizacion)}
-  `;
+  const terminosHTML = generarTerminosGenerales(cotizacion);
 
   return {
     descripcionHTML,
@@ -35,6 +25,8 @@ export function generarSeccionesHTML(cotizacion) {
 const p = (text) => `<p>${text}</p>`;
 const li = (text) => `<li>${text}</li>`;
 const ulOpen = `<ul class="condiciones-compactas">`;
+const termBlock = (title, body) => `<div class="term-item"><p><strong>${title}</strong></p><p>${body}</p></div>`;
+const termGroup = (html) => `<div class="terms-compact">${html}</div>`;
 
 function generarDescripcion(cot) {
   const tipo = cot.productos[0]?.tipo;
@@ -239,7 +231,7 @@ function generarTablaPrecios(cot) {
 
   html = html.replace(/(<br\s*\/?>\s*){2,}/gi, '<br />');
 
-  return `<div style="page-break-before: always;">${html}</div>`;
+  return html;
 }
 
 
@@ -323,13 +315,31 @@ function generarCondicionesComerciales(cot) {
 
 function generarTerminosGenerales(cot) {
   const itemsTop = [
-    'Esta oferta técnica y económica se formula con base en la información suministrada por el cliente. Para proceder con el diseño, fabricación o suministro de los equipos, es indispensable contar con planos, medidas y fotografías proporcionadas por el cliente, los cuales deben ser aprobados y firmados antes de iniciar cualquier proceso productivo. Ningún trabajo de fabricación se ejecutará sin la confirmación escrita de estos documentos, que representan la aceptación formal de las condiciones técnicas de la propuesta.',
-    '<strong>Alcance de la Oferta:</strong> La presente propuesta comprende exclusivamente los equipos y servicios expresamente descritos en la cotización. Cualquier modificación, ampliación o requerimiento adicional deberá ser objeto de un nuevo acuerdo formal entre las partes. No se incluyen en el alcance obras civiles, adecuaciones de vano, reforzamientos estructurales, cableado externo, acometidas eléctricas, canalizaciones, equipos de izaje, suministro de elementos de seguridad industrial (SISO) o personal de vigilancia.',
-    '<strong>Instalación (Opcional):</strong> El servicio de instalación es opcional. El cliente puede ejecutar la instalación con su propio personal o contratarla con Cold Chain Services S.A.S. En caso de requerirse, la instalación cubrirá únicamente los equipos ofertados y se realizará bajo condiciones adecuadas de acceso, seguridad y disponibilidad del área de trabajo. Salvo que se indique lo contrario, las instalaciones están presupuestadas para ejecutarse en días hábiles (lunes a viernes, de 7:00 a.m. a 5:00 p.m.). Cualquier labor que deba realizarse fuera de este horario, en festivos o en jornadas nocturnas, deberá ser previamente cotizada y aprobada por ambas partes.',
-    '<strong>Tiempo de Entrega:</strong> El plazo de entrega se contará a partir del cumplimiento de los siguientes requisitos: (1) aprobación escrita de la oferta y de los planos, (2) recepción efectiva del anticipo pactado, y (3) confirmación de disponibilidad de materiales. Los tiempos de entrega estimados no contemplan demoras ocasionadas por fuerza mayor, paros, bloqueos, derrumbes, escasez de materiales, cierres viales o retrasos logísticos ajenos a la compañía.',
-    '<strong>Garantía:</strong> Todos los equipos cuentan con una garantía limitada de doce (12) meses, la cual cubre exclusivamente defectos de fabricación bajo condiciones normales de uso y mantenimiento. Esta garantía no aplica para daños causados por instalación inadecuada, golpes, manipulación indebida, modificaciones no autorizadas, descargas eléctricas, variaciones de voltaje, exposición a químicos no compatibles, ni por el desgaste normal de las piezas. Los componentes eléctricos y electrónicos, tales como motores, tarjetas, controles o sensores, estarán cubiertos únicamente si se especifica expresamente en la cotización. Cualquier alteración o ajuste no autorizado por el personal técnico de Cold Chain Services S.A.S. anulará automáticamente la garantía.',
-    '<strong>Mantenimiento y Periodicidad:</strong> Durante el período de garantía, los mantenimientos preventivos y correctivos deberán ser realizados por personal técnico calificado. Para conservar la validez de la garantía, el cliente deberá garantizar al menos una visita anual de mantenimiento documentada. El incumplimiento de esta condición, o la ausencia de registros técnicos válidos en caso de falla, invalidará la cobertura de garantía.',
-    '<strong>Obligaciones del Contratante (Aplican si se incluye instalación):</strong>'
+    termBlock(
+      'Generalidades:',
+      'Esta oferta técnica y económica se formula con base en la información suministrada por el cliente. Para proceder con el diseño, fabricación o suministro de los equipos, es indispensable contar con planos, medidas y fotografías proporcionadas por el cliente, los cuales deben ser aprobados y firmados antes de iniciar cualquier proceso productivo. Ningún trabajo de fabricación se ejecutará sin la confirmación escrita de estos documentos, que representan la aceptación formal de las condiciones técnicas de la propuesta.'
+    ),
+    termBlock(
+      'Alcance de la Oferta:',
+      'La presente propuesta comprende exclusivamente los equipos y servicios expresamente descritos en la cotización. Cualquier modificación, ampliación o requerimiento adicional deberá ser objeto de un nuevo acuerdo formal entre las partes. No se incluyen en el alcance obras civiles, adecuaciones de vano, reforzamientos estructurales, cableado externo, acometidas eléctricas, canalizaciones, equipos de izaje, suministro de elementos de seguridad industrial (SISO) o personal de vigilancia.'
+    ),
+    termBlock(
+      'Instalación (Opcional):',
+      'El servicio de instalación es opcional. El cliente puede ejecutar la instalación con su propio personal o contratarla con Cold Chain Services S.A.S. En caso de requerirse, la instalación cubrirá únicamente los equipos ofertados y se realizará bajo condiciones adecuadas de acceso, seguridad y disponibilidad del área de trabajo. Salvo que se indique lo contrario, las instalaciones están presupuestadas para ejecutarse en días hábiles (lunes a viernes, de 7:00 a.m. a 5:00 p.m.). Cualquier labor que deba realizarse fuera de este horario, en festivos o en jornadas nocturnas, deberá ser previamente cotizada y aprobada por ambas partes.'
+    ),
+    termBlock(
+      'Tiempo de Entrega:',
+      'El plazo de entrega se contará a partir del cumplimiento de los siguientes requisitos: (1) aprobación escrita de la oferta y de los planos, (2) recepción efectiva del anticipo pactado, y (3) confirmación de disponibilidad de materiales. Los tiempos de entrega estimados no contemplan demoras ocasionadas por fuerza mayor, paros, bloqueos, derrumbes, escasez de materiales, cierres viales o retrasos logísticos ajenos a la compañía.'
+    ),
+    termBlock(
+      'Garantía:',
+      'Todos los equipos cuentan con una garantía limitada de doce (12) meses, la cual cubre exclusivamente defectos de fabricación bajo condiciones normales de uso y mantenimiento. Esta garantía no aplica para daños causados por instalación inadecuada, golpes, manipulación indebida, modificaciones no autorizadas, descargas eléctricas, variaciones de voltaje, exposición a químicos no compatibles, ni por el desgaste normal de las piezas. Los componentes eléctricos y electrónicos, tales como motores, tarjetas, controles o sensores, estarán cubiertos únicamente si se especifica expresamente en la cotización. Cualquier alteración o ajuste no autorizado por el personal técnico de Cold Chain Services S.A.S. anulará automáticamente la garantía.'
+    ),
+    termBlock(
+      'Mantenimiento y Periodicidad:',
+      'Durante el período de garantía, los mantenimientos preventivos y correctivos deberán ser realizados por personal técnico calificado. Para conservar la validez de la garantía, el cliente deberá garantizar al menos una visita anual de mantenimiento documentada. El incumplimiento de esta condición, o la ausencia de registros técnicos válidos en caso de falla, invalidará la cobertura de garantía.'
+    ),
+    '<div class="term-item"><p><strong>Obligaciones del Contratante (Aplican si se incluye instalación):</strong></p></div>'
   ];
 
   const obligaciones = [
@@ -342,9 +352,17 @@ function generarTerminosGenerales(cot) {
   ];
 
   const cierre = [
-    '<strong>Aceptación:</strong> La emisión de una orden de compra, la firma de la cotización o el pago del anticipo constituyen aceptación plena de las condiciones aquí descritas. Estas condiciones prevalecen sobre cualquier comunicación previa y forman parte integral del acuerdo comercial entre el cliente y Cold Chain Services S.A.S.'
+    termBlock(
+      'Aceptación:',
+      'La emisión de una orden de compra, la firma de la cotización o el pago del anticipo constituyen aceptación plena de las condiciones aquí descritas. Estas condiciones prevalecen sobre cualquier comunicación previa y forman parte integral del acuerdo comercial entre el cliente y Cold Chain Services S.A.S.'
+    )
   ];
 
-  const ul = (arr) => `<ul class='condiciones-compactas'>${arr.map(t => `<li>${t}</li>`).join('')}</ul>`;
-  return `${ul(itemsTop)}${ul(obligaciones)}${ul(cierre)}`;
+  const blocks = [
+    ...itemsTop,
+    termGroup(obligaciones.map((item) => `<p>${item}</p>`).join('')),
+    ...cierre,
+  ];
+
+  return termGroup(blocks.join(''));
 }

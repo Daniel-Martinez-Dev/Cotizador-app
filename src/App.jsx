@@ -117,6 +117,7 @@ function AppShell() {
     const location = useLocation();
     const navigate = useNavigate();
     const handleNueva = () => { setShowNuevaModal(true); };
+    const [menuOpen, setMenuOpen] = useState(false);
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
       { to: '/', label: 'Cotizar', show: true },
@@ -127,23 +128,63 @@ function AppShell() {
       { to: '/empresas', label: 'Empresas', show: true },
       { to: '/usuarios', label: 'Usuarios', show: hasRole('admin') },
     ].filter(l => l.show);
+    const primaryOrder = ['/dashboard', '/', '/produccion', '/inventario'];
+    const primaryLinks = primaryOrder
+      .map((path) => links.find((l) => l.to === path))
+      .filter(Boolean);
+    const overflowLinks = links.filter((l) => !primaryOrder.includes(l.to));
     return (
-      <div className="md:hidden flex gap-2 overflow-x-auto pb-2 px-1 mt-14 bg-white dark:bg-negro border-b border-gray-200 dark:border-gris-700">
-        {links.map(l => {
-          const active = location.pathname === l.to;
-          return (
-            <Link
-              key={l.to}
-              to={l.to}
-              className={`whitespace-nowrap px-3 py-1.5 rounded text-xs font-medium border border-transparent ${active ? 'bg-trafico text-black' : 'bg-gris-800/60 text-gray-200 hover:bg-gris-700 hover:text-trafico'}`}
-            >{l.label}</Link>
-          );
-        })}
-        <button
-          type="button"
-          onClick={handleNueva}
-          className="whitespace-nowrap px-3 py-1.5 rounded text-xs font-medium bg-green-600 hover:bg-green-500 text-white"
-        >Nueva</button>
+      <div className="md:hidden mt-14 bg-white dark:bg-negro border-b border-gray-200 dark:border-gris-700">
+        <div className="px-3 py-2 flex items-center gap-2">
+          <div className="flex-1 grid grid-cols-2 gap-2">
+            {primaryLinks.map((l) => {
+              const active = location.pathname === l.to;
+              return (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  className={`text-center px-2 py-2 rounded-lg text-xs font-semibold border ${active ? 'bg-trafico text-black border-trafico' : 'bg-gray-900 text-gray-100 border-gray-800'} `}
+                >{l.label}</Link>
+              );
+            })}
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-800 text-gray-700 dark:text-gray-200"
+              aria-expanded={menuOpen}
+              aria-label="Abrir menu"
+            >Mas</button>
+            <button
+              type="button"
+              onClick={handleNueva}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-500 text-white"
+            >Nueva</button>
+          </div>
+        </div>
+        {menuOpen && (
+          <div className="px-3 pb-3">
+            <div className="rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 p-2 grid grid-cols-2 gap-2">
+              {overflowLinks.map((l) => {
+                const active = location.pathname === l.to;
+                return (
+                  <Link
+                    key={l.to}
+                    to={l.to}
+                    onClick={() => setMenuOpen(false)}
+                    className={`text-center px-2 py-2 rounded-lg text-xs font-semibold border ${active ? 'bg-trafico text-black border-trafico' : 'bg-gray-50 dark:bg-gris-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gris-700'}`}
+                  >{l.label}</Link>
+                );
+              })}
+              {!overflowLinks.length && (
+                <div className="col-span-2 text-[11px] text-center text-gray-500 dark:text-gray-400 py-2">
+                  No hay mas secciones.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
