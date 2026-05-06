@@ -11,14 +11,18 @@ export const theme = {
     headerBg: pdfTheme.colors.headerBg,
     headerText: pdfTheme.colors.headerText,
     extraBg: pdfTheme.colors.extraBg,
-    summaryBg: '#F0F6FC',
+    summaryPanelBg: pdfTheme.colors.summaryPanelBg,
+    summaryRowBg: pdfTheme.colors.summaryRowBg,
     totalBg: pdfTheme.colors.totalBg,
-    discountBg: pdfTheme.colors.discountBg,
-    discountText: pdfTheme.colors.discountText
+    totalText: pdfTheme.colors.totalText,
+    discountRowBg: pdfTheme.colors.discountRowBg,
+    discountText: pdfTheme.colors.discountText,
+    generalDiscountBg: pdfTheme.colors.generalDiscountBg,
+    generalDiscountText: pdfTheme.colors.generalDiscountText,
   },
-  font: { base: pdfTheme.font.base, header: pdfTheme.font.header, small: 9 },
-  spacing: { xxs: 2, xs: 4, sm: 8, md: 10 },
-  radius: { sm: 3 }
+  font: { base: pdfTheme.font.base, tableHeader: pdfTheme.font.tableHeader, summaryTotal: pdfTheme.font.summaryTotal, small: 9 },
+  spacing: pdfTheme.spacing,
+  radius: pdfTheme.radius
 };
 
 const styles = StyleSheet.create({
@@ -40,23 +44,26 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     backgroundColor: theme.colors.headerBg,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#0F2238',
+    borderBottomWidth: 2,
+    borderBottomColor: pdfTheme.colors.headerRowBottom,
   },
   extraRow: {
-    backgroundColor: '#F5F7FB',
+    backgroundColor: theme.colors.extraBg,
   },
   productRow: {
     backgroundColor: '#FFFFFF',
   },
   summaryRow: {
-    backgroundColor: '#F2F6FB',
+    backgroundColor: theme.colors.summaryRowBg,
   },
   totalRow: {
-    backgroundColor: '#E6F2FF',
+    backgroundColor: theme.colors.totalBg,
   },
   descuentoRow: {
-    backgroundColor: '#FFF1F1',
+    backgroundColor: theme.colors.discountRowBg,
+  },
+  generalDescuentoRow: {
+    backgroundColor: theme.colors.generalDiscountBg,
   },
   cell: {
     flex: 1,
@@ -66,19 +73,20 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   headerCell: {
-    fontSize: theme.font.header,
+    fontSize: theme.font.tableHeader,
     fontWeight: 'bold',
     color: theme.colors.headerText,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    letterSpacing: 0.4,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    letterSpacing: 0.5,
   },
   boldCell: {
     fontWeight: 'bold',
   },
   rightAlign: { textAlign: 'right' },
   centerAlign: { textAlign: 'center' },
-  descuentoText: { color: theme.colors.discountText }
+  descuentoText: { color: theme.colors.discountText },
+  generalDescuentoText: { color: theme.colors.generalDiscountText }
 });
 
 function formatCurrency(raw, locale = 'es-CO', currency = 'COP', forceTwoDecimals = false) {
@@ -119,6 +127,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
     const isGrandTotalRow = /^(total)/i.test(labelRaw);
     const isSubtotalIvaRow = /^(subtotal|iva)/i.test(labelRaw);
     const isDescuentoRow = /descuento/i.test(labelCell);
+    const isGeneralDescuentoRow = /descuento general/i.test(labelCell);
     const isExtraRow = celdas[0] && /^(↳|³|->|→)/.test(celdas[0].textContent.trim());
     // Ya no numeramos productos ni extras para coincidir con la tabla de preview.
 
@@ -130,14 +139,15 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
         style={[
           styles.row,
           isHeader && styles.headerRow,
-      isProductRow && styles.productRow,
+          isProductRow && styles.productRow,
           isExtraRow && styles.extraRow,
           !summaryPanel && isSubtotalIvaRow && styles.summaryRow,
           !summaryPanel && isGrandTotalRow && styles.totalRow,
-          !summaryPanel && isDescuentoRow && styles.descuentoRow,
-          zebra && !isHeader && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: '#FBFCFE' },
+          !summaryPanel && isDescuentoRow && !isGeneralDescuentoRow && styles.descuentoRow,
+          !summaryPanel && isGeneralDescuentoRow && styles.generalDescuentoRow,
+          zebra && !isHeader && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && !isDescuentoRow && rowIndexForZebra % 2 === 1 && { backgroundColor: pdfTheme.colors.zebraStripe },
           summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow) && { display: 'none' }
-        ]}
+        ].filter(Boolean)}
       >
         {celdas.map((cell, j) => {
           let content = cell.textContent.trim();
@@ -146,25 +156,26 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
           if (summaryPanel && (isGrandTotalRow || isSubtotalIvaRow || isDescuentoRow)) return null;
 
           if (!summaryPanel && isDescuentoRow) {
-            if (j === 0) return <Text key={j} style={[styles.cell, styles.rightAlign, styles.descuentoText, { flex: 3 }]} wrap>{content}</Text>;
+            const dtStyle = isGeneralDescuentoRow ? styles.generalDescuentoText : styles.descuentoText;
+            if (j === 0) return <Text key={j} style={[styles.cell, styles.rightAlign, dtStyle, { flex: 3 }]} wrap>{content}</Text>;
             if (j === celdas.length - 1) {
               const val = celdas[j]?.textContent.trim() || '';
-              return <Text key={j} style={[styles.cell, styles.rightAlign, styles.descuentoText, { flex: 1 }]} wrap>{val}</Text>;
+              return <Text key={j} style={[styles.cell, styles.rightAlign, dtStyle, { flex: 1 }]} wrap>{val}</Text>;
             }
             return null;
           }
 
           if (!summaryPanel && (isGrandTotalRow || isSubtotalIvaRow)) {
             if (j === 0) {
-              const styleExtras = isGrandTotalRow ? { flex: 3, fontSize: 16 } : { flex: 3 };
+              const styleExtras = isGrandTotalRow ? { flex: 3, fontSize: theme.font.summaryTotal, color: theme.colors.totalText } : { flex: 3 };
               return <Text key={j} style={[styles.cell, styles.rightAlign, styles.boldCell, styleExtras]} wrap>{content}</Text>;
             }
             if (j === celdas.length - 1) {
               const val = celdas[j]?.textContent.trim() || '';
-              const styleExtras = isGrandTotalRow ? { flex: 1, fontSize: 16 } : { flex: 1 };
+              const styleExtras = isGrandTotalRow ? { flex: 1, fontSize: theme.font.summaryTotal, color: theme.colors.totalText } : { flex: 1 };
               return <Text key={j} style={[styles.cell, styles.rightAlign, styles.boldCell, styleExtras]} wrap>{val}</Text>;
             }
-            return null; // Ocultar celdas intermedias fusionadas en HTML
+            return null;
           }
 
           if (j === 0) {
@@ -193,7 +204,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
             (j === 2 || j === 3) && styles.rightAlign,
             !isHeader && j === 0 && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && styles.boldCell,
             j < celdas.length - 1 && { borderRightWidth: 1, borderRightColor: theme.colors.border },
-          ];
+          ].filter(Boolean);
 
           return <Text key={j} style={cellStyles} wrap>{content}</Text>;
         })}
@@ -204,7 +215,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
       const label = celdas[0]?.textContent.trim();
       const value = celdas[celdas.length - 1]?.textContent.trim();
       summaryRows.push({
-        type: isDescuentoRow ? 'discount' : (isGrandTotalRow ? 'total' : 'summary'),
+        type: isGeneralDescuentoRow ? 'generalDiscount' : isDescuentoRow ? 'discount' : (isGrandTotalRow ? 'total' : 'summary'),
         label,
         value: formatCurrency(value, currencyOptions.locale, currencyOptions.currency, currencyOptions.forceTwoDecimals)
       });
@@ -222,37 +233,50 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
         <View style={{
           marginTop: theme.spacing.md,
           marginLeft: 'auto',
-          width: '60%', // un poco más ancho para valores largos
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radius.sm,
-          padding: theme.spacing.sm,
-          backgroundColor: '#F8FAFC'
+          width: '58%',
+          borderLeftWidth: 3,
+          borderLeftColor: pdfTheme.colors.accent,
+          borderRadius: theme.radius.lg,
+          padding: theme.spacing.md,
+          backgroundColor: theme.colors.summaryPanelBg
         }}>
           {summaryRows.map((r, idx) => {
             const isGrandTotal = r.type === 'total' && /total/i.test(r.label);
+            const isDiscount = r.type === 'discount';
+            const isGenDiscount = r.type === 'generalDiscount';
+            const textColor = isDiscount
+              ? theme.colors.discountText
+              : isGenDiscount
+                ? theme.colors.generalDiscountText
+                : isGrandTotal
+                  ? theme.colors.totalText
+                  : theme.colors.text;
             return (
-              <View key={idx} style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: idx === summaryRows.length - 1 ? 0 : theme.spacing.xxs,
-                paddingTop: isGrandTotal ? theme.spacing.xs : 0,
-                borderTopWidth: isGrandTotal ? 1 : 0,
-                borderTopColor: isGrandTotal ? '#CBD5E1' : 'transparent'
-              }}>
+              <View key={idx} style={[
+                {
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: idx === summaryRows.length - 1 ? 0 : theme.spacing.xxs,
+                },
+                isGrandTotal && {
+                  paddingTop: theme.spacing.xs,
+                  borderTopWidth: 1,
+                  borderTopColor: theme.colors.border,
+                }
+              ].filter(Boolean)}>
                 <Text style={{
-                  fontSize: isGrandTotal ? theme.font.base + 2 : theme.font.base,
+                  fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
                   fontWeight: isGrandTotal ? 'bold' : 'normal',
-                  color: r.type === 'discount' ? theme.colors.discountText : theme.colors.text,
+                  color: textColor,
                   textAlign: 'right',
                   flex: 2.4,
                   paddingRight: 4
                 }}>{r.label}</Text>
                 <Text style={{
-                  fontSize: isGrandTotal ? theme.font.base + 2 : theme.font.base,
+                  fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
                   fontWeight: 'bold',
-                  color: r.type === 'discount' ? theme.colors.discountText : theme.colors.text,
+                  color: textColor,
                   textAlign: 'right',
                   flex: 1.4,
                   lineHeight: 1.1

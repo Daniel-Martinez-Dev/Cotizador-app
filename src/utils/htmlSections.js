@@ -23,8 +23,7 @@ export function generarSeccionesHTML(cotizacion) {
 
 // Pequeños helpers para construir HTML de texto/listas de forma consistente
 const p = (text) => `<p>${text}</p>`;
-const li = (text) => `<li>${text}</li>`;
-const ulOpen = `<ul class="condiciones-compactas">`;
+
 const termBlock = (title, body) => `<div class="term-item"><p><strong>${title}</strong></p><p>${body}</p></div>`;
 const termGroup = (html) => `<div class="terms-compact">${html}</div>`;
 
@@ -39,9 +38,16 @@ function generarEspecificaciones(cot) {
   const tipo = cot.productos[0]?.tipo;
   let raw = getEspecificacionesHTML(tipo);
   if(!raw) return '';
+  raw = raw.replace(/&nbsp;/gi, ' ');
   raw = raw.replace(/<ul(?![^>]*condiciones-compactas)/gi, '<ul class="condiciones-compactas espec-compactas"');
   raw = raw.replace(/<li>(.*?)<br\s*\/?>(.*?)<\/li>/gi, (m, a, b) => `<li>${a.trim()} ${b.trim()}</li>`);
   raw = raw.replace(/<br\s*\/?>(\s*)/gi, ' ');
+  raw = raw.replace(/<p>\s*<br\s*\/?>(\s*)<\/p>/gi, '');
+  raw = raw.replace(/<p>\s*<\/p>/gi, '');
+  raw = raw.replace(/<p>\s*(<strong>.*?<\/strong>)\s*<\/p>/gi, '$1');
+  raw = raw.replace(/<li>\s*<\/li>/gi, '');
+  raw = raw.replace(/<li>\s*&nbsp;\s*<\/li>/gi, '');
+  raw = raw.replace(/>\s+</g, '><');
   raw = raw.replace(/\s{2,}/g, ' ');
   return raw;
 }
@@ -50,11 +56,11 @@ function generarTablaPrecios(cot) {
   let html = `
     <table style="width:100%; border-collapse: collapse; font-size: 13px;">
       <thead>
-        <tr style="background-color: #1a3357; color: white;">
-          <th style="border: 1px solid #ccc; padding: 10px; text-align:left;">Producto</th>
-          <th style="border: 1px solid #ccc; padding: 10px; text-align:center;">Cantidad</th>
-          <th style="border: 1px solid #ccc; padding: 10px; text-align:right;">Precio Unitario</th>
-          <th style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</th>
+        <tr style="background-color: #152E4D; color: white;">
+          <th style="border: 1px solid #D1D9E4; padding: 10px; text-align:left;">Producto</th>
+          <th style="border: 1px solid #D1D9E4; padding: 10px; text-align:center;">Cantidad</th>
+          <th style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Precio Unitario</th>
+          <th style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Subtotal</th>
         </tr>
       </thead>
       <tbody>
@@ -97,10 +103,10 @@ function generarTablaPrecios(cot) {
 
     html += `
       <tr style="font-weight: bold;">
-        <td style="border: 1px solid #ccc; padding: 8px;">${descripcionProducto}</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidad}</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
+        <td style="border: 1px solid #D1D9E4; padding: 8px;">${descripcionProducto}</td>
+        <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidad}</td>
+        <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(precio)}</td>
+        <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(subtotal)}</td>
       </tr>
     `;
 
@@ -110,9 +116,9 @@ function generarTablaPrecios(cot) {
       const valorDescuento = subtotal * (porcentaje / 100);
 
       html += `
-        <tr style="background-color:#fff4f4; color: #c00;">
-          <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right;">- Descuento del ${porcentaje}%</td>
-          <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">- ${formatearPesos(valorDescuento)}</td>
+        <tr style="background-color:#FEF2F2; color: #B91C1C;">
+          <td colspan="3" style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">- Descuento del ${porcentaje}%</td>
+          <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">- ${formatearPesos(valorDescuento)}</td>
         </tr>
       `;
     }
@@ -134,11 +140,11 @@ function generarTablaPrecios(cot) {
 
           if (!isNaN(precioExtra)) {
             html += `
-              <tr style="background-color:#f9f9f9;">
-                <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
+              <tr style="background-color:#F5F7FB;">
+                <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
+                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidadExtra}</td>
+                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
+                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
               </tr>
             `;
           }
@@ -155,11 +161,11 @@ function generarTablaPrecios(cot) {
         const precioUnitBullet = 35000;
         const totalBullets = precioUnitBullet * bullets;
         html += `
-          <tr style="background-color:#f9f9f9;">
-            <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ MAX BULLET PLÁSTICO PARA MONTAJE (60cm de largo)</td>
-            <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${bullets.toFixed(2)}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(precioUnitBullet)}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalBullets)}</td>
+          <tr style="background-color:#F5F7FB;">
+            <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ MAX BULLET PLÁSTICO PARA MONTAJE (60cm de largo)</td>
+            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${bullets.toFixed(2)}</td>
+            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(precioUnitBullet)}</td>
+            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalBullets)}</td>
           </tr>`;
       }
     }
@@ -173,11 +179,11 @@ function generarTablaPrecios(cot) {
         if (extra?.nombre && !isNaN(extra.precio)) {
           // Mismo estilo que los otros extras y sin la etiqueta "(Personalizado)"
           html += `
-            <tr style="background-color:#f9f9f9;">
-              <td style="border: 1px solid #ccc; padding: 8px; padding-left: 24px;">↳ ${extra.nombre}</td>
-              <td style="border: 1px solid #ccc; padding: 8px; text-align:center;">${cantidadExtra}</td>
-              <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
-              <td style="border: 1px solid #ccc; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
+            <tr style="background-color:#F5F7FB;">
+              <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ ${extra.nombre}</td>
+              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidadExtra}</td>
+              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
+              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
             </tr>
           `;
         }
@@ -200,11 +206,11 @@ function generarTablaPrecios(cot) {
     const valorDescuento = subtotalBruto * (porcentaje / 100);
     // Estilos verdes para indicar un beneficio positivo para el cliente
     html += `
-      <tr style="background-color:#f1fff1; color:#0a7a0a;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 8px; text-align:right; font-weight:600;">
+      <tr style="background-color:#F0FDF4; color:#15803D;">
+        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 8px; text-align:right; font-weight:600;">
           Descuento general del ${porcentaje}%
         </td>
-        <td style="border: 1px solid #ccc; padding: 8px; text-align:right; font-weight:600;">
+        <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right; font-weight:600;">
           - ${formatearPesos(valorDescuento)}
         </td>
       </tr>
@@ -214,17 +220,17 @@ function generarTablaPrecios(cot) {
 
   // === Subtotal, IVA y Total ===
   html += `
-      <tr style="font-weight:bold; background-color:#eaeaea;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Subtotal</td>
-        <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
+      <tr style="font-weight:bold; background-color:#EEF4FB;">
+        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Subtotal</td>
+        <td style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">${formatearPesos(cot.subtotal)}</td>
       </tr>
-      <tr style="font-weight:bold; background-color:#eaeaea;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">IVA (19%)</td>
-        <td style="border: 1px solid #ccc; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
+      <tr style="font-weight:bold; background-color:#EEF4FB;">
+        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">IVA (19%)</td>
+        <td style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
       </tr>
-  <tr style="font-weight:bold; background-color: #d7ecff; font-size:16px;">
-        <td colspan="3" style="border: 1px solid #ccc; padding: 10px; text-align:right;">Total</td>
-        <td style="border: 1px solid #ccc; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
+      <tr style="font-weight:bold; background-color:#DBEEFF; font-size:11px;">
+        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Total</td>
+        <td style="border: 1px solid #D1D9E4; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
       </tr>
     </tbody>
   </table>`;
@@ -241,43 +247,36 @@ function generarCondicionesComerciales(cot) {
   const liCond = (arr) => `<ul class='condiciones-compactas'>${arr.map(txt=>`<li>${txt}</li>`).join('')}</ul>`;
   // Condiciones específicas para Sello de Andén
   if (primerTipo === "Sello de Andén") {
-    return `
-      ${p('<strong>Condiciones Comerciales – Sellos de Andén</strong>')}
-      ${p('<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.')}
-      ${p('<strong>Tiempo de entrega:</strong> 10 días hábiles a partir del anticipo confirmado.')}
-      ${p('<strong>Vigencia de la oferta:</strong> 30 días calendario desde la fecha de emisión.')}
-      ${p('<strong>Garantía:</strong> 12 meses contra defectos de fabricación.')}
-      ${p('<strong>Incluye:</strong> Sello de andén según dimensiones, postes laterales, cortina y/o travesaño, y platinas de anclaje.')}
-      ${p('<strong>No incluye (en caso de contratar instalación):</strong> Obra civil, adecuaciones del vano, topes de caucho, ni acompañamiento SYSO (estos se cotizan aparte en caso de ser requeridos).')}
-      ${p('<strong>Condiciones de instalación:</strong>')}
-      ${ulOpen}
-        ${li('Vano terminado, nivelado y con la resistencia estructural adecuada.')}
-        ${li('Libre de obstrucciones y con espacio suficiente para el montaje.')}
-      </ul>
-      ${p('<strong>Mantenimiento:</strong> Limpieza trimestral de lona, inspección de costuras y revisión de fijaciones.')}
-      ${p('<strong>Observaciones:</strong> Cualquier variación en las medidas iniciales podrá generar ajustes en la oferta.')}
-    `;
+    return liCond([
+      '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
+      '<strong>Tiempo de entrega:</strong> 10 días hábiles a partir del anticipo confirmado.',
+      '<strong>Vigencia de la oferta:</strong> 30 días calendario desde la fecha de emisión.',
+      '<strong>Garantía:</strong> 12 meses contra defectos de fabricación.',
+      '<strong>Incluye:</strong> Sello de andén según dimensiones, postes laterales, cortina y/o travesaño, y platinas de anclaje.',
+      '<strong>No incluye (en caso de contratar instalación):</strong> Obra civil, adecuaciones del vano, topes de caucho, ni acompañamiento SYSO (estos se cotizan aparte en caso de ser requeridos).',
+      '<strong>Condiciones de instalación:</strong> Vano terminado, nivelado y con la resistencia estructural adecuada. Libre de obstrucciones y con espacio suficiente para el montaje.',
+      '<strong>Mantenimiento:</strong> Limpieza trimestral de lona, inspección de costuras y revisión de fijaciones.',
+      '<strong>Observaciones:</strong> Cualquier variación en las medidas iniciales podrá generar ajustes en la oferta.',
+    ]);
   }
   // Condiciones específicas para Abrigos Retráctiles (Estándar e Inflables)
   if (primerTipo === "Abrigo Retráctil Estándar" || primerTipo === "Abrigo Retráctil Inflable") {
     const tiempoEntrega = primerTipo === "Abrigo Retráctil Estándar"
       ? "10 días hábiles para Abrigo Retráctil Estándar."
       : "15 días hábiles para Abrigo Retráctil Inflable.";
-    return `
-      ${p('<strong>Condiciones Comerciales – Abrigos Retráctiles (Estándar e Inflables)</strong>')}
-      ${p('<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.')}
-      ${p(`<strong>Tiempo de entrega:</strong> ${tiempoEntrega}`)}
-      ${p('<strong>Vigencia de la oferta:</strong> 30 días calendario.')}
-      ${p(`<strong>Garantía:</strong> 12 meses contra defectos de fabricación. No cubre desgaste por uso, cortes en lona, exposición a químicos no compatibles, golpes o falta de mantenimiento. ${primerTipo === "Abrigo Retráctil Inflable" ? "En el caso del abrigo inflable, la garantía tampoco cubre daños ocasionados por sobrecargas eléctricas, mala conexión del ventilador o variaciones de voltaje." : ""}`)}
-      ${p('<strong>Incluye:</strong> Abrigo retráctil según modelo, estructura metálica, lona perimetral y bandas frontales.')}
-      ${p('<strong>No incluye (en caso de contratar instalación):</strong> Obras civiles, canalizaciones, refuerzos de muro, sistemas eléctricos, ni acompañamiento SYSO, el cual deberá cotizarse por separado en caso de ser requerido.')}
-      ${p('<strong>Condiciones de instalación:</strong>')}
-      ${ulOpen}
-        ${li('El vano debe estar terminado, libre de obstrucciones, nivelado y con resistencia estructural adecuada.')}
-        ${li('Se recomienda verificar que no existan interferencias con estructuras, techos o bajantes de agua que afecten la correcta fijación del abrigo.')}
-      </ul>
-      ${p('<strong>Mantenimiento:</strong> Revisión e inspección visual trimestral de lona, costuras y fijaciones. Limpieza con productos compatibles.')}
-    `;
+    const garantiaInflable = primerTipo === "Abrigo Retráctil Inflable"
+      ? " En el caso del abrigo inflable, la garantía tampoco cubre daños ocasionados por sobrecargas eléctricas, mala conexión del ventilador o variaciones de voltaje."
+      : "";
+    return liCond([
+      '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
+      `<strong>Tiempo de entrega:</strong> ${tiempoEntrega}`,
+      '<strong>Vigencia de la oferta:</strong> 30 días calendario.',
+      `<strong>Garantía:</strong> 12 meses contra defectos de fabricación. No cubre desgaste por uso, cortes en lona, exposición a químicos no compatibles, golpes o falta de mantenimiento.${garantiaInflable}`,
+      '<strong>Incluye:</strong> Abrigo retráctil según modelo, estructura metálica, lona perimetral y bandas frontales.',
+      '<strong>No incluye (en caso de contratar instalación):</strong> Obras civiles, canalizaciones, refuerzos de muro, sistemas eléctricos, ni acompañamiento SYSO, el cual deberá cotizarse por separado en caso de ser requerido.',
+      '<strong>Condiciones de instalación:</strong> El vano debe estar terminado, libre de obstrucciones, nivelado y con resistencia estructural adecuada. Se recomienda verificar que no existan interferencias con estructuras, techos o bajantes de agua que afecten la correcta fijación del abrigo.',
+      '<strong>Mantenimiento:</strong> Revisión e inspección visual trimestral de lona, costuras y fijaciones. Limpieza con productos compatibles.',
+    ]);
   }
   if (primerTipo === "Puertas Rápidas") {
     const items = [
