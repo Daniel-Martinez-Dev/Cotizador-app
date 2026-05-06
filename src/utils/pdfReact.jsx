@@ -7,8 +7,12 @@ import {
   View,
   StyleSheet,
   pdf,
-  Image
+  Image,
+  Font,
+  Link
 } from "@react-pdf/renderer";
+import InterRegularUrl from '../assets/fonts/Inter-Regular.ttf?url';
+import InterBoldUrl from '../assets/fonts/Inter-Bold.ttf?url';
 import { getNextQuoteNumber } from "./quoteNumberFirebase";
 import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
@@ -18,6 +22,44 @@ import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
 import { compressImageToDataURL } from './pdfImageCompression';
+
+// Carga lazy de fuentes como data URIs (evita problemas de URL relativa con base:'./')
+let PDF_FONT_FAMILY = 'Helvetica';
+let _fontsLoadPromise = null;
+
+async function _toFontDataURI(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const buf = await r.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 32768)
+    bin += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  return `data:font/truetype;base64,${btoa(bin)}`;
+}
+
+async function ensureFontsRegistered() {
+  if (_fontsLoadPromise) return _fontsLoadPromise;
+  _fontsLoadPromise = (async () => {
+    try {
+      const [regular, bold] = await Promise.all([
+        _toFontDataURI(InterRegularUrl),
+        _toFontDataURI(InterBoldUrl),
+      ]);
+      Font.register({
+        family: 'Inter',
+        fonts: [
+          { src: regular, fontWeight: 'normal' },
+          { src: bold, fontWeight: 'bold' },
+        ],
+      });
+      PDF_FONT_FAMILY = 'Inter';
+    } catch (e) {
+      console.warn('[PDF] Inter no disponible, usando Helvetica.', e.message);
+    }
+  })();
+  return _fontsLoadPromise;
+}
 
 // Extra top padding added to page, also needed by the header accent bar to bleed to page edge.
 const PAGE_TOP_EXTRA = 4;
@@ -38,16 +80,29 @@ const styles = StyleSheet.create({
   page: {
     paddingHorizontal: T.page.marginHorizontal,
     paddingTop: T.page.marginVertical + PAGE_TOP_EXTRA,
-    paddingBottom: T.page.marginVertical + 20,
+    paddingBottom: 10,
     fontSize: T.font.base,
     fontFamily: 'Helvetica',
     color: T.colors.text,
     lineHeight: 1.35,
     backgroundColor: T.colors.pageBg,
-    flexDirection: 'column'
+    flexDirection: 'column',
+    display: 'flex'
+  },
+  pageNoHeader: {
+    paddingHorizontal: T.page.marginHorizontal,
+    paddingTop: T.page.marginVertical,
+    paddingBottom: 10,
+    fontSize: T.font.base,
+    fontFamily: 'Helvetica',
+    color: T.colors.text,
+    lineHeight: 1.35,
+    backgroundColor: T.colors.pageBg,
+    flexDirection: 'column',
+    display: 'flex'
   },
   header: {
-    marginBottom: T.spacing.sm,
+    marginBottom: T.spacing.xs,
     paddingBottom: 0,
   },
   headerTop: {
@@ -55,12 +110,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: T.spacing.xs,
+    marginBottom: 3,
   },
   headerLeft: {
     flexDirection: 'row',
     flex: 1.7,
-    gap: 8,
+    gap: 10,
     alignItems: 'flex-start',
   },
   headerRight: {
@@ -68,89 +123,96 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   logoBox: {
-    width: 120,
+    width: 130,
     justifyContent: 'center',
-    alignItems: 'flex-start'
+    alignItems: 'center'
   },
   logoImg: {
-    width: 114,
-    height: 40,
+    width: 118,
+    height: 44,
     objectFit: 'contain'
   },
   companyBlock: {
     flex: 1,
-    paddingTop: 2,
+    paddingTop: 1,
   },
   companyName: {
     fontWeight: 'bold',
-    fontSize: 10.5,
+    fontSize: 10,
     color: T.colors.headerBg,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   companyLine: {
-    fontSize: 8.2,
+    fontSize: 7.8,
     color: T.colors.subtleText,
-    marginBottom: 1.5,
+    marginBottom: 1,
   },
   quoteMeta: {
     backgroundColor: T.colors.headerBg,
-    borderRadius: 4,
+    borderRadius: T.radius.md,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 5,
     minWidth: 170,
+    borderLeftWidth: 3,
+    borderLeftColor: T.colors.accent,
   },
   quoteMetaLine: {
-    fontSize: 8.2,
+    fontSize: T.font.meta,
     color: T.colors.headerText,
-    marginBottom: 2.5,
+    marginBottom: 2,
   },
   quoteMetaLabel: {
     fontWeight: 'bold',
-    color: '#7EC8F0',
+    color: T.colors.metaLabel,
   },
   title: {
     fontSize: T.font.h1,
-    color: T.colors.headerBg,
-    backgroundColor: 'transparent',
+    color: T.colors.headerText,
+    backgroundColor: T.colors.headerBg,
     marginTop: T.spacing.xs,
     marginBottom: 0,
+    marginHorizontal: -T.page.marginHorizontal,
     textAlign: 'center',
     fontWeight: 'bold',
-    letterSpacing: 0.8,
-    paddingVertical: 2,
+    letterSpacing: 1.5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   datosCliente: {
-    marginTop: T.spacing.xs,
+    marginTop: 10,
     marginBottom: T.spacing.md,
-    padding: T.spacing.md,
-    backgroundColor: '#F7FAFD',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: T.colors.clientBlockBg,
     borderRadius: T.radius.md,
     borderWidth: 1,
-    borderColor: T.colors.sectionDivider,
+    borderColor: T.colors.border,
     borderTopWidth: 3,
     borderTopColor: T.colors.accent,
   },
   dataGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
   dataCol: { width: '49%' },
-  dataLine: { fontSize: 9, color: T.colors.text, marginBottom: 2.5 },
+  dataLine: { fontSize: 8.5, color: T.colors.text, marginBottom: 3, lineHeight: 1.4 },
   label: {
     fontWeight: 'bold',
-    color: T.colors.headerBg,
+    color: T.colors.accent,
     marginRight: 3,
   },
   rightAlign: { textAlign: 'right' },
   sectionTitle: {
     fontSize: T.font.h2,
     color: T.colors.headerBg,
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: T.spacing.sectionGap,
+    marginBottom: 8,
     fontWeight: 'bold',
-    borderLeftWidth: 4,
-    borderLeftColor: T.colors.accent,
-    paddingLeft: 9,
-    paddingRight: 8,
-    paddingVertical: 4,
-    backgroundColor: 'transparent',
+    borderBottomWidth: 2,
+    borderBottomColor: T.colors.accent,
+    paddingLeft: 4,
+    paddingRight: 4,
+    paddingVertical: 5,
+    backgroundColor: T.colors.sectionTitleBg,
+    borderRadius: T.radius.sm,
+    letterSpacing: 0.3,
   },
   htmlContent: {
     marginBottom: T.spacing.sm,
@@ -190,9 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   imageCaption: {
-    marginTop: 3,
-    fontSize: 7.5,
-    color: T.colors.subtleText,
+    marginTop: 4,
+    fontSize: T.font.caption,
+    color: T.colors.captionText,
     textAlign: 'center',
   },
   sideImageTitle: {
@@ -219,18 +281,38 @@ const styles = StyleSheet.create({
     color: T.colors.subtleText,
     textAlign: 'center',
   },
-  flexGrowContent: {},
-  footer: {
-    fontSize: T.font.small,
-    textAlign: 'center',
-    color: T.colors.subtleText,
+  flexGrowContent: {
+    flex: 1,
+  },
+  footerContainer: {
+    marginHorizontal: -T.page.marginHorizontal,
+    paddingHorizontal: T.page.marginHorizontal,
+    paddingTop: T.spacing.xxs,
+    paddingBottom: T.spacing.xxs,
     borderTopWidth: 1,
     borderTopColor: T.colors.sectionDivider,
-    paddingTop: T.spacing.xs + 1,
-    position: 'absolute',
-    left: T.page.marginHorizontal,
-    right: T.page.marginHorizontal,
-    bottom: T.page.marginVertical - 2,
+  },
+  footerAccent: {
+    height: 1.5,
+    backgroundColor: T.colors.accent,
+    marginHorizontal: -T.page.marginHorizontal,
+    marginBottom: T.spacing.xxs,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 7,
+    color: T.colors.subtleText,
+    letterSpacing: 0.1,
+  },
+  footerQuoteInfo: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: T.colors.text,
+    letterSpacing: 0.1,
   },
 });
 
@@ -258,11 +340,11 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
     <View style={styles.header}>
       {/* Barra de acento de marca */}
       <View style={{
-        height: 4,
+        height: T.page.headerAccentHeight,
         backgroundColor: T.colors.accent,
         marginHorizontal: -T.page.marginHorizontal,
         marginTop: -(T.page.marginVertical + PAGE_TOP_EXTRA),
-        marginBottom: 10,
+        marginBottom: 12,
       }} />
       <View style={styles.headerTop}>
         <View style={styles.headerLeft}>
@@ -271,9 +353,9 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
           </View>
           <View style={styles.companyBlock}>
             <Text style={styles.companyName}>Cold Chain Services S.A.S.</Text>
-            <Text style={styles.companyLine}>Cra 4 #1-04, Subachoque, Cundinamarca, Colombia</Text>
+            <Link src="https://www.google.com/maps/place/Cold+Chain+Services+SAS/@4.8553394,-74.1948824,1097m/data=!3m1!1e3!4m6!3m5!1s0x8e407f8546bba43d:0xb6eddda2b352370b!8m2!3d4.8549508!4d-74.1950576!16s%2Fg%2F11j0tx4nqn?entry=ttu&g_ep=EgoyMDI2MDUwMi4wIKXMDSoASAFQAw%3D%3D" style={styles.companyLine}>Km 6.5, vía Puente Piedra, Subachoque</Link>
             <Text style={styles.companyLine}>NIT 900434149-6 | www.ccservices.com.co</Text>
-            <Text style={styles.companyLine}>300 858 2709 | santiago.martinez@ccservices.com.co</Text>
+            <Text style={styles.companyLine}>santiago.martinez@ccservices.com.co</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -281,7 +363,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Cotización:</Text> #{numeroCotizacion}</Text>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Fecha:</Text> {fecha}</Text>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> 30 días calendario</Text>
-            <Text style={[styles.quoteMetaLine, { marginBottom: 0 }]}><Text style={styles.quoteMetaLabel}>Asesor:</Text> Equipo Comercial CCS</Text>
+            <Text style={[styles.quoteMetaLine, { marginBottom: 0 }]}><Text style={styles.quoteMetaLabel}>Asesor:</Text> Santiago Martinez</Text>
           </View>
         </View>
       </View>
@@ -290,15 +372,14 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
   );
 }
 
-function PdfFooter({ numeroCotizacion }) {
+function PdfFooter({ numeroCotizacion, pageNumber, totalPages }) {
   return (
-    <Text
-      style={styles.footer}
-      fixed
-      render={({ pageNumber, totalPages }) =>
-        `Cold Chain Services S.A.S. | Carrera 4 #1-04, Subachoque | www.ccservices.com.co  ·  CT#${numeroCotizacion}  ·  Página ${pageNumber} de ${totalPages}`
-      }
-    />
+    <View style={styles.footerContainer} wrap={false}>
+      <View style={styles.footerAccent} />
+      <Text style={[styles.footerText, { textAlign: 'center' }]}>
+        {`Cotización #${numeroCotizacion} generada por Cold Chain Services S.A.S. | www.ccservices.com.co | Tel. 300 858 2709 | santiago.martinez@ccservices.com.co | Pág. ${pageNumber} / ${totalPages}`}
+      </Text>
+    </View>
   );
 }
 
@@ -347,63 +428,71 @@ function ImageAside({ imagenSeleccionada, titulo }) {
 
 function ValidityCallout() {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, marginBottom: 4 }}>
-      <View style={{
-        backgroundColor: '#EBF4FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-        borderLeftWidth: 3,
-        borderLeftColor: T.colors.accent,
-        borderRadius: 3,
-        padding: 7,
-        width: '54%',
-      }}>
-        <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-          Oferta válida por 30 días calendario desde la fecha de emisión.
-        </Text>
-        <Text style={{ fontSize: 7.5, color: '#2C5282' }}>
-          Precios sujetos a variación de TRM y disponibilidad de materiales.
-        </Text>
+    <>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, marginBottom: 4 }}>
+        <View style={{
+          backgroundColor: T.colors.calloutBg,
+          borderLeftWidth: 3,
+          borderLeftColor: T.colors.accent,
+          borderRadius: T.radius.sm,
+          padding: 9,
+          width: '56%',
+        }}>
+          <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
+            Oferta válida por 30 días calendario desde la fecha de emisión.
+          </Text>
+          <Text style={{ fontSize: 8, color: T.colors.calloutText }}>
+            Precios sujetos a variación de TRM y disponibilidad de materiales.
+          </Text>
+        </View>
       </View>
-    </View>
+      <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
+    </>
   );
 }
 
 function SignatureBlock() {
   return (
-    <View wrap={false} minPresenceAhead={28} style={{ marginTop: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: T.colors.sectionDivider }}>
-      <Text style={{ fontSize: 9, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 20, letterSpacing: 0.5 }}>
-        ACEPTACIÓN DE COTIZACIÓN
-      </Text>
+    <View wrap={false} minPresenceAhead={8} style={{ marginTop: T.spacing.sm, paddingTop: 4, borderTopWidth: 2, borderTopColor: T.colors.accent }}>
+      <View style={{
+        backgroundColor: T.colors.headerBg,
+        borderRadius: T.radius.sm,
+        padding: 5,
+        marginBottom: 8,
+      }}>
+        <Text style={{ fontSize: 9, fontWeight: 'bold', color: T.colors.headerText, letterSpacing: 0.8, textAlign: 'center' }}>
+          ACEPTACIÓN DE COTIZACIÓN
+        </Text>
+      </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <View style={{ width: '44%' }}>
+        <View style={{ width: '46%' }}>
           <View style={{
             borderWidth: 1,
-            borderColor: T.colors.sectionDivider,
-            borderRadius: 3,
-            backgroundColor: '#FAFCFE',
-            padding: 8,
+            borderColor: T.colors.border,
+            borderRadius: T.radius.sm,
+            backgroundColor: T.colors.signatureBoxBg,
+            padding: 6,
             marginBottom: 6,
-            height: 48,
+            height: 44,
           }} />
-          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.text, marginBottom: 3 }}>Firma y sello — Cold Chain Services S.A.S.</Text>
-          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
-          <Text style={{ fontSize: 8, color: T.colors.subtleText }}>Cargo: ___________________________________</Text>
+          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 3 }}>Firma y sello — Cold Chain Services S.A.S.</Text>
+          <Text style={{ fontSize: 7.5, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
+          <Text style={{ fontSize: 7.5, color: T.colors.subtleText }}>Cargo: ___________________________________</Text>
         </View>
-        <View style={{ width: '44%' }}>
+        <View style={{ width: '46%' }}>
           <View style={{
             borderWidth: 1,
-            borderColor: T.colors.sectionDivider,
-            borderRadius: 3,
-            backgroundColor: '#FAFCFE',
-            padding: 8,
+            borderColor: T.colors.border,
+            borderRadius: T.radius.sm,
+            backgroundColor: T.colors.signatureBoxBg,
+            padding: 6,
             marginBottom: 6,
-            height: 48,
+            height: 44,
           }} />
-          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.text, marginBottom: 3 }}>Firma y sello — Cliente</Text>
-          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
-          <Text style={{ fontSize: 8, color: T.colors.subtleText, marginBottom: 2 }}>Cargo: ___________________________________</Text>
-          <Text style={{ fontSize: 8, color: T.colors.subtleText }}>Fecha de aceptación: _____________________</Text>
+          <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 3 }}>Firma y sello — Cliente</Text>
+          <Text style={{ fontSize: 7.5, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
+          <Text style={{ fontSize: 7.5, color: T.colors.subtleText, marginBottom: 2 }}>Cargo: ___________________________________</Text>
+          <Text style={{ fontSize: 7.5, color: T.colors.subtleText }}>Fecha de aceptación: _____________________</Text>
         </View>
       </View>
     </View>
@@ -443,17 +532,16 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
   const imagenSeleccionada = imagenesOptimizadas?.principal ?? imagenSeleccionadaRaw;
   const imagenesMulti = imagenesOptimizadas?.extras ?? imagenesMultiRaw;
   const hasAnyImage = Boolean(imagenSeleccionada) || imagenesMulti.length > 0;
-  const hasSideImage = Boolean(imagenSeleccionada);
   const imagenSectionTitle = hasAnyImage ? "2. Imágenes de Referencia" : "";
   const detalleIndex = hasAnyImage ? 3 : 2;
   const condicionesIndex = hasAnyImage ? 4 : 3;
   const terminosIndex = hasAnyImage ? 5 : 4;
-  const showFullImageSection = !hasSideImage && hasAnyImage;
-  const showExtraImagesSection = hasSideImage && imagenesMulti.length > 0;
+  const textLen = `${descripcionHTML}${especificacionesHTML}`.replace(/<[^>]*>/g, '').length;
+  const placeImagesOnFirstPage = hasAnyImage && textLen < 1200;
 
   return (
     <Document>
-      <Page size="A4" style={styles.page} wrap>
+      <Page size="A4" style={[styles.page, { fontFamily: PDF_FONT_FAMILY }]} wrap>
         <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
         <View style={styles.datosCliente}>
           <View style={styles.dataGrid}>
@@ -482,51 +570,29 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
           </View>
         </View>
         <View style={styles.flexGrowContent}>
-          {hasSideImage ? (
-            <>
-              {descripcionHTML ? (
-                <View style={styles.htmlContentCompact}>
-                  {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
-                </View>
-              ) : null}
-              <View style={styles.contentRow}>
-                <View style={styles.mainColumn}>
-                  <Text minPresenceAhead={24} style={styles.sectionTitle}>1. Especificaciones Técnicas</Text>
-                  <View style={styles.htmlContent}>
-                    {parseHtmlToPDFComponents(especificacionesHTML, { compact: true, onlyBoldHeadings: true, compressShortItems: true })}
-                  </View>
-                </View>
-                <ImageAside titulo={imagenSectionTitle} imagenSeleccionada={imagenSeleccionada} />
-              </View>
-            </>
-          ) : (
-            <>
-              {descripcionHTML ? (
-                <View style={styles.htmlContentCompact}>
-                  {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
-                </View>
-              ) : null}
-              <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact onlyBoldHeadings compressShortItems />
-            </>
-          )}
-        </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} />
-      </Page>
-
-      <Page size="A4" style={styles.page} wrap>
-        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
-        <View style={styles.flexGrowContent}>
-          {showFullImageSection && (
+          {descripcionHTML ? (
+            <View style={styles.htmlContentCompact}>
+              {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
+            </View>
+          ) : null}
+          <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact dense onlyBoldHeadings compressShortItems fontScale={0.9} />
+          {placeImagesOnFirstPage && (
             <ImageSection
               titulo={imagenSectionTitle}
               imagenSeleccionada={imagenSeleccionada}
               imagenesMulti={imagenesMulti}
             />
           )}
-          {showExtraImagesSection && (
+        </View>
+        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={1} totalPages={3} />
+      </Page>
+
+      <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
+        <View style={styles.flexGrowContent}>
+          {!placeImagesOnFirstPage && hasAnyImage && (
             <ImageSection
-              titulo="Imágenes adicionales"
-              imagenSeleccionada={null}
+              titulo={imagenSectionTitle}
+              imagenSeleccionada={imagenSeleccionada}
               imagenesMulti={imagenesMulti}
             />
           )}
@@ -541,12 +607,18 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
             compressShortItems
           />
         </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} />
+        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={2} totalPages={3} />
       </Page>
 
-      <Page size="A4" style={styles.page} wrap>
-        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
+      <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
         <View style={styles.flexGrowContent}>
+          <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+            <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
+                DOCUMENTO LEGAL — LEER ANTES DE FIRMAR
+              </Text>
+            </View>
+          </View>
           <SeccionHTML
             titulo={`${terminosIndex}. Términos y Condiciones Generales`}
             contenido={terminosHTML}
@@ -556,7 +628,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
           />
           <SignatureBlock />
         </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} />
+        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={3} totalPages={3} />
       </Page>
     </Document>
   );
@@ -599,6 +671,7 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
   }
 
+  await ensureFontsRegistered();
   const doc = PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas });
   const asPdf = pdf();
   asPdf.updateContainer(doc);

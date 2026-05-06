@@ -13,7 +13,7 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
   const headingFont = Math.max(baseH2 - 0.5 * scale, baseFont + 0.5 * scale);
   const headingSmallFont = baseFont + 0.25 * scale;
   const baseLineHeight = 1.35;
-  const denseLineHeight = 1.2;
+  const denseLineHeight = 1.25;
   const readableLineHeight = 1.32;
   const headingLineHeight = 1.25;
   const headingSmallLineHeight = 1.25;
@@ -68,10 +68,10 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
   let s = compact
     ? {
         ...styles,
-        heading: { ...styles.heading, marginTop: 0.5, marginBottom: 1 },
-        headingSmall: { ...styles.headingSmall, marginTop: 1, marginBottom: 1 },
+        heading: { ...styles.heading, marginTop: 0.5, marginBottom: 0.5 },
+        headingSmall: { ...styles.headingSmall, marginTop: 3, marginBottom: 0.5 },
         paragraph: { ...styles.paragraph, marginBottom: 0.8 },
-        list: { ...styles.list, marginTop: 0.5, marginBottom: 1 },
+        list: { ...styles.list, marginTop: 0.5, marginBottom: 0.5 },
       }
     : styles;
 
@@ -194,23 +194,16 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
           const isEspec = className.includes('espec-compactas');
           const extraIndent = isEspec ? 4 : 0; // indent base
           if (!isEspec) {
-            // Condiciones / Términos: render en bloques para evitar solapamiento de líneas.
+            // Condiciones / Términos: render en bloques preservando negrilla inline (<strong>).
             return (
               <View key={index} style={{ marginTop: 0.2, marginBottom: 0.2, paddingLeft: extraIndent }}>
                 {[...node.children].map((liNode, i) => {
-                  const headingNode = liNode.querySelector && liNode.querySelector('strong');
-                  const heading = headingNode ? (headingNode.textContent || '').replace(/\s+/g, ' ').trim() : '';
-                  const fullText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
-                  if (!fullText) return null;
-                  const bodyText = heading
-                    ? fullText.replace(new RegExp(`^${escapeRegex(heading)}\\s*`), '')
-                    : fullText;
-
+                  const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
+                  if (!liText) return null;
                   return (
                     <View key={i} style={{ marginBottom: 0.2 }}>
                       <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: s.paragraph.lineHeight }}>
-                        {heading ? <Text style={{ ...s.bold, lineHeight: s.paragraph.lineHeight }}>{heading} </Text> : null}
-                        {bodyText}
+                        {parseChildren(liNode)}
                       </Text>
                     </View>
                   );
@@ -219,15 +212,16 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
             );
           }
           // Especificaciones: mostrar bullets compactos
+          const compactLineHeight = Math.min((s.listItemText?.lineHeight || s.paragraph.lineHeight || 1.35), 1.2);
           return (
             <View key={index} style={{ marginTop:0.5, marginBottom:0.5, paddingLeft: extraIndent }}>
               {[...node.children].map((liNode, i) => {
                 const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
                 if (!liText) return null;
                 return (
-                  <View wrap={false} key={i} style={{ flexDirection:'row', marginBottom: s.listItem.marginBottom }}>
-                    <Text style={{ width:6, textAlign:'center', lineHeight: (s.listItemText?.lineHeight || s.paragraph.lineHeight) }}>•</Text>
-                    <Text style={{ ...s.listItemText, flex:1, marginBottom:0.2 }}>
+                  <View wrap={false} key={i} style={{ flexDirection:'row', marginBottom: 0.2 }}>
+                    <Text style={{ width:6, textAlign:'center', lineHeight: compactLineHeight }}>•</Text>
+                    <Text style={{ ...s.listItemText, flex:1, marginBottom:0.1, lineHeight: compactLineHeight }}>
                       {liText}
                     </Text>
                   </View>
@@ -302,12 +296,12 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         if (className && className.includes('term-item')) {
           const children = [...node.children];
           return (
-            <View key={index} style={{ marginTop: 0.3, marginBottom: 6.0 }}>
+            <View key={index} style={{ marginTop: 0.5, marginBottom: 8 }}>
               {children.map((child, i) => {
                 if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
                   const isTitle = !!child.querySelector && !!child.querySelector('strong');
                   return (
-                    <View key={i} style={{ marginBottom: isTitle ? 1.8 : 3.2 }}>
+                    <View key={i} style={{ marginBottom: isTitle ? 2 : 3.2 }}>
                       <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
                         {parseChildren(child)}
                       </Text>
@@ -330,7 +324,7 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
                 const childClass = child.getAttribute && child.getAttribute('class');
                 if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
                   return (
-                    <View key={i} style={{ marginBottom: 4.0 }}>
+                    <View key={i} style={{ marginBottom: 5 }}>
                       <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
                         {parseChildren(child)}
                       </Text>
@@ -339,13 +333,13 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
                 }
                 if (childClass && childClass.includes('terms-compact')) {
                   return (
-                    <View key={i} style={{ marginBottom: 4.0 }}>
+                    <View key={i} style={{ marginBottom: 5 }}>
                       {processNode(child, i)}
                     </View>
                   );
                 }
                 return (
-                  <View key={i} style={{ marginBottom: 4.0 }}>
+                  <View key={i} style={{ marginBottom: 5 }}>
                     {processNode(child, i)}
                   </View>
                 );
@@ -387,5 +381,7 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
 
   const escapeRegex = (txt = '') => txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  return [...root.childNodes].map((node, i) => processNode(node, i));
+  return [...root.childNodes]
+    .filter(n => !(n.nodeType === 3 && !n.textContent.trim()))
+    .map((node, i) => processNode(node, i));
 }
