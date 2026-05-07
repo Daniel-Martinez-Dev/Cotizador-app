@@ -206,7 +206,7 @@ export default function CompaniesPage(){
                       <div className="font-medium text-sm flex items-center gap-2"><FaBuilding className="text-gray-400" /> {emp.nombre} <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{sanitizeNIT(emp.nit)}</span></div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-3">
                         {emp.ciudad && <span>{emp.ciudad}</span>}
-                        <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/'); }}>Usar en cotización</span>
+                        <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/cotizar'); }}>Usar en cotización</span>
                         <span className="cursor-pointer text-indigo-600" onClick={()=> toggleContactos(emp)}>{contactos? 'Ocultar contactos':'Ver contactos'}</span>
                       </div>
                     </div>
@@ -251,7 +251,7 @@ export default function CompaniesPage(){
                             <div className="font-medium flex flex-wrap items-center gap-2"><FaUser className="text-gray-400" /> {cont.nombre} {cont.email && <span className="text-gray-500 font-normal">({cont.email})</span>}</div>
                             <div className="flex flex-wrap gap-3 text-[10px] text-gray-600 dark:text-gray-400">
                               {cont.telefono && <span>{cont.telefono}</span>}
-                              <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); setContactoSeleccionado(cont); toast.success('Contacto seleccionado'); navigate('/'); }}>Usar en cotización</span>
+                              <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); setContactoSeleccionado(cont); toast.success('Contacto seleccionado'); navigate('/cotizar'); }}>Usar en cotización</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-sm">

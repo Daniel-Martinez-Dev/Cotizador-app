@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
-  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
   onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
   signOut,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import {
   ensureUserProfileForLogin,
   getUserProfileForUid,
+  upsertUserProfile,
 } from "../utils/firebaseUsers";
 
 const AuthContext = createContext(null);
@@ -51,7 +53,6 @@ export function AuthProvider({ children }) {
 
   const roles = profile?.roles || [];
 
-  // El email del admin principal siempre tiene acceso completo
   const isMainAdmin = Boolean(
     user?.email && ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL
   );
@@ -68,30 +69,40 @@ export function AuthProvider({ children }) {
     return Boolean(user && !user.isAnonymous);
   }, [requireLogin, user]);
 
-  // Usuario pendiente de aprobación (no puede usar la app)
   const isPending = useMemo(() => {
     if (!isLoggedIn) return false;
-    if (isMainAdmin) return false;                    // admin nunca queda bloqueado
+    if (isMainAdmin) return false;
     return profile?.status === "pending";
   }, [isLoggedIn, isMainAdmin, profile]);
 
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (e) {
-      const code = e?.code;
-      if (
-        code === "auth/popup-blocked" ||
-        code === "auth/popup-closed-by-user" ||
-        code === "auth/operation-not-supported-in-this-environment"
-      ) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-      throw e;
-    }
+  const signUpWithEmail = async (email, password, firstName, lastName) => {
+    const emailNorm = email.trim().toLowerCase();
+    const displayName = `${firstName.trim()} ${lastName.trim()}`;
+    const cred = await createUserWithEmailAndPassword(auth, emailNorm, password);
+    await updateProfile(cred.user, { displayName });
+    await upsertUserProfile(cred.user.uid, {
+      email: emailNorm,
+      displayName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      roles: [],
+      status: "pending",
+      source: "self-registered",
+    });
+    return cred.user;
+  };
+
+  const signInWithEmail = async (email, password) => {
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      email.trim().toLowerCase(),
+      password
+    );
+    return cred.user;
+  };
+
+  const resetPassword = async (email) => {
+    await sendPasswordResetEmail(auth, email.trim().toLowerCase());
   };
 
   const refreshProfile = async () => {
@@ -116,7 +127,9 @@ export function AuthProvider({ children }) {
       isPending,
       isMainAdmin,
       hasRole,
-      signInWithGoogle,
+      signUpWithEmail,
+      signInWithEmail,
+      resetPassword,
       signOutUser,
       refreshProfile,
     }),

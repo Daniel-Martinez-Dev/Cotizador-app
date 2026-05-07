@@ -53,7 +53,7 @@ function AppShell() {
     setEmpresaSeleccionada(null);
     setContactoSeleccionado(null);
     setResetToken(Date.now());
-    if(currentPath !== '/') navigate('/');
+    if(currentPath !== '/cotizar') navigate('/cotizar');
     window.scrollTo(0,0);
     setShowNuevaModal(false);
   };
@@ -87,7 +87,7 @@ function AppShell() {
     const handleNueva = () => { setShowNuevaModal(true); };
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
-      { to: '/', label: 'Cotizar', show: true },
+      { to: '/cotizar', label: 'Cotizar', show: true },
       { to: '/produccion', label: 'Producción', show: canProduccion },
       { to: '/inventario', label: 'Inventario', show: canInventario },
       { to: '/productos', label: 'Productos', show: true },
@@ -122,7 +122,7 @@ function AppShell() {
     const [menuOpen, setMenuOpen] = useState(false);
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
-      { to: '/', label: 'Cotizar', show: true },
+      { to: '/cotizar', label: 'Cotizar', show: true },
       { to: '/produccion', label: 'Producción', show: canProduccion },
       { to: '/inventario', label: 'Inventario', show: canInventario },
       { to: '/productos', label: 'Productos', show: true },
@@ -263,7 +263,8 @@ export default function App(){
               <Route element={<AppShell />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
 
-                <Route path="/" element={<CotizadorApp />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/cotizar" element={<CotizadorApp />} />
                 <Route path="/preview" element={<PreviewPage />} />
                 <Route element={<ProtectedRoute requireRole="produccion" />}>
                   <Route

@@ -521,7 +521,7 @@ export default function PreviewPage() {
     <>
       <button
         className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm"
-        onClick={() => navigate("/")}
+        onClick={() => navigate("/cotizar")}
       >
         ✏️ Editar cotización
       </button>
@@ -821,7 +821,7 @@ export default function PreviewPage() {
       <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2 shadow-2xl z-40">
         <button
           className="flex-1 bg-blue-600 text-white px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/cotizar")}
         >
           ✏️ Editar
         </button>

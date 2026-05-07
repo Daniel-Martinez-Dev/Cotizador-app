@@ -83,7 +83,7 @@ export default function DashboardPage() {
           <Card
             title="Cotizador"
             desc="Crear cotizaciones y PDFs"
-            to="/"
+            to="/cotizar"
             enabled={true}
             icon="🧾"
             tone="from-sky-500/20 via-sky-400/10 to-transparent"
