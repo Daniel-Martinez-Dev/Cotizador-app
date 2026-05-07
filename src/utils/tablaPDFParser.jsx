@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
     marginTop: theme.spacing.xs,
     fontSize: theme.font.base,
@@ -40,12 +40,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
     alignItems: 'stretch',
-    minHeight: 16,
+    minHeight: 20,
   },
   headerRow: {
     backgroundColor: theme.colors.headerBg,
-    borderBottomWidth: 2,
-    borderBottomColor: pdfTheme.colors.headerRowBottom,
+    borderBottomWidth: 3,
+    borderBottomColor: pdfTheme.colors.accent,
   },
   extraRow: {
     backgroundColor: theme.colors.extraBg,
@@ -67,8 +67,8 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 7,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
     fontSize: theme.font.base,
     color: theme.colors.text,
   },
@@ -76,9 +76,9 @@ const styles = StyleSheet.create({
     fontSize: theme.font.tableHeader,
     fontWeight: 'bold',
     color: theme.colors.headerText,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    letterSpacing: 0.5,
+    paddingVertical: 11,
+    paddingHorizontal: 11,
+    letterSpacing: 1.2,
   },
   boldCell: {
     fontWeight: 'bold',
@@ -110,7 +110,7 @@ function formatCurrency(raw, locale = 'es-CO', currency = 'COP', forceTwoDecimal
 
 export function convertirTablaHTMLaComponentes(html, options = {}) {
   if (!html) return null;
-  const { summaryPanel = false, zebra = false, currencyOptions = { locale: 'es-CO', currency: 'COP', forceTwoDecimals: false } } = options;
+  const { summaryPanel = false, zebra = false, currencyOptions = { locale: 'es-CO', currency: 'COP', forceTwoDecimals: false }, leftPanel = null } = options;
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -204,6 +204,8 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
             (j === 2 || j === 3) && styles.rightAlign,
             !isHeader && j === 0 && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && styles.boldCell,
             j < celdas.length - 1 && { borderRightWidth: 1, borderRightColor: theme.colors.border },
+            isExtraRow && !isHeader && { color: pdfTheme.colors.subtleText, fontSize: theme.font.base - 0.5 },
+            !summaryPanel && isGrandTotalRow && { paddingVertical: 9 },
           ].filter(Boolean);
 
           return <Text key={j} style={cellStyles} wrap>{content}</Text>;
@@ -229,63 +231,90 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
   return (
     <View wrap>
       <View style={styles.table}>{bodyRows}</View>
-      {summaryPanel && summaryRows.length > 0 && (
-        <View style={{
-          marginTop: theme.spacing.md,
-          marginLeft: 'auto',
-          width: '58%',
-          borderLeftWidth: 3,
-          borderLeftColor: pdfTheme.colors.accent,
-          borderRadius: theme.radius.lg,
-          padding: theme.spacing.md,
-          backgroundColor: theme.colors.summaryPanelBg
-        }}>
-          {summaryRows.map((r, idx) => {
-            const isGrandTotal = r.type === 'total' && /total/i.test(r.label);
-            const isDiscount = r.type === 'discount';
-            const isGenDiscount = r.type === 'generalDiscount';
-            const textColor = isDiscount
-              ? theme.colors.discountText
-              : isGenDiscount
-                ? theme.colors.generalDiscountText
-                : isGrandTotal
-                  ? theme.colors.totalText
-                  : theme.colors.text;
-            return (
-              <View key={idx} style={[
-                {
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: idx === summaryRows.length - 1 ? 0 : theme.spacing.xxs,
-                },
-                isGrandTotal && {
-                  paddingTop: theme.spacing.xs,
-                  borderTopWidth: 1,
-                  borderTopColor: theme.colors.border,
-                }
-              ].filter(Boolean)}>
-                <Text style={{
-                  fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
-                  fontWeight: isGrandTotal ? 'bold' : 'normal',
-                  color: textColor,
-                  textAlign: 'right',
-                  flex: 2.4,
-                  paddingRight: 4
-                }}>{r.label}</Text>
-                <Text style={{
-                  fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
-                  fontWeight: 'bold',
-                  color: textColor,
-                  textAlign: 'right',
-                  flex: 1.4,
-                  lineHeight: 1.1
-                }}>{r.value}</Text>
+      {(summaryPanel && summaryRows.length > 0) || leftPanel ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: theme.spacing.md }}>
+          {leftPanel && (
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              {leftPanel}
+            </View>
+          )}
+          {summaryPanel && summaryRows.length > 0 && (
+            <View style={{
+              width: leftPanel ? '52%' : '58%',
+              borderLeftWidth: 3,
+              borderLeftColor: pdfTheme.colors.accent,
+              borderTopWidth: 1,
+              borderRightWidth: 1,
+              borderBottomWidth: 1,
+              borderTopColor: pdfTheme.colors.border,
+              borderRightColor: pdfTheme.colors.border,
+              borderBottomColor: pdfTheme.colors.border,
+              borderRadius: theme.radius.lg,
+              overflow: 'hidden',
+              backgroundColor: theme.colors.summaryPanelBg,
+            }}>
+              <View style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderBottomWidth: 1,
+                borderBottomColor: pdfTheme.colors.border,
+                backgroundColor: pdfTheme.colors.sectionTitleBg,
+              }}>
+                <Text style={{ fontSize: 7, fontWeight: 'bold', color: pdfTheme.colors.headerBg, letterSpacing: 1.5 }}>
+                  RESUMEN DE PRECIOS
+                </Text>
               </View>
-            );
-          })}
+              {summaryRows.map((r, idx) => {
+                const isGrandTotal = r.type === 'total' && /total/i.test(r.label);
+                const isDiscount = r.type === 'discount';
+                const isGenDiscount = r.type === 'generalDiscount';
+                const textColor = isDiscount
+                  ? theme.colors.discountText
+                  : isGenDiscount
+                    ? theme.colors.generalDiscountText
+                    : isGrandTotal
+                      ? theme.colors.totalText
+                      : theme.colors.text;
+                const rowBg = isGrandTotal
+                  ? pdfTheme.colors.totalBg
+                  : isDiscount
+                    ? pdfTheme.colors.discountRowBg
+                    : isGenDiscount
+                      ? pdfTheme.colors.generalDiscountBg
+                      : 'transparent';
+                return (
+                  <View key={idx} style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: 10,
+                    paddingVertical: isGrandTotal ? 8 : 6,
+                    backgroundColor: rowBg,
+                    borderTopWidth: 0.5,
+                    borderTopColor: isGrandTotal ? pdfTheme.colors.accent : pdfTheme.colors.border,
+                  }}>
+                    <Text style={{
+                      fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
+                      fontWeight: isGrandTotal ? 'bold' : 'normal',
+                      color: textColor,
+                      flex: 2.4,
+                      paddingRight: 4,
+                    }}>{r.label}</Text>
+                    <Text style={{
+                      fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
+                      fontWeight: 'bold',
+                      color: textColor,
+                      textAlign: 'right',
+                      flex: 1.4,
+                      lineHeight: 1.1,
+                    }}>{r.value}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }

@@ -6,7 +6,7 @@ import { pdfTheme } from './pdfTheme';
 const T = pdfTheme;
 // Estilos base unificados para todas las secciones (descripción, condiciones, términos, especificaciones)
 // Objetivo: mismo interlineado y separación vertical mínima y consistente.
-export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1 } = {}) {
+export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null } = {}) {
   const scale = typeof fontScale === 'number' && fontScale > 0 ? fontScale : 1;
   const baseFont = (T.font?.base || 10) * scale;
   const baseH2 = (T.font?.h2 || (T.font?.base || 10) + 1) * scale;
@@ -98,6 +98,10 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
       heading: { ...s.heading, marginBottom: 1.5, lineHeight: headingLineHeight },
       headingSmall: { ...s.headingSmall, marginTop: 1, marginBottom: 1.4, lineHeight: headingSmallLineHeight },
     };
+  }
+
+  if (paragraphSpacing !== null) {
+    s = { ...s, paragraph: { ...s.paragraph, marginBottom: paragraphSpacing } };
   }
 
   const applyInlineStyle = (base, node) => {
@@ -194,15 +198,16 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
           const isEspec = className.includes('espec-compactas');
           const extraIndent = isEspec ? 4 : 0; // indent base
           if (!isEspec) {
-            // Condiciones / Términos: render en bloques preservando negrilla inline (<strong>).
+            // Condiciones / Términos: render en bloques con bullet preservando negrilla inline (<strong>).
             return (
-              <View key={index} style={{ marginTop: 0.2, marginBottom: 0.2, paddingLeft: extraIndent }}>
+              <View key={index} style={{ marginTop: 1, marginBottom: 1, paddingLeft: extraIndent }}>
                 {[...node.children].map((liNode, i) => {
                   const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
                   if (!liText) return null;
                   return (
-                    <View key={i} style={{ marginBottom: 0.2 }}>
-                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: s.paragraph.lineHeight }}>
+                    <View key={i} style={{ flexDirection: 'row', marginBottom: 2.5 }}>
+                      <Text style={{ width: 8, fontSize: baseFont, lineHeight: s.paragraph.lineHeight, color: T.colors?.accent || '#1A4A7A' }}>•</Text>
+                      <Text style={{ ...s.paragraph, marginBottom: 0, flex: 1, lineHeight: s.paragraph.lineHeight }}>
                         {parseChildren(liNode)}
                       </Text>
                     </View>
@@ -367,21 +372,33 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
     }
   };
 
+  const tag = n => n.nodeName && n.nodeName.toLowerCase();
+
+  const isEmptyNode = n => {
+    if (n.nodeType === 3 && (!n.textContent || !n.textContent.trim())) return true;
+    if (tag(n) === 'br') return true;
+    if (tag(n) === 'p' && !n.textContent.trim()) return true;
+    return false;
+  };
+
   const parseChildren = (node) => {
+    const isBlockParent = node.nodeName && ['div','ul','ol','body'].includes(node.nodeName.toLowerCase());
     return [...node.childNodes]
-      .filter(
-        (child) =>
-          // Si es texto, solo si no es vacío o solo espacios
-          !(child.nodeType === 3 && (!child.textContent || !child.textContent.trim()))
-      )
+      .filter(child => {
+        if (child.nodeType === 3 && (!child.textContent || !child.textContent.trim())) return false;
+        if (isBlockParent && isEmptyNode(child)) return false;
+        return true;
+      })
       .map((child, i) =>
-    child.nodeType === 3 ? child.textContent : processNode(child, i)
+        child.nodeType === 3
+          ? child.textContent.replace(/[ \t]*[\r\n]+[ \t]*/g, ' ')
+          : processNode(child, i)
       );
   };
 
   const escapeRegex = (txt = '') => txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   return [...root.childNodes]
-    .filter(n => !(n.nodeType === 3 && !n.textContent.trim()))
+    .filter(n => !isEmptyNode(n))
     .map((node, i) => processNode(node, i));
 }

@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
 });
 
-function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1 }) {
+function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null }) {
   return (
     <View>
       <Text
@@ -329,7 +329,7 @@ function SeccionHTML({ titulo, contenido, compact = false, dense = false, readab
         {titulo}
       </Text>
       <View style={compact ? styles.htmlContentCompact : styles.htmlContent}>
-        {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems, fontScale })}
+        {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems, fontScale, paragraphSpacing })}
       </View>
     </View>
   );
@@ -572,10 +572,10 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
         <View style={styles.flexGrowContent}>
           {descripcionHTML ? (
             <View style={styles.htmlContentCompact}>
-              {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true })}
+              {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
             </View>
           ) : null}
-          <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact dense onlyBoldHeadings compressShortItems fontScale={0.9} />
+          <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact dense fontScale={0.9} />
           {placeImagesOnFirstPage && (
             <ImageSection
               titulo={imagenSectionTitle}
@@ -597,14 +597,34 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
             />
           )}
           <Text minPresenceAhead={28} style={styles.sectionTitle}>{detalleIndex}. Detalle Económico</Text>
-          {convertirTablaHTMLaComponentes(tablaHTML, { summaryPanel: true, zebra: true, currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true } })}
-          <ValidityCallout />
+          {convertirTablaHTMLaComponentes(tablaHTML, {
+            summaryPanel: true,
+            zebra: true,
+            currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
+            leftPanel: (
+              <View style={{
+                backgroundColor: T.colors.calloutBg,
+                borderLeftWidth: 3,
+                borderLeftColor: T.colors.accent,
+                borderRadius: T.radius.sm,
+                padding: 9,
+              }}>
+                <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
+                  Oferta válida por 30 días calendario desde la fecha de emisión.
+                </Text>
+                <Text style={{ fontSize: 8, color: T.colors.calloutText }}>
+                  Precios sujetos a variación de TRM y disponibilidad de materiales.
+                </Text>
+              </View>
+            ),
+          })}
+          <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
           <SeccionHTML
             titulo={`${condicionesIndex}. Condiciones Comerciales`}
             contenido={condicionesHTML}
             compact
             dense
-            compressShortItems
+            fontScale={0.9}
           />
         </View>
         <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={2} totalPages={3} />
