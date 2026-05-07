@@ -41,6 +41,10 @@ import imgCarroJaula2 from "../assets/imagenes/CarroJaula/Carro Jaula 2.jpg";
 import imgCarroJaula3 from "../assets/imagenes/CarroJaula/Carro Jaula 3.jpg";
 import imgCarroJaulaManta from "../assets/imagenes/CarroJaula/CON MANTA.JPG";
 
+import imgSemaforoSencillo from "../assets/imagenes/SemaforosParaMuelle/SemaforoSencillo.jpg";
+import imgSemaforoDoble from "../assets/imagenes/SemaforosParaMuelle/SemaforoDoble.jpg";
+import imgSemaforoConSensor from "../assets/imagenes/SemaforosParaMuelle/ConSensor.jpg";
+
 // Esta función convierte una imagen en base64 directamente
 const convertirADataUrl = (imagen) => {
   return fetch(imagen)
@@ -90,6 +94,9 @@ const rutas = {
   "Carro Jaula 2": imgCarroJaula2,
   "Carro Jaula 3": imgCarroJaula3,
   "Carro Jaula con Manta": imgCarroJaulaManta,
+  "Semáforo para Muelles de Carga Sencillo": imgSemaforoSencillo,
+  "Semáforo para Muelles de Carga Doble": imgSemaforoDoble,
+  "Semáforo para Muelles de Carga con Sensor": imgSemaforoConSensor,
 };
 
 const imagenesPorProducto = {};

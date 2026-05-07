@@ -73,7 +73,20 @@ export default function CotizadorApp(){
   // Sincronizar nombre cliente mostrado con empresa/contacto/legacy
   useEffect(()=>{ if(empresaSeleccionada){ setCliente(empresaSeleccionada.nombre||''); } }, [empresaSeleccionada]);
   // Edición
-  useEffect(()=>{ if(quoteData?.productos?.length){ setProductos(quoteData.productos); setCliente(quoteData.cliente||''); setAjusteTotalTipo(quoteData.ajusteGeneral?.tipo||'Descuento'); setAjusteTotalValor(quoteData.ajusteGeneral?.porcentaje||0);} }, []);
+  useEffect(()=>{
+    if(quoteData?.productos?.length){
+      setProductos(quoteData.productos);
+      setCliente(quoteData.cliente||'');
+      setAjusteTotalTipo(quoteData.ajusteGeneral?.tipo||'Descuento');
+      setAjusteTotalValor(quoteData.ajusteGeneral?.porcentaje||0);
+      if(quoteData.nombreCliente) setEmpresaNombreInput(quoteData.nombreCliente);
+      if(quoteData.clienteNIT || quoteData.empresaNIT) setEmpresaNITInput(quoteData.clienteNIT || quoteData.empresaNIT || '');
+      if(quoteData.clienteCiudad || quoteData.empresaCiudad) setEmpresaCiudadInput(quoteData.clienteCiudad || quoteData.empresaCiudad || '');
+      if(quoteData.clienteContacto) setContactoNombreInput(quoteData.clienteContacto);
+      if(quoteData.clienteEmail) setContactoEmailInput(quoteData.clienteEmail);
+      if(quoteData.clienteTelefono) setContactoTelInput(quoteData.clienteTelefono);
+    }
+  }, []);
   // Cargar datos de empresa/contacto al entrar en modo edicion
   const clienteCargadoRef = useRef(false);
   useEffect(()=>{

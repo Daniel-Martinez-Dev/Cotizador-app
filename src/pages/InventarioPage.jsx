@@ -2548,18 +2548,19 @@ export default function InventarioPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="text-xs text-gray-600 dark:text-gray-300">Foto (opcional)</label>
+              <label className="text-xs text-gray-600 dark:text-gray-300">Foto (opcional) — en móvil abre la cámara</label>
               <div className="mt-1 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
                 <div>
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={(e) => handleFotoChange(e.target.files?.[0])}
                     className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
                   />
                   <div className="text-[11px] opacity-70 mt-1">
-                    Se comprime automáticamente para guardarlo en Firebase.
-                    {itemForm.fotoDataUrl ? ` Tamaño aprox: ${dataUrlSizeLabel(itemForm.fotoDataUrl)}.` : ""}
+                    Captura desde cámara en móvil o selecciona una imagen. Se comprime automáticamente.
+                    {itemForm.fotoDataUrl ? ` Tamaño: ${dataUrlSizeLabel(itemForm.fotoDataUrl)}.` : ""}
                   </div>
                 </div>
 

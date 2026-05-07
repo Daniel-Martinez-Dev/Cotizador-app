@@ -44,7 +44,7 @@ function generarEspecificaciones(cot) {
   raw = raw.replace(/<br\s*\/?>(\s*)/gi, ' ');
   raw = raw.replace(/<p>\s*<br\s*\/?>(\s*)<\/p>/gi, '');
   raw = raw.replace(/<p>\s*<\/p>/gi, '');
-  raw = raw.replace(/<p>\s*(<strong>.*?<\/strong>)\s*<\/p>/gi, '$1');
+  raw = raw.replace(/<p>\s*<strong>(.*?)<\/strong>\s*<\/p>/gi, '<h4>$1</h4>');
   raw = raw.replace(/<li>\s*<\/li>/gi, '');
   raw = raw.replace(/<li>\s*&nbsp;\s*<\/li>/gi, '');
   raw = raw.replace(/>\s+</g, '><');
