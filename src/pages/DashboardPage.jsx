@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ENABLE_INVENTARIO, ENABLE_PRODUCCION } from "../utils/featureFlags";
+import { useAuth } from "../context/AuthContext";
 
 function Card({ title, desc, to, enabled, icon, tone }) {
   const base = "group relative block overflow-hidden rounded-2xl border px-5 py-5 transition";
@@ -29,24 +30,25 @@ function Card({ title, desc, to, enabled, icon, tone }) {
         )}
       </div>
       <div className="mt-5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>Acceder a modulo</span>
+        <span>Acceder al módulo</span>
         <span className={`text-base transition ${enabled ? 'group-hover:translate-x-1' : ''}`}>→</span>
       </div>
     </div>
   );
 
   if (!enabled) return <div className={`${base} ${cls}`}>{inner}</div>;
-  return (
-    <Link to={to} className={`${base} ${cls}`}>
-      {inner}
-    </Link>
-  );
+  return <Link to={to} className={`${base} ${cls}`}>{inner}</Link>;
 }
 
 export default function DashboardPage() {
   const location = useLocation();
   const denied = location.state?.denied;
   const disabled = location.state?.disabled;
+  const { hasRole, isMainAdmin } = useAuth();
+
+  const isAdmin = isMainAdmin || hasRole("admin");
+  const showProduccion = ENABLE_PRODUCCION && (isAdmin || hasRole("produccion"));
+  const showInventario = ENABLE_INVENTARIO && (isAdmin || hasRole("inventario"));
 
   return (
     <div className="relative">
@@ -58,7 +60,7 @@ export default function DashboardPage() {
             <p className="text-xs uppercase tracking-[0.35em] text-gray-400 dark:text-gray-500">Panel principal</p>
             <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white" style={{ fontFamily: '"Space Grotesk", "Segoe UI", sans-serif' }}>Inicio</h1>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-xl">
-              Accede rapido a los modulos clave para crear cotizaciones, administrar produccion y llevar el control de inventario.
+              Accede rápido a los módulos disponibles según tus permisos.
             </p>
           </div>
           <div className="rounded-2xl border border-gray-200/80 dark:border-gris-700/80 bg-white/80 dark:bg-gris-900/70 px-4 py-3 text-xs text-gray-500 dark:text-gray-300">
@@ -86,26 +88,22 @@ export default function DashboardPage() {
             icon="🧾"
             tone="from-sky-500/20 via-sky-400/10 to-transparent"
           />
-          {ENABLE_PRODUCCION && (
-            <Card
-              title="Producción"
-              desc="Órdenes en producción y fichas de fabricación"
-              to="/produccion"
-              enabled={true}
-              icon="🏭"
-              tone="from-amber-500/20 via-amber-400/10 to-transparent"
-            />
-          )}
-          {ENABLE_INVENTARIO && (
-            <Card
-              title="Inventario"
-              desc="Materia prima, proveedores y tiempos de entrega"
-              to="/inventario"
-              enabled={true}
-              icon="📦"
-              tone="from-emerald-500/20 via-emerald-400/10 to-transparent"
-            />
-          )}
+          <Card
+            title="Producción"
+            desc="Órdenes en producción y fichas de fabricación"
+            to="/produccion"
+            enabled={showProduccion}
+            icon="🏭"
+            tone="from-amber-500/20 via-amber-400/10 to-transparent"
+          />
+          <Card
+            title="Inventario"
+            desc="Materia prima, proveedores y tiempos de entrega"
+            to="/inventario"
+            enabled={showInventario}
+            icon="📦"
+            tone="from-emerald-500/20 via-emerald-400/10 to-transparent"
+          />
         </div>
       </div>
     </div>
