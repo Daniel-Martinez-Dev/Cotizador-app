@@ -221,7 +221,7 @@ export default function HistorialPage() {
   const manejarEditar = cot => {
     // Marca modo edición para mostrar aviso en el formulario
     setQuoteData({ ...cot, modoEdicion: true });
-    navigate("/");
+    navigate("/cotizar");
   };
   const manejarEliminar = async cot => {
     if (!(await confirm("¿Eliminar la cotización #" + cot.numero + "?"))) return;
@@ -278,7 +278,7 @@ export default function HistorialPage() {
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
-          <button onClick={() => navigate('/')} className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700">← Volver</button>
+          <button onClick={() => navigate('/cotizar')} className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700">← Volver</button>
           <h1 className="text-2xl font-bold">Historial de Cotizaciones</h1>
         </div>
         <div className="flex items-center gap-2 text-xs">

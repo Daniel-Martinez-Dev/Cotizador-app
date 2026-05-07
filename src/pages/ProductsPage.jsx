@@ -241,7 +241,7 @@ export default function ProductsPage() {
   return (
   <div className="max-w-7xl mx-auto p-6 bg-white dark:bg-gris-900 shadow-md rounded-lg text-gray-900 dark:text-gray-100">
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <button onClick={()=>navigate('/')} className="bg-gray-600 text-white px-4 py-2 rounded text-sm">← Volver</button>
+        <button onClick={()=>navigate('/cotizar')} className="bg-gray-600 text-white px-4 py-2 rounded text-sm">← Volver</button>
         <input placeholder="Buscar producto" value={filtro} onChange={e=>setFiltro(e.target.value)} className="border p-2 rounded flex-1" />
       </div>
 

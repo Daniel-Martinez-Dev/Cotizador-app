@@ -81,7 +81,7 @@ export default function ClientsPage() {
   <div className="max-w-5xl mx-auto p-6 bg-white dark:bg-gris-900 shadow-md rounded-lg text-gray-900 dark:text-gray-100">
       <h1 className="text-2xl font-bold mb-4">Clientes</h1>
       <div className="mb-4">
-        <button onClick={()=>navigate('/')} className="bg-gray-600 text-white px-3 py-1 rounded text-sm">← Volver al Cotizador</button>
+        <button onClick={()=>navigate('/cotizar')} className="bg-gray-600 text-white px-3 py-1 rounded text-sm">← Volver al Cotizador</button>
       </div>
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="flex items-center gap-2 flex-1">
