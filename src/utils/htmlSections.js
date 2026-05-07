@@ -4,12 +4,12 @@ import { formatearPesos } from "./formatos";
 import { EXTRAS_POR_DEFECTO } from "../data/precios"; // legacy fallback
 import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtrasPorTipo } from '../data/catalogoProductos';
 
-export function generarSeccionesHTML(cotizacion) {
+export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0) {
   const descripcionHTML = generarDescripcion(cotizacion);
   const especificacionesHTML = generarEspecificaciones(cotizacion);
   const tablaHTML = generarTablaPrecios(cotizacion);
 
-  const condicionesHTML = generarCondicionesComerciales(cotizacion);
+  const condicionesHTML = generarCondicionesComerciales(cotizacion, condicionesProductoIndex);
   const terminosHTML = generarTerminosGenerales(cotizacion);
 
   return {
@@ -19,6 +19,17 @@ export function generarSeccionesHTML(cotizacion) {
     condicionesHTML,
     terminosHTML,
   };
+}
+
+export function generarSeccionesPorProducto(cotizacion) {
+  return (cotizacion.productos || []).map((prod) => {
+    const cotSingle = { ...cotizacion, productos: [prod] };
+    return {
+      tipo: prod.tipo,
+      descripcionHTML: generarDescripcion(cotSingle),
+      especificacionesHTML: generarEspecificaciones(cotSingle),
+    };
+  });
 }
 
 // Pequeños helpers para construir HTML de texto/listas de forma consistente
@@ -242,8 +253,8 @@ function generarTablaPrecios(cot) {
 
 
 
-function generarCondicionesComerciales(cot) {
-  const primerTipo = cot.productos?.[0]?.tipo || "";
+function generarCondicionesComerciales(cot, indiceProducto = 0) {
+  const primerTipo = cot.productos?.[indiceProducto]?.tipo || cot.productos?.[0]?.tipo || "";
   const liCond = (arr) => `<ul class='condiciones-compactas'>${arr.map(txt=>`<li>${txt}</li>`).join('')}</ul>`;
   // Condiciones específicas para Sello de Andén
   if (primerTipo === "Sello de Andén") {

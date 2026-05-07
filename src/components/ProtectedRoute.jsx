@@ -2,8 +2,12 @@ import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ requireRole }) {
-  const { loading, isLoggedIn, hasRole } = useAuth();
+/**
+ * @param {string} [requireRole]   rol requerido (p.ej. 'admin')
+ * @param {string} [requireEmail]  email exacto requerido (sensible a mayúsculas)
+ */
+export default function ProtectedRoute({ requireRole, requireEmail }) {
+  const { loading, isLoggedIn, hasRole, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -20,6 +24,14 @@ export default function ProtectedRoute({ requireRole }) {
 
   if (requireRole && !hasRole(requireRole)) {
     return <Navigate to="/dashboard" replace state={{ denied: requireRole }} />;
+  }
+
+  if (requireEmail) {
+    const userEmail = (user?.email ?? "").toLowerCase();
+    const allowed = requireEmail.toLowerCase();
+    if (userEmail !== allowed) {
+      return <Navigate to="/dashboard" replace state={{ denied: 'email' }} />;
+    }
   }
 
   return <Outlet />;

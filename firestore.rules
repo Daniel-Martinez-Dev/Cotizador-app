@@ -1,6 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ─── Helpers ───────────────────────────────────────────────────────────────
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,8 +16,124 @@ service cloud.firestore {
       return isSignedIn() && !isAnonymous();
     }
 
+    // Admin by email (propietario del sistema)
+    function isAdminEmail() {
+      return isStaff() && request.auth.token.email == 'gerenciacchainservices@gmail.com';
+    }
+
+    // Admin por rol en colección usuarios (para admins delegados)
+    function hasAdminRole() {
+      return isStaff() &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+          .data.get('roles', []).hasAny(['admin']);
+    }
+
+    function isAdmin() {
+      return isAdminEmail() || hasAdminRole();
+    }
+
+    function isOwner(uid) {
+      return isStaff() && request.auth.uid == uid;
+    }
+
+    // ─── Cotizaciones (Row-Level Security por usuario) ─────────────────────────
+    match /cotizaciones/{cotId} {
+      // Admin ve todo; usuario solo ve sus propias; docs legacy (sin uid) solo admin
+      allow read: if isStaff() && (
+        isAdmin() ||
+        ('uid' in resource.data && resource.data.uid == request.auth.uid) ||
+        !('uid' in resource.data)  // docs legados: acceso temporal hasta migración
+      );
+      // Al crear, el uid del doc debe coincidir con el usuario autenticado
+      allow create: if isStaff() && (
+        !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid
+      );
+      // Solo el dueño o admin puede editar/eliminar
+      allow update, delete: if isStaff() && (
+        isAdmin() ||
+        ('uid' in resource.data && resource.data.uid == request.auth.uid)
+      );
+    }
+
+    // ─── Perfiles de usuario ────────────────────────────────────────────────────
+    match /usuarios/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) || isAdmin();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Índice por email (lookup de perfil por email)
+    match /usuarios_email/{emailKey} {
+      allow read: if isStaff();
+      allow write: if isStaff(); // cada usuario crea/actualiza su propio registro
+    }
+
+    // ─── Empresas y Contactos (recurso compartido del equipo) ───────────────────
+    match /empresas/{empresaId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+
+      match /contactos/{contactoId} {
+        allow read: if isStaff();
+        allow create, update: if isStaff();
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ─── Contador de número de cotización ───────────────────────────────────────
+    match /counters/{counterId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    // Alias alternativo que usen algunos módulos
+    match /quoteCounters/{docId} {
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    // ─── Producción: solo el administrador propietario ──────────────────────────
+    match /produccion/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /produccion/{docId}/{subCol}/{subId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ─── Inventario: solo administradores ───────────────────────────────────────
+    match /inventario/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /inventario/{docId}/{subCol}/{subId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ─── Configuración de precios: lectura para staff, escritura solo admin ─────
+    match /pricingConfig/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /configuracion/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─── Catálogo de productos: lectura para staff, escritura solo admin ────────
+    match /productos/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─── Catch-all: admin tiene acceso total; todo lo demás denegado ────────────
     match /{document=**} {
-      allow read, write: if isStaff();
+      allow read, write: if isAdmin();
     }
   }
 }

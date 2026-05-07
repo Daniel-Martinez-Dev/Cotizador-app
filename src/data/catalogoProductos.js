@@ -31,14 +31,14 @@ const PRODUCT_CATALOG = {
           <li><strong>Aislantes:</strong> Núcleo de poliuretano, poliestireno extruido y/o polietileno expandido.</li>
           <li><strong>Cubierta:</strong> Lona PVC 700 g/m² impermeable y lavable, resistente a UV.</li>
           <li><strong>Protección inferior:</strong> Lámina plástica antifricción 3 mm.</li>
-          <li><strong>Fijación:</strong> Reatas nylon alta resistencia + tornillería con tuercas de seguridad.</li>
+          <li><strong>Fijación:</strong> Reatas de nylon de alta resistencia + tornillería con tuercas de seguridad.</li>
           <li><strong>Estructura interna:</strong> Soportes livianos para fácil manipulación sin perder rigidez.</li>
         </ul>
         <h4>Beneficios</h4>
         <ul>
-          <li>Separa zonas frías / templadas.</li>
-          <li>Reduce pérdida de frío y consumo energético.</li>
-          <li>Evita mezcla de olores entre cargas.</li>
+          <li>Segrega zonas frías de zonas templadas.</li>
+          <li>Reduce la pérdida de frío y el consumo energético.</li>
+          <li>Evita la mezcla de olores entre cargas.</li>
           <li>Diseño liviano y ergonómico para el operario.</li>
         </ul>
       </div>`
@@ -47,7 +47,7 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
   extrasKey: 'Puertas Rápidas',
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas para mejorar eficiencia operativa, reducir pérdida energética y facilitar el flujo logístico.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación e instalación de puertas rápidas enrollables automatizadas para mejorar la eficiencia operativa, reducir la pérdida energética y facilitar el flujo logístico.',
     lineaTabla: (p, medidasLinea) => `PUERTA RÁPIDA PARA VANO DE${medidasLinea}`,
     especificacionesHTML: `
       <div>
@@ -68,7 +68,7 @@ const PRODUCT_CATALOG = {
         <h4>Seguridad y operación</h4>
         <ul>
           <li>Cortina óptica (barrera fotoeléctrica) en un costado para detección de presencia en el paso de la puerta. (Si se requiere en ambos lados, adicionar $1’100.000 + IVA.)</li>
-          <li>Sistema “airbag” en zócalo: ante impacto en la parte baja, se acciona y restituye la cortina.</li>
+          <li>Sistema “airbag” en el zócalo: ante impacto en la parte inferior, se acciona y restituye la cortina.</li>
         </ul>
         <h4>Accesorios y opciones</h4>
         <ul>
@@ -92,18 +92,18 @@ const PRODUCT_CATALOG = {
     requiereMedidas: true,
     extrasKey: 'Puertas Seccionales',
     factorBaseCliente: 'Cliente Final Contado',
-    descripcionGeneral: 'Respetados señores. Enviamos para su consideración nuestra propuesta para la venta de puertas seccionales; tienen entre otros los siguientes elementos:',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la venta e instalación de puertas seccionales automatizadas, fabricadas con paneles tipo sándwich con aislamiento de poliuretano, ideales para accesos industriales y de bodegas.',
     lineaTabla: (p, medidasLinea) => `PUERTA SECCIONAL${medidasLinea}`,
     especificacionesHTML: `
       <div>
         <h4>Elementos incluidos</h4>
         <ul>
-          <li>Panel de 4cm tipo sándwich de acero galvanizado con aislamiento de poliuretano.</li>
-          <li>Ventana de polipropileno grande en uno de los paneles.</li>
+          <li>Panel tipo sándwich de 4 cm en acero galvanizado con aislamiento de poliuretano.</li>
+          <li>Ventana de polipropileno en uno de los paneles.</li>
           <li>Sistema de rieles.</li>
           <li>Freno de seguridad de guayas.</li>
           <li>Ménsula paracaídas.</li>
-          <li>Sistema de protección a través de bolsa de aire para retroceso de la puerta en caso de golpe accidental en la parte baja.</li>
+          <li>Sistema de bolsa de aire para retroceso de la puerta ante golpes en la parte inferior.</li>
           <li>Motor con 7 metros de cadena.</li>
           <li>Caja de control.</li>
           <li>Control remoto opcional sin costo adicional.</li>
@@ -116,15 +116,19 @@ const PRODUCT_CATALOG = {
   requiereMedidas: true,
   extrasKey: 'Abrigo Retráctil Estándar',
     descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación de abrigos aislantes retráctiles con bandas de PVC de alta resistencia para muelles de carga, minimizando la pérdida de frío y protegiendo el ambiente interno.',
-    lineaTabla: (p, medidasLinea) => `Abrigo Retráctil para muelle de carga${medidasLinea}`,
+    lineaTabla: (p, medidasLinea) => `ABRIGO RETRÁCTIL PARA MUELLE DE CARGA${medidasLinea}`,
     especificacionesHTML: `
       <div>
-        <h4>Componentes principales</h4>
+        <h4>Materiales</h4>
         <ul>
-          <li><strong>Estructura:</strong> Marco de acero con sistema retráctil manual.</li>
-          <li><strong>Bandas:</strong> PVC de alta resistencia con función aislante.</li>
-          <li><strong>Fijación:</strong> Anclajes y perfiles metálicos incluidos.</li>
-          <li><strong>Sellado:</strong> Reduce transferencia térmica durante cargue.</li>
+          <li>Estructura metálica elaborada con tubería de 2×1" calibre 16 unida con soldadura MIG y protegida de la intemperie con pintura electrostática.</li>
+          <li>Travesaños elaborados en tubería de 1¼" calibre 16 protegidos de la intemperie con pintura electrostática.</li>
+          <li>Cortinas laterales en banda de PVC de 3 mm.</li>
+          <li>Cortina superior en banda de PVC de 3 mm.</li>
+          <li>Sistema retráctil para evitar daños en la estructura por golpes de los vehículos, el cual se logra mediante un marco fijo y uno suspendido sujeto por la lona y los travesaños.</li>
+          <li>Soportes y refuerzos elaborados en acero Cold Rolled protegido de la intemperie mediante pintura electrostática.</li>
+          <li>Elementos de anclaje y sujeción galvanizados que ayudan a proteger contra la corrosión.</li>
+          <li>Ángulos en acero galvanizado que ayudan a sujetar la lona a la estructura y dan mejor presentación al abrigo.</li>
         </ul>
       </div>`
   },
@@ -132,16 +136,22 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'matriz',
   requiereMedidas: true,
   extrasKey: 'Abrigo Retráctil Inflable',
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para suministro de abrigo inflable tipo burbuja para zonas de cargue, ofreciendo máxima eficiencia de sellado mediante sistema neumático y lona resistente.',
-    lineaTabla: (p, medidasLinea) => `Abrigo Retráctil Inflable para muelle de carga${medidasLinea}`,
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de abrigo inflable tipo burbuja para zonas de cargue, ofreciendo máxima eficiencia de sellado mediante sistema neumático y lona resistente.',
+    lineaTabla: (p, medidasLinea) => `ABRIGO RETRÁCTIL INFLABLE PARA MUELLE DE CARGA${medidasLinea}`,
     especificacionesHTML: `
       <div>
-        <h4>Características</h4>
+        <h4>Materiales</h4>
         <ul>
-          <li><strong>Tipo:</strong> Inflable tipo burbuja.</li>
-          <li><strong>Sistema:</strong> Cámaras neumáticas para sellado hermético.</li>
-          <li><strong>Material:</strong> Lona PVC alta resistencia antiflama y UV.</li>
-          <li><strong>Extras disponibles:</strong> Almohadillas, topes, instalación.</li>
+          <li>Estructura metálica elaborada con tubería de 2×1" calibre 16 unida con soldadura MIG y protegida de la intemperie mediante pintura electrostática.</li>
+          <li>Travesaños elaborados en tubería de 1¼" calibre 16 protegidos de la intemperie mediante pintura electrostática.</li>
+          <li>Cortinas frontales laterales con banda 3 mm elaborada en PVC reforzada con doble malla de fibra de poliéster, 40 cm de ancho.</li>
+          <li>Cortina frontal superior con lona 3 mm elaborada en PVC reforzada con doble malla de fibra de poliéster, 60 cm de ancho.</li>
+          <li>Sistema retráctil para evitar daños en la estructura por golpes de los vehículos, el cual se logra mediante un marco fijo y uno suspendido sujeto por la lona y los travesaños.</li>
+          <li>Soportes y refuerzos elaborados en acero Cold Rolled protegido de la intemperie mediante pintura electrostática.</li>
+          <li>Elementos de anclaje y sujeción galvanizados que ayudan a proteger contra la corrosión.</li>
+          <li>Ángulos en acero galvanizado que ayudan a sujetar la banda a la estructura y dan mejor presentación al abrigo, protegidos de la intemperie con pintura electrostática.</li>
+          <li>Ventilador centrífugo de 680 W a 3600 RPM con su respectivo arrancador.</li>
+          <li>Cortinas inflables laterales y superior elaboradas en lona PVC 700 g/m² de trama cerrada, que brinda mayor resistencia al rasgado. La cortina superior al inflarse se proyecta 110 cm y las laterales 80 cm.</li>
         </ul>
       </div>`
   },
@@ -149,17 +159,19 @@ const PRODUCT_CATALOG = {
     tipoCalculo: 'componentes',
   requiereMedidas: true,
   extrasKey: 'Sello de Andén',
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para fabricación de sello de andén compuesto por cortina superior y postes laterales, asegurando sellado térmico y protección en puntos de cargue y descargue.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para la fabricación de sello de andén compuesto por cortina superior y postes laterales, asegurando sellado térmico y protección en puntos de cargue y descargue.',
     lineaTabla: (p, medidasLinea) => `SELLO DE ANDÉN PARA MUELLE DE${medidasLinea}`,
     especificacionesHTML: `
       <div>
-        <h4>Configuración</h4>
+        <h4>Materiales y construcción</h4>
         <ul>
-          <li><strong>Componentes:</strong> Cortina superior, postes laterales, opcional travesaño.</li>
-          <li><strong>Estructura:</strong> Marco reforzado + lona industrial.</li>
-          <li><strong>Rangos:</strong> Dimensiones según tabla comercial.</li>
-          <li><strong>Instalación:</strong> Requiere superficie nivelada y preparada.</li>
+          <li>Recubrimiento en lona PVC de 700 g/m² con mayor resistencia al rasgado gracias a su mayor número de hilos por centímetro cuadrado. Para la confección del sello, la lona es unida por medio de ultra frecuencia con un traslape del 50%, lo que garantiza mayor duración y resistencia al desgarre respecto a otros métodos de unión (costura).</li>
+          <li>Espuma densidad 23 (de 25 cm de ancho), que brinda el soporte necesario para garantizar el sellado contra el vehículo y permite una fácil recuperación de la forma original del sello una vez el vehículo es retirado del muelle.</li>
+          <li>Velcro y demás elementos de confección de primera calidad, que brindan estabilidad a través del tiempo evitando el deterioro prematuro del sello.</li>
+          <li>Cortina en lona PVC de 700 g/m² con caída de 80 cm.</li>
+          <li>Base en madera.</li>
         </ul>
+        <p>El diseño y confección de nuestros sellos permite separar fácilmente la superficie de contacto con los vehículos, facilitando las labores de mantenimiento y limpieza sin necesidad de desmontar el sello del muelle de carga. Se disponen hasta 5 capas de lona que protegen la espuma de daños ocasionados por vehículos con partes cortantes. La lona y espuma utilizadas permiten el uso en diferentes condiciones de temperatura sin que se afecte su desempeño.</p>
       </div>`,
     getPrecioBase: (p)=>{ // cálculo por componentes
       const {ancho, alto, componentes=[]} = p;
@@ -174,7 +186,7 @@ const PRODUCT_CATALOG = {
   'Semáforo para Muelles de Carga': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de sistemas de señalización luminosa (semáforos) para operaciones de cargue y descargue en muelles, mejorando la seguridad operativa y flujo logístico.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de sistemas de señalización luminosa (semáforos) para operaciones de cargue y descargue en muelles, mejorando la seguridad operativa y el flujo logístico.',
     variantes: [
       { id: 'sencillo', nombre: 'SEMÁFORO SENCILLO PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y UN SEMÁFORO)', precio: 570000 },
       { id: 'doble', nombre: 'SEMÁFORO DOBLE PARA MUELLE DE CARGA (UNA CAJA DE CONTROL Y DOS SEMÁFOROS)', precio: 870000 },
@@ -189,7 +201,7 @@ const PRODUCT_CATALOG = {
         <h4>Aplicación y operación</h4>
         <ul>
           <li>Control visual de ingreso / salida de vehículos.</li>
-          <li>Indicadores LED rojo / verde alto brillo.</li>
+          <li>Indicadores LED rojo/verde de alto brillo.</li>
           <li>Variante con sensor de masas (opcional).</li>
         </ul>
         <h4>Características eléctricas</h4>
@@ -216,15 +228,15 @@ const PRODUCT_CATALOG = {
   'Lámpara Industrial': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de lámpara industrial para muelle de carga con reflector LED de 50W, diseñada para brindar iluminación dirigida y segura dentro de vehículos durante operaciones de cargue y descargue.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de una lámpara industrial para muelle de carga con reflector LED de 50 W, diseñada para brindar iluminación dirigida y segura dentro de vehículos durante operaciones de cargue y descargue.',
     lineaTabla: () => 'LÁMPARA INDUSTRIAL PARA MUELLE DE CARGA',
     especificacionesHTML: `
       <div>
         <h4>Componentes</h4>
         <ul>
-          <li><strong>Reflector LED:</strong> 50W (≈2100 lm) 100–240 VAC.</li>
-          <li><strong>Brazo ecualizable:</strong> Acero cuadrado 1½” cal.16 con refuerzos.</li>
-          <li><strong>Mango:</strong> Direccionamiento ergonómico interior vehículo.</li>
+          <li><strong>Reflector LED:</strong> 50 W (≈2.100 lm), 100–240 VAC.</li>
+          <li><strong>Brazo articulado:</strong> Acero cuadrado 1½” cal.16 con refuerzos.</li>
+          <li><strong>Mango:</strong> Para orientación ergonómica hacia el interior del vehículo.</li>
         </ul>
         <h4>Seguridad</h4>
         <ul>
@@ -232,7 +244,7 @@ const PRODUCT_CATALOG = {
         </ul>
         <h4>Aplicación</h4>
         <ul>
-          <li>Iluminación en cargue y zonas internas de camiones.</li>
+          <li>Iluminación durante operaciones de cargue en zonas internas de camiones.</li>
         </ul>
         <h4>Instalación</h4>
         <ul>
@@ -244,7 +256,7 @@ const PRODUCT_CATALOG = {
   'Canastilla de Seguridad': {
     tipoCalculo: 'especial',
     requiereMedidas: false,
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de CANASTILLA DE SEGURIDAD ESTÁNDAR para montacargas, diseñada para labores de limpieza, mantenimiento y toma de producto en niveles superiores cumpliendo criterios de seguridad estructural.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro de canastilla de seguridad estándar para montacargas, diseñada para labores de limpieza, mantenimiento y toma de producto en niveles superiores, bajo criterios de seguridad estructural.',
     lineaTabla: () => 'CANASTILLA DE SEGURIDAD ESTÁNDAR PARA MONTACARGA',
     especificacionesHTML: `
       <div>
@@ -264,7 +276,7 @@ const PRODUCT_CATALOG = {
         <h4>Aplicación</h4>
         <ul>
           <li>Elevación segura de personal para mantenimiento y logística interna.</li>
-          <li>Comparar diseño/estructura contra oferentes (Res. 4272/2021).</li>
+          <li>Diseño verificable con la normativa vigente (Res. 4272/2021).</li>
         </ul>
       </div>` ,
     getPrecioBase: () => ({ precio: 5410000, fueraDeRango: false })
@@ -272,7 +284,7 @@ const PRODUCT_CATALOG = {
   'Cortina Thermofilm': {
     tipoCalculo: 'especial',
     requiereMedidas: true,
-    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro e instalación (opcional) de cortina Thermofilm transparente reforzada para control ambiental y separación física, incluyendo refuerzos y elementos de fijación (max bullets) según dimensionamiento.',
+    descripcionGeneral: 'Enviamos para su consideración nuestra propuesta para el suministro e instalación (opcional) de cortina Thermofilm transparente reforzada para control ambiental y separación física, incluyendo abrazaderas y elementos de fijación según dimensionamiento.',
     lineaTabla: (p, medidasLinea) => {
       const ancho = p.ancho ? `${p.ancho}mm` : '';
       const alto = p.alto ? `${p.alto}mm` : '';
@@ -282,13 +294,13 @@ const PRODUCT_CATALOG = {
       <div>
         <h4>Material y diseño</h4>
         <ul>
-          <li>Thermofilm transparente reforzado 20 cm banda × 2 mm espesor.</li>
-          <li>Se adicionan 10 cm a ancho y alto para traslapes y cálculo de área.</li>
+          <li>Bandas de Thermofilm transparente reforzado, 20 cm de ancho × 2 mm de espesor.</li>
+          <li>Incluye traslapes de 10 cm en ancho y alto.</li>
         </ul>
         <h4>Montaje</h4>
         <ul>
-          <li>Max bullet plástico cada ~60 cm (decimal según ancho real).</li>
-          <li>Opción con o sin instalación (precio €/m² variable).</li>
+          <li>Abrazadera plástica cada 60 cm aproximadamente.</li>
+          <li>Opción con o sin instalación (precio $/m² variable).</li>
         </ul>
         <h4>Aplicación</h4>
         <ul>
@@ -296,7 +308,7 @@ const PRODUCT_CATALOG = {
         </ul>
         <h4>Extras</h4>
         <ul>
-          <li>Transporte / andamio como extra personalizado si aplica.</li>
+          <li>Transporte y/o andamio disponibles como extra adicional según aplique.</li>
         </ul>
       </div>` ,
     getPrecioBase: (p) => {
