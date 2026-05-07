@@ -2,7 +2,32 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Using relative base ensures assets load when opened via file:// in Electron
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'https://cotizadorccs-38398.web.app',
+  'https://cotizadorccs-38398.firebaseapp.com',
+];
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // unsafe-eval requerido por React PDF + Quill
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+  ].join('; '),
+};
+
 export default defineConfig({
   base: './',
   plugins: [
@@ -11,7 +36,6 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
-        // Allow precaching the main bundle (it is > 2MB).
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
@@ -43,6 +67,23 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    cors: {
+      origin: ALLOWED_ORIGINS,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    },
+    headers: SECURITY_HEADERS,
+  },
+  preview: {
+    cors: {
+      origin: ALLOWED_ORIGINS,
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
+    headers: SECURITY_HEADERS,
+  },
   define: {
     global: 'globalThis',
   },

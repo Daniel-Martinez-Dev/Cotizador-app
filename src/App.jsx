@@ -16,13 +16,14 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
 import menuIcon from "./assets/imagenes/menu-icon.png";
-import { ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
+import { ADMIN_EMAIL, ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
 // Carga catálogo central (side-effect) para futuras referencias globales
 import './data/catalogoProductos';
 
 function AppShell() {
   const { quoteData, setQuoteData, setResetToken, setEmpresaSeleccionada, setContactoSeleccionado } = useQuote();
   const { user, signOutUser, hasRole } = useAuth();
+  const isAdminUser = ADMIN_EMAIL && (user?.email ?? "").toLowerCase() === ADMIN_EMAIL;
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem('theme') === 'dark';
@@ -85,7 +86,7 @@ function AppShell() {
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
       { to: '/', label: 'Cotizar', show: true },
-      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION },
+      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION && isAdminUser },
       { to: '/inventario', label: 'Inventario', show: ENABLE_INVENTARIO },
       { to: '/productos', label: 'Productos', show: true },
       { to: '/historial', label: 'Historial', show: true },
@@ -120,7 +121,7 @@ function AppShell() {
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
       { to: '/', label: 'Cotizar', show: true },
-      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION },
+      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION && isAdminUser },
       { to: '/inventario', label: 'Inventario', show: ENABLE_INVENTARIO },
       { to: '/productos', label: 'Productos', show: true },
       { to: '/historial', label: 'Historial', show: true },
@@ -262,10 +263,12 @@ export default function App(){
 
                 <Route path="/" element={<CotizadorApp />} />
                 <Route path="/preview" element={<PreviewPage />} />
-                <Route
-                  path="/produccion"
-                  element={ENABLE_PRODUCCION ? <ProduccionPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'produccion' }} />}
-                />
+                <Route element={<ProtectedRoute requireEmail={ADMIN_EMAIL || undefined} />}>
+                  <Route
+                    path="/produccion"
+                    element={ENABLE_PRODUCCION ? <ProduccionPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'produccion' }} />}
+                  />
+                </Route>
                 <Route
                   path="/inventario"
                   element={ENABLE_INVENTARIO ? <InventarioPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'inventario' }} />}

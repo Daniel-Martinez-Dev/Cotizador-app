@@ -367,7 +367,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
           </View>
         </View>
       </View>
-      <Text style={styles.title}>COTIZACIÓN DE {tipoProducto}</Text>
+      <Text style={styles.title}>{tipoProducto.startsWith("COTIZACIÓN") ? tipoProducto : `COTIZACIÓN DE ${tipoProducto}`}</Text>
     </View>
   );
 }
@@ -499,7 +499,7 @@ function SignatureBlock() {
   );
 }
 
-function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
+function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorProducto }) {
   const {
     nombreCliente,
     cliente,
@@ -510,93 +510,107 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
     clienteTelefono,
     productos,
     secciones = [],
-  imagenSeleccionada: imagenSeleccionadaPorUsuario,
-  imagenesSeleccionadas = []
+    seccionesPorProducto = [],
+    tituloCotizacion,
   } = cotizacion;
 
-  const producto = productos?.[0];
-  const tipoProducto = producto?.tipo?.toUpperCase?.() || "PRODUCTO";
   const fecha = new Date().toLocaleDateString("es-CO");
 
-  const {
-    descripcionHTML = "",
-    especificacionesHTML = "",
-    tablaHTML = "",
-    condicionesHTML = "",
-    terminosHTML = ""
-  } = secciones[0] || {};
+  const tiposProducto = tituloCotizacion || ((productos || [])
+    .map(p => p.tipo?.toUpperCase?.() || "PRODUCTO")
+    .join(", "));
 
-  const nombreImagen = imagenSeleccionadaPorUsuario || producto?.imagen || "";
-  const imagenSeleccionadaRaw = imagenesPorProducto[nombreImagen] || null;
-  const imagenesMultiRaw = Array.isArray(imagenesSeleccionadas) ? imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean) : [];
-  const imagenSeleccionada = imagenesOptimizadas?.principal ?? imagenSeleccionadaRaw;
-  const imagenesMulti = imagenesOptimizadas?.extras ?? imagenesMultiRaw;
-  const hasAnyImage = Boolean(imagenSeleccionada) || imagenesMulti.length > 0;
-  const imagenSectionTitle = hasAnyImage ? "2. Imágenes de Referencia" : "";
-  const detalleIndex = hasAnyImage ? 3 : 2;
-  const condicionesIndex = hasAnyImage ? 4 : 3;
-  const terminosIndex = hasAnyImage ? 5 : 4;
-  const textLen = `${descripcionHTML}${especificacionesHTML}`.replace(/<[^>]*>/g, '').length;
-  const placeImagesOnFirstPage = hasAnyImage && textLen < 1200;
+  // Secciones compartidas (tabla, condiciones, términos)
+  const { tablaHTML = "", condicionesHTML = "", terminosHTML = "" } = secciones[0] || {};
+
+  // Si no hay seccionesPorProducto (backward compat), construir desde secciones[0]
+  const secsPorProd = seccionesPorProducto.length > 0
+    ? seccionesPorProducto
+    : [{ tipo: productos?.[0]?.tipo, descripcionHTML: secciones[0]?.descripcionHTML || "", especificacionesHTML: secciones[0]?.especificacionesHTML || "" }];
+
+  // Paginación estimada: N páginas de producto + tabla + términos
+  const totalPagesEst = secsPorProd.length + 2;
+
+  const ClienteBlock = () => (
+    <View style={styles.datosCliente}>
+      <View style={styles.dataGrid}>
+        <View style={styles.dataCol}>
+          {(nombreCliente || cliente) && (
+            <Text style={styles.dataLine}><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
+          )}
+          {(clienteContacto || clienteEmail || clienteTelefono) && (
+            <Text style={styles.dataLine}><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
+          )}
+          {clienteNIT && (
+            <Text style={styles.dataLine}><Text style={styles.label}>NIT:</Text> {clienteNIT}</Text>
+          )}
+        </View>
+        <View style={styles.dataCol}>
+          {clienteCiudad && (
+            <Text style={[styles.dataLine, styles.rightAlign]}><Text style={styles.label}>Ciudad:</Text> {clienteCiudad}</Text>
+          )}
+          {(clienteEmail || clienteTelefono) && (
+            <Text style={[styles.dataLine, styles.rightAlign]}>
+              <Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}
+            </Text>
+          )}
+          <Text style={[styles.dataLine, styles.rightAlign]}>
+            <Text style={styles.label}>Productos:</Text> {(productos || []).length}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <Document>
-      <Page size="A4" style={[styles.page, { fontFamily: PDF_FONT_FAMILY }]} wrap>
-        <PdfHeader tipoProducto={tipoProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
-        <View style={styles.datosCliente}>
-          <View style={styles.dataGrid}>
-            <View style={styles.dataCol}>
-              {(nombreCliente || cliente) && (
-                <Text style={styles.dataLine}><Text style={styles.label}>Cliente:</Text> {nombreCliente || cliente}</Text>
-              )}
-              {(clienteContacto || clienteEmail || clienteTelefono) && (
-                <Text style={styles.dataLine}><Text style={styles.label}>Contacto:</Text> {clienteContacto || clienteEmail || clienteTelefono}</Text>
-              )}
-              {clienteNIT && (
-                <Text style={styles.dataLine}><Text style={styles.label}>NIT:</Text> {clienteNIT}</Text>
-              )}
-            </View>
-            <View style={styles.dataCol}>
-              {clienteCiudad && (
-                <Text style={[styles.dataLine, styles.rightAlign]}><Text style={styles.label}>Ciudad:</Text> {clienteCiudad}</Text>
-              )}
-              {(clienteEmail || clienteTelefono) && (
-                <Text style={[styles.dataLine, styles.rightAlign]}>
-                  <Text style={styles.label}>Datos:</Text> {[clienteEmail, clienteTelefono].filter(Boolean).join(' / ')}
-                </Text>
-              )}
-              <Text style={[styles.dataLine, styles.rightAlign]}><Text style={styles.label}>Producto:</Text> {tipoProducto}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.flexGrowContent}>
-          {descripcionHTML ? (
-            <View style={styles.htmlContentCompact}>
-              {parseHtmlToPDFComponents(descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
-            </View>
-          ) : null}
-          <SeccionHTML titulo="1. Especificaciones Técnicas" contenido={especificacionesHTML} compact dense fontScale={0.9} />
-          {placeImagesOnFirstPage && (
-            <ImageSection
-              titulo={imagenSectionTitle}
-              imagenSeleccionada={imagenSeleccionada}
-              imagenesMulti={imagenesMulti}
-            />
-          )}
-        </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={1} totalPages={3} />
-      </Page>
+      {/* Una página por producto */}
+      {secsPorProd.map((seccion, idx) => {
+        const imgOpt = imagenesOptimizadasPorProducto?.[idx] || {};
+        const imagenPrincipal = imgOpt.principal || null;
+        const imagenesExtras = imgOpt.extras || [];
+        const hasAnyImage = Boolean(imagenPrincipal) || imagenesExtras.length > 0;
 
+        return (
+          <Page key={idx} size="A4" style={[idx === 0 ? styles.page : styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
+            {idx === 0 ? (
+              <>
+                <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
+                <ClienteBlock />
+              </>
+            ) : (
+              <View style={{ marginBottom: T.spacing.sm }}>
+                <Text style={[styles.sectionTitle, { marginTop: 0 }]}>
+                  Producto {idx + 1}: {(seccion.tipo || 'PRODUCTO').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.flexGrowContent}>
+              {seccion.descripcionHTML ? (
+                <View style={styles.htmlContentCompact}>
+                  {parseHtmlToPDFComponents(seccion.descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
+                </View>
+              ) : null}
+              {seccion.especificacionesHTML ? (
+                <SeccionHTML titulo="Especificaciones Técnicas" contenido={seccion.especificacionesHTML} compact dense fontScale={0.9} />
+              ) : null}
+              {hasAnyImage && (
+                <ImageSection
+                  titulo="Imágenes de Referencia"
+                  imagenSeleccionada={imagenPrincipal}
+                  imagenesMulti={imagenesExtras}
+                />
+              )}
+            </View>
+            <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={idx + 1} totalPages={totalPagesEst} />
+          </Page>
+        );
+      })}
+
+      {/* Página tabla + condiciones comerciales */}
       <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
         <View style={styles.flexGrowContent}>
-          {!placeImagesOnFirstPage && hasAnyImage && (
-            <ImageSection
-              titulo={imagenSectionTitle}
-              imagenSeleccionada={imagenSeleccionada}
-              imagenesMulti={imagenesMulti}
-            />
-          )}
-          <Text minPresenceAhead={28} style={styles.sectionTitle}>{detalleIndex}. Detalle Económico</Text>
+          <Text minPresenceAhead={28} style={styles.sectionTitle}>Detalle Económico</Text>
           {convertirTablaHTMLaComponentes(tablaHTML, {
             summaryPanel: true,
             zebra: true,
@@ -620,16 +634,17 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
           })}
           <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
           <SeccionHTML
-            titulo={`${condicionesIndex}. Condiciones Comerciales`}
+            titulo="Condiciones Comerciales"
             contenido={condicionesHTML}
             compact
             dense
             fontScale={0.9}
           />
         </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={2} totalPages={3} />
+        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={secsPorProd.length + 1} totalPages={totalPagesEst} />
       </Page>
 
+      {/* Página términos y condiciones */}
       <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
         <View style={styles.flexGrowContent}>
           <View style={{ flexDirection: 'row', marginBottom: 4 }}>
@@ -640,7 +655,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
             </View>
           </View>
           <SeccionHTML
-            titulo={`${terminosIndex}. Términos y Condiciones Generales`}
+            titulo="Términos y Condiciones Generales"
             contenido={terminosHTML}
             compact
             dense
@@ -648,7 +663,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas }) {
           />
           <SignatureBlock />
         </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={3} totalPages={3} />
+        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={secsPorProd.length + 2} totalPages={totalPagesEst} />
       </Page>
     </Document>
   );
@@ -669,30 +684,37 @@ export async function generarPDFReact(cotizacion, estaEditando) {
     }
   }
 
-  const producto = cotizacion.productos?.[0];
-  const nombreImagen = cotizacion.imagenSeleccionada || producto?.imagen || '';
-  const imagenSeleccionadaSrc = nombreImagen ? (imagenesPorProducto[nombreImagen] || null) : null;
-  const imagenesMultiSrc = Array.isArray(cotizacion.imagenesSeleccionadas)
-    ? cotizacion.imagenesSeleccionadas.map(k => imagenesPorProducto[k]).filter(Boolean)
-    : [];
+  // Construir lista de imágenes por producto
+  // Nuevo formato: cotizacion.imagenesSeleccionadasPorProducto = [{principal, adicionales}]
+  // Backward compat: si no existe, usar imagenSeleccionada + imagenesSeleccionadas del primer producto
+  let seleccionesPorProd = cotizacion.imagenesSeleccionadasPorProducto;
+  if (!Array.isArray(seleccionesPorProd) || seleccionesPorProd.length === 0) {
+    const nombreImagen = cotizacion.imagenSeleccionada || cotizacion.productos?.[0]?.imagen || '';
+    const adicionales = Array.isArray(cotizacion.imagenesSeleccionadas) ? cotizacion.imagenesSeleccionadas : [];
+    seleccionesPorProd = [{ principal: nombreImagen || null, adicionales }];
+  }
 
-  let imagenesOptimizadas = undefined;
+  const opts = { maxWidth: 1000, maxHeight: 760, quality: 0.55, mimeType: 'image/jpeg' };
+  let imagenesOptimizadasPorProducto = [];
   try {
     await yieldToMainThread();
-    const opts = { maxWidth: 1000, maxHeight: 760, quality: 0.55, mimeType: 'image/jpeg' };
-    const [principal, ...extras] = await Promise.all([
-      imagenSeleccionadaSrc ? compressImageToDataURL(imagenSeleccionadaSrc, opts) : Promise.resolve(null),
-      ...imagenesMultiSrc.slice(0, 2).map(src => compressImageToDataURL(src, opts)),
-    ]);
-    if (principal || extras.length) {
-      imagenesOptimizadas = { principal, extras };
-    }
+    imagenesOptimizadasPorProducto = await Promise.all(
+      seleccionesPorProd.map(async ({ principal, adicionales = [] }) => {
+        const principalSrc = principal ? (imagenesPorProducto[principal] || null) : null;
+        const adicionalesSrc = adicionales.slice(0, 2).map(k => imagenesPorProducto[k]).filter(Boolean);
+        const [principalComp, ...extrasComp] = await Promise.all([
+          principalSrc ? compressImageToDataURL(principalSrc, opts) : Promise.resolve(null),
+          ...adicionalesSrc.map(src => compressImageToDataURL(src, opts)),
+        ]);
+        return { principal: principalComp, extras: extrasComp };
+      })
+    );
   } catch (e) {
     console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
   }
 
   await ensureFontsRegistered();
-  const doc = PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadas });
+  const doc = PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorProducto });
   const asPdf = pdf();
   asPdf.updateContainer(doc);
   await yieldToMainThread();
@@ -703,8 +725,10 @@ export async function generarPDFReact(cotizacion, estaEditando) {
   const mm = String(ahora.getMonth()+1).padStart(2,'0');
   const yyyy = String(ahora.getFullYear());
   const fechaCompacta = `${dd}-${mm}-${yyyy}`;
-  const primerProducto = cotizacion.productos?.[0]?.tipo || 'Producto';
-  const prodNorm = normalizarTitulo(primerProducto);
+  const productos = cotizacion.productos || [];
+  const prodNorm = productos.length > 1
+    ? productos.slice(0, 3).map(p => normalizarTitulo(p.tipo || 'Producto')).join('_')
+    : normalizarTitulo(productos[0]?.tipo || 'Producto');
   const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
   const empresaNorm = normalizarTitulo(empresaBase);
   const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
