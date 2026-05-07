@@ -14,9 +14,9 @@ import {
 
 const AuthContext = createContext(null);
 
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL ?? "").trim().toLowerCase();
+
 function getRequireLoginFlag() {
-  // Default: true (because the app now has login-gated sections)
-  // Set VITE_REQUIRE_LOGIN=false to disable during dev.
   return String(import.meta.env.VITE_REQUIRE_LOGIN ?? "true").toLowerCase() !== "false";
 }
 
@@ -35,9 +35,6 @@ export function AuthProvider({ children }) {
         if (nextUser && !nextUser.isAnonymous) {
           const ensured = await ensureUserProfileForLogin(nextUser);
           setProfile(ensured);
-        } else if (nextUser && nextUser.isAnonymous) {
-          // If anonymous auth is enabled, keep as "not logged" for gating.
-          setProfile(null);
         }
       } catch (e) {
         console.error("Error ensuring user profile:", e);
@@ -54,8 +51,14 @@ export function AuthProvider({ children }) {
 
   const roles = profile?.roles || [];
 
+  // El email del admin principal siempre tiene acceso completo
+  const isMainAdmin = Boolean(
+    user?.email && ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL
+  );
+
   const hasRole = (role) => {
     if (!role) return true;
+    if (isMainAdmin) return true;
     if (roles.includes("admin")) return true;
     return roles.includes(role);
   };
@@ -65,16 +68,25 @@ export function AuthProvider({ children }) {
     return Boolean(user && !user.isAnonymous);
   }, [requireLogin, user]);
 
+  // Usuario pendiente de aprobación (no puede usar la app)
+  const isPending = useMemo(() => {
+    if (!isLoggedIn) return false;
+    if (isMainAdmin) return false;                    // admin nunca queda bloqueado
+    return profile?.status === "pending";
+  }, [isLoggedIn, isMainAdmin, profile]);
+
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-
     try {
       await signInWithPopup(auth, provider);
     } catch (e) {
-      // Popup may fail in some contexts (Electron / blocked popups). Fallback to redirect.
       const code = e?.code;
-      if (code === "auth/popup-blocked" || code === "auth/popup-closed-by-user" || code === "auth/operation-not-supported-in-this-environment") {
+      if (
+        code === "auth/popup-blocked" ||
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/operation-not-supported-in-this-environment"
+      ) {
         await signInWithRedirect(auth, provider);
         return;
       }
@@ -101,12 +113,15 @@ export function AuthProvider({ children }) {
       loading,
       requireLogin,
       isLoggedIn,
+      isPending,
+      isMainAdmin,
       hasRole,
       signInWithGoogle,
       signOutUser,
       refreshProfile,
     }),
-    [user, profile, roles, loading, requireLogin, isLoggedIn]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, profile, roles, loading, requireLogin, isLoggedIn, isPending, isMainAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

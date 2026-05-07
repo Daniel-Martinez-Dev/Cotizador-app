@@ -22,8 +22,10 @@ import './data/catalogoProductos';
 
 function AppShell() {
   const { quoteData, setQuoteData, setResetToken, setEmpresaSeleccionada, setContactoSeleccionado } = useQuote();
-  const { user, signOutUser, hasRole } = useAuth();
-  const isAdminUser = ADMIN_EMAIL && (user?.email ?? "").toLowerCase() === ADMIN_EMAIL;
+  const { user, signOutUser, hasRole, isMainAdmin } = useAuth();
+  const isAdminUser = isMainAdmin || hasRole('admin');
+  const canProduccion = ENABLE_PRODUCCION && (isAdminUser || hasRole('produccion'));
+  const canInventario = ENABLE_INVENTARIO && (isAdminUser || hasRole('inventario'));
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem('theme') === 'dark';
@@ -86,12 +88,12 @@ function AppShell() {
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
       { to: '/', label: 'Cotizar', show: true },
-      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION && isAdminUser },
-      { to: '/inventario', label: 'Inventario', show: ENABLE_INVENTARIO },
+      { to: '/produccion', label: 'Producción', show: canProduccion },
+      { to: '/inventario', label: 'Inventario', show: canInventario },
       { to: '/productos', label: 'Productos', show: true },
       { to: '/historial', label: 'Historial', show: true },
       { to: '/empresas', label: 'Empresas', show: true },
-      { to: '/usuarios', label: 'Usuarios', show: hasRole('admin') },
+      { to: '/usuarios', label: 'Usuarios', show: isAdminUser },
     ].filter(l => l.show);
     return (
       <nav className="hidden md:flex items-center gap-2 ml-4">
@@ -121,12 +123,12 @@ function AppShell() {
     const links = [
       { to: '/dashboard', label: 'Inicio', show: true },
       { to: '/', label: 'Cotizar', show: true },
-      { to: '/produccion', label: 'Producción', show: ENABLE_PRODUCCION && isAdminUser },
-      { to: '/inventario', label: 'Inventario', show: ENABLE_INVENTARIO },
+      { to: '/produccion', label: 'Producción', show: canProduccion },
+      { to: '/inventario', label: 'Inventario', show: canInventario },
       { to: '/productos', label: 'Productos', show: true },
       { to: '/historial', label: 'Historial', show: true },
       { to: '/empresas', label: 'Empresas', show: true },
-      { to: '/usuarios', label: 'Usuarios', show: hasRole('admin') },
+      { to: '/usuarios', label: 'Usuarios', show: isAdminUser },
     ].filter(l => l.show);
     return (
       <>
@@ -263,7 +265,7 @@ export default function App(){
 
                 <Route path="/" element={<CotizadorApp />} />
                 <Route path="/preview" element={<PreviewPage />} />
-                <Route element={<ProtectedRoute requireEmail={ADMIN_EMAIL || undefined} />}>
+                <Route element={<ProtectedRoute requireRole="produccion" />}>
                   <Route
                     path="/produccion"
                     element={ENABLE_PRODUCCION ? <ProduccionPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'produccion' }} />}

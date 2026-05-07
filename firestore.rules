@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
+    // ─── Helpers base ──────────────────────────────────────────────────────────
 
     function isSignedIn() {
       return request.auth != null;
@@ -16,122 +16,145 @@ service cloud.firestore {
       return isSignedIn() && !isAnonymous();
     }
 
-    // Admin by email (propietario del sistema)
+    // ─── Perfil del usuario autenticado ────────────────────────────────────────
+
+    function userRef() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.uid);
+    }
+
+    function userExists() {
+      return isStaff() && exists(userRef());
+    }
+
+    function userDoc() {
+      return get(userRef()).data;
+    }
+
+    // Usuario con estado "active" en su perfil
+    function isActive() {
+      return userExists() && userDoc().get('status', 'pending') == 'active';
+    }
+
+    // Usuario con un rol específico en su array de roles
+    function hasRole(role) {
+      return userExists() && userDoc().get('roles', []).hasAny([role]);
+    }
+
+    // ─── Admin ─────────────────────────────────────────────────────────────────
+
+    // Admin por email del token (propietario del sistema, siempre activo)
     function isAdminEmail() {
       return isStaff() && request.auth.token.email == 'gerenciacchainservices@gmail.com';
     }
 
-    // Admin por rol en colección usuarios (para admins delegados)
+    // Admin por rol en el perfil
     function hasAdminRole() {
-      return isStaff() &&
-        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid))
-          .data.get('roles', []).hasAny(['admin']);
+      return userExists() && userDoc().get('roles', []).hasAny(['admin']);
     }
 
     function isAdmin() {
-      return isAdminEmail() || hasAdminRole();
+      return isAdminEmail() || (isStaff() && hasAdminRole());
     }
 
-    function isOwner(uid) {
-      return isStaff() && request.auth.uid == uid;
+    // ─── Usuario activo (no pendiente) ─────────────────────────────────────────
+    // Cualquier staff activo o el admin-email (que no necesita perfil en DB)
+
+    function isActiveStaff() {
+      return isAdmin() || (isStaff() && isActive());
     }
 
-    // ─── Cotizaciones (Row-Level Security por usuario) ─────────────────────────
+    // ─── Cotizaciones ──────────────────────────────────────────────────────────
     match /cotizaciones/{cotId} {
-      // Admin ve todo; usuario solo ve sus propias; docs legacy (sin uid) solo admin
-      allow read: if isStaff() && (
+      allow read: if isActiveStaff() && (
         isAdmin() ||
         ('uid' in resource.data && resource.data.uid == request.auth.uid) ||
-        !('uid' in resource.data)  // docs legados: acceso temporal hasta migración
+        !('uid' in resource.data)
       );
-      // Al crear, el uid del doc debe coincidir con el usuario autenticado
-      allow create: if isStaff() && (
+      allow create: if isActiveStaff() && (
         !('uid' in request.resource.data) ||
         request.resource.data.uid == request.auth.uid
       );
-      // Solo el dueño o admin puede editar/eliminar
-      allow update, delete: if isStaff() && (
+      allow update, delete: if isActiveStaff() && (
         isAdmin() ||
         ('uid' in resource.data && resource.data.uid == request.auth.uid)
       );
     }
 
-    // ─── Perfiles de usuario ────────────────────────────────────────────────────
+    // ─── Perfiles de usuario ───────────────────────────────────────────────────
     match /usuarios/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create: if isOwner(uid) || isAdmin();
-      allow update: if isOwner(uid) || isAdmin();
+      // Lectura: el propio usuario puede ver su perfil (para saber si está pendiente)
+      allow read: if isStaff() && (request.auth.uid == uid || isAdmin());
+      allow create: if isStaff() && (request.auth.uid == uid || isAdmin());
+      allow update: if isStaff() && (request.auth.uid == uid || isAdmin());
       allow delete: if isAdmin();
     }
 
-    // Índice por email (lookup de perfil por email)
+    // Índice por email
     match /usuarios_email/{emailKey} {
       allow read: if isStaff();
-      allow write: if isStaff(); // cada usuario crea/actualiza su propio registro
+      allow write: if isStaff();
     }
 
-    // ─── Empresas y Contactos (recurso compartido del equipo) ───────────────────
+    // ─── Empresas y Contactos ──────────────────────────────────────────────────
     match /empresas/{empresaId} {
-      allow read: if isStaff();
-      allow create, update: if isStaff();
+      allow read: if isActiveStaff();
+      allow create, update: if isActiveStaff();
       allow delete: if isAdmin();
 
       match /contactos/{contactoId} {
-        allow read: if isStaff();
-        allow create, update: if isStaff();
+        allow read: if isActiveStaff();
+        allow create, update: if isActiveStaff();
         allow delete: if isAdmin();
       }
     }
 
-    // ─── Contador de número de cotización ───────────────────────────────────────
+    // ─── Contadores de numeración ──────────────────────────────────────────────
     match /counters/{counterId} {
-      allow read: if isStaff();
-      allow write: if isStaff();
+      allow read: if isActiveStaff();
+      allow write: if isActiveStaff();
     }
 
-    // Alias alternativo que usen algunos módulos
     match /quoteCounters/{docId} {
-      allow read: if isStaff();
-      allow write: if isStaff();
+      allow read: if isActiveStaff();
+      allow write: if isActiveStaff();
     }
 
-    // ─── Producción: solo el administrador propietario ──────────────────────────
+    // ─── Producción: admin o usuario con rol "produccion" ──────────────────────
     match /produccion/{docId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
     }
 
     match /produccion/{docId}/{subCol}/{subId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
     }
 
-    // ─── Inventario: solo administradores ───────────────────────────────────────
+    // ─── Inventario: admin o usuario con rol "inventario" ─────────────────────
     match /inventario/{docId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
     match /inventario/{docId}/{subCol}/{subId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
-    // ─── Configuración de precios: lectura para staff, escritura solo admin ─────
+    // ─── Configuración de precios ──────────────────────────────────────────────
     match /pricingConfig/{docId} {
-      allow read: if isStaff();
+      allow read: if isActiveStaff();
       allow write: if isAdmin();
     }
 
     match /configuracion/{docId} {
-      allow read: if isStaff();
+      allow read: if isActiveStaff();
       allow write: if isAdmin();
     }
 
-    // ─── Catálogo de productos: lectura para staff, escritura solo admin ────────
+    // ─── Catálogo de productos ────────────────────────────────────────────────
     match /productos/{docId} {
-      allow read: if isStaff();
+      allow read: if isActiveStaff();
       allow write: if isAdmin();
     }
 
-    // ─── Catch-all: admin tiene acceso total; todo lo demás denegado ────────────
+    // ─── Catch-all: admin accede a todo; todo lo demás denegado ───────────────
     match /{document=**} {
       allow read, write: if isAdmin();
     }
