@@ -18,6 +18,9 @@ import { guardarCotizacionEnFirebase } from "./firebaseQuotes";
 import { convertirTablaHTMLaComponentes } from "./tablaPDFParser";
 import { pdfTheme } from './pdfTheme';
 import toast from "react-hot-toast";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
@@ -659,7 +662,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
             contenido={terminosHTML}
             compact
             dense
-            fontScale={0.9}
+            fontScale={0.78}
           />
           <SignatureBlock />
         </View>
@@ -732,12 +735,46 @@ export async function generarPDFReact(cotizacion, estaEditando) {
   const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
   const empresaNorm = normalizarTitulo(empresaBase);
   const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
-  const link = document.createElement("a");
-  const objectUrl = URL.createObjectURL(blob);
-  link.href = objectUrl;
-  link.download = nombreArchivo;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+  if (Capacitor.isNativePlatform()) {
+    // Android: guardar en almacenamiento del dispositivo y compartir
+    const base64 = await blobToBase64(blob);
+    await Filesystem.writeFile({
+      path: nombreArchivo,
+      data: base64,
+      directory: Directory.Cache,
+    });
+    const { uri } = await Filesystem.getUri({
+      path: nombreArchivo,
+      directory: Directory.Cache,
+    });
+    await Share.share({
+      title: nombreArchivo,
+      url: uri,
+      dialogTitle: "Guardar o compartir cotización",
+    });
+  } else {
+    // Web / Electron: descarga estándar del navegador
+    const link = document.createElement("a");
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = nombreArchivo;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // El resultado viene como "data:application/pdf;base64,XXXX"
+      // Capacitor Filesystem necesita solo la parte base64
+      const base64 = reader.result.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
