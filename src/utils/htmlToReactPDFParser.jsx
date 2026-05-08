@@ -301,12 +301,12 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         if (className && className.includes('term-item')) {
           const children = [...node.children];
           return (
-            <View key={index} style={{ marginTop: 0.5, marginBottom: 8 }}>
+            <View key={index} style={{ marginTop: 0.5, marginBottom: 4 }}>
               {children.map((child, i) => {
                 if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
                   const isTitle = !!child.querySelector && !!child.querySelector('strong');
                   return (
-                    <View key={i} style={{ marginBottom: isTitle ? 2 : 3.2 }}>
+                    <View key={i} style={{ marginBottom: isTitle ? 1 : 1.8 }}>
                       <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
                         {parseChildren(child)}
                       </Text>
@@ -324,13 +324,13 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         }
         if (className && className.includes('terms-compact')) {
           return (
-            <View key={index} style={{ marginTop: 0.5, marginBottom: 2.0 }}>
+            <View key={index} style={{ marginTop: 0.5, marginBottom: 0.5 }}>
               {[...node.children].map((child, i) => {
                 const childClass = child.getAttribute && child.getAttribute('class');
                 if (child.nodeName && child.nodeName.toLowerCase() === 'p') {
                   return (
-                    <View key={i} style={{ marginBottom: 5 }}>
-                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.45) }}>
+                    <View key={i} style={{ marginBottom: 2 }}>
+                      <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: readable ? readableLineHeight : Math.max(s.paragraph.lineHeight, 1.3) }}>
                         {parseChildren(child)}
                       </Text>
                     </View>
@@ -338,13 +338,13 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
                 }
                 if (childClass && childClass.includes('terms-compact')) {
                   return (
-                    <View key={i} style={{ marginBottom: 5 }}>
+                    <View key={i} style={{ marginBottom: 2 }}>
                       {processNode(child, i)}
                     </View>
                   );
                 }
                 return (
-                  <View key={i} style={{ marginBottom: 5 }}>
+                  <View key={i} style={{ marginBottom: 2 }}>
                     {processNode(child, i)}
                   </View>
                 );
