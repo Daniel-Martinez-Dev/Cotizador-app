@@ -1,6 +1,6 @@
 // src/components/RichTextEditor.jsx
 import React from "react";
-import ReactQuill from "react-quill";
+import ReactQuill from "react-quill-new";
 
 export default function RichTextEditor({ value, onChange }) {
   return (
@@ -24,7 +24,6 @@ export default function RichTextEditor({ value, onChange }) {
           "italic",
           "underline",
           "list",
-          "bullet",
           "link",
         ]}
       />

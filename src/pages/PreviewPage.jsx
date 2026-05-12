@@ -7,8 +7,8 @@ import { generarSeccionesHTML, generarSeccionesPorProducto } from "../utils/html
 import { sanitizeHtml } from "../utils/sanitizeHtml";
 import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
 import toast from "react-hot-toast";
-import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 
 function generarTituloCompacto(productos) {
@@ -23,7 +23,7 @@ function generarTituloCompacto(productos) {
 export default function PreviewPage() {
   const { quoteData, setQuoteData,
     empresas, setEmpresas, empresaSeleccionada, setEmpresaSeleccionada, contactoSeleccionado, setContactoSeleccionado, confirm,
-    setImagenSeleccionada, setImagenesSeleccionadas } = useQuote();
+    setImagenSeleccionada, setImagenesSeleccionadas, productosOverride } = useQuote();
   const navigate = useNavigate();
 
   // --- Estado de edición por producto ---
@@ -60,14 +60,14 @@ export default function PreviewPage() {
   useEffect(() => {
     if (!quoteData?.productos) return;
     try {
-      const porProducto = generarSeccionesPorProducto(quoteData);
+      const porProducto = generarSeccionesPorProducto(quoteData, productosOverride);
       setEdicionesPorProducto(porProducto.map(s => ({
         tipo: s.tipo,
         descripcionHTML: sanitizeHtml(s.descripcionHTML || ""),
         especificacionesHTML: sanitizeHtml(s.especificacionesHTML || ""),
       })));
 
-      const compartidas = generarSeccionesHTML(quoteData, 0);
+      const compartidas = generarSeccionesHTML(quoteData, 0, productosOverride);
       setEdicionesCompartidas({
         condicionesHTML: sanitizeHtml(compartidas.condicionesHTML || ""),
         terminosHTML: sanitizeHtml(compartidas.terminosHTML || ""),
@@ -77,13 +77,13 @@ export default function PreviewPage() {
     } catch (e) {
       console.error("Error generando secciones HTML:", e);
     }
-  }, [quoteData]);
+  }, [quoteData, productosOverride]);
 
   // --- Regenerar condicionesHTML al cambiar el índice del producto ---
   useEffect(() => {
     if (!quoteData?.productos) return;
     try {
-      const compartidas = generarSeccionesHTML(quoteData, condicionesProductoIndex);
+      const compartidas = generarSeccionesHTML(quoteData, condicionesProductoIndex, productosOverride);
       setEdicionesCompartidas(prev => ({
         ...prev,
         condicionesHTML: sanitizeHtml(compartidas.condicionesHTML || ""),
@@ -288,7 +288,7 @@ export default function PreviewPage() {
         ) : (
           <div>
             <div
-              className="mb-3 prose max-w-none text-gray-700"
+              className="mb-3 prose max-w-none text-gray-700 overflow-x-auto"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
             />
             <button
@@ -333,7 +333,7 @@ export default function PreviewPage() {
         ) : (
           <div>
             <div
-              className="mb-3 prose max-w-none text-gray-700"
+              className="mb-3 prose max-w-none text-gray-700 overflow-x-auto"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
             />
             <button
@@ -491,7 +491,7 @@ export default function PreviewPage() {
       }));
 
       // Tabla siempre regenerada desde quoteData (no editable)
-      const { tablaHTML } = generarSeccionesHTML(quoteData, condicionesProductoIndex);
+      const { tablaHTML } = generarSeccionesHTML(quoteData, condicionesProductoIndex, productosOverride);
 
       const safeCompartidas = {
         tablaHTML,
@@ -546,7 +546,7 @@ export default function PreviewPage() {
   const productos = quoteData?.productos || [];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-28 lg:pb-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-28 lg:pb-8 text-gray-900 dark:text-gray-100 overflow-x-hidden">
 
       {/* Hero header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl p-6 mb-6 shadow-lg">
@@ -571,7 +571,7 @@ export default function PreviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
 
         {/* LEFT: all sections */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0 overflow-x-hidden">
 
           {/* Título del PDF */}
           <div className="group relative bg-white shadow-md rounded-2xl p-6 border border-gray-200 force-light">

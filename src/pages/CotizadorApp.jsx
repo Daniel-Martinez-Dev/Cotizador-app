@@ -53,7 +53,8 @@ const crearProductoInicial = () => ({
 export default function CotizadorApp(){
   const { quoteData, setQuoteData,
     empresas, setEmpresas, empresaSeleccionada, setEmpresaSeleccionada, contactoSeleccionado, setContactoSeleccionado,
-    matricesOverride, extrasOverride, resetToken, setResetToken } = useQuote();
+    matricesOverride, extrasOverride, productosOverride,
+    productosDB, resetToken, setResetToken } = useQuote();
   const navigate = useNavigate();
 
   const [productos, setProductos] = useState([crearProductoInicial()]);
@@ -124,7 +125,7 @@ export default function CotizadorApp(){
   // Sincronizar collapsed
   useEffect(()=>{ setCollapsed(prev=> productos.map((_,i)=> prev[i]??false)); }, [productos.length]);
   // Alertas rango
-  useEffect(()=>{ const nuevas=productos.map(p=> validarRangoProducto(p,{ matricesOverride })); setAlertas(nuevas); }, [productos, matricesOverride]);
+  useEffect(()=>{ const nuevas=productos.map(p=> validarRangoProducto(p,{ matricesOverride, productosOverride })); setAlertas(nuevas); }, [productos, matricesOverride, productosOverride]);
 
   const handleAgregarProducto = ()=>{
     const baseCliente = productos[0]?.cliente || 'Cliente Final Contado';
@@ -177,7 +178,7 @@ export default function CotizadorApp(){
   const handleChangeCantidadExtraPersonalizado = (ip, idx,val)=> setProductos(p=>{ const n=[...p]; n[ip].extrasPersonalizadosCant={...(n[ip].extrasPersonalizadosCant||{}), [idx]:val}; return n;});
 
   // Precios
-  const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); const r=getPrecioProducto(p,{ matricesOverride }); return r.ajustado; };
+  const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); const r=getPrecioProducto(p,{ matricesOverride, productosOverride }); return r.ajustado; };
   const calcularSubtotalExtras = (p)=>{ const {tipo, cliente, extras=[], extrasCantidades={}, extrasPersonalizados=[], extrasPersonalizadosCant={}}=p; let subtotal=0; const lista=getExtrasPorTipo(tipo, extrasOverride); for(const nombre of extras){ const ex=lista.find(e=> e.nombre===nombre); if(ex){ const cant=parseInt(extrasCantidades[nombre])||1; subtotal += cant * (ex.precioDistribuidor || ex.precioCliente ? (cliente==='Distribuidor' ? (ex.precioDistribuidor||0) : (ex.precioCliente||0)) : (ex.precio||0)); } } for(const idx in extrasPersonalizados){ const ex=extrasPersonalizados[idx]; const cant=parseInt(extrasPersonalizadosCant[idx])||1; subtotal += cant*(ex.precio||0);} return redondear5000(subtotal); };
 
   // Estados para entradas libres (combobox)
@@ -440,7 +441,7 @@ export default function CotizadorApp(){
                       <div className="space-y-2">
                         <label className="block text-xs font-semibold tracking-wide uppercase">Producto</label>
                         <select value={producto.tipo} onChange={e=> handleChangeProducto(i,'tipo', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
-                          {[...PRODUCTOS_ACTIVOS, 'Productos Personalizados', 'Repuestos'].map(t=> <option key={t} value={t}>{t}</option>)}
+                          {[...(productosDB.length > 0 ? productosDB.filter(p=>p.activo!==false).map(p=>p.etiqueta) : PRODUCTOS_ACTIVOS), 'Productos Personalizados', 'Repuestos'].map(t=> <option key={t} value={t}>{t}</option>)}
                         </select>
                         {(producto.tipo==='Productos Personalizados'||producto.tipo==='Repuestos') && <p className="text-[11px] text-yellow-600 dark:text-trafico mt-1">Sin precio automático. Ingrese precio manual.</p>}
                         {(producto.tipo==='Productos Personalizados'||producto.tipo==='Repuestos') && (
@@ -459,28 +460,34 @@ export default function CotizadorApp(){
                       {getConfigProducto(producto.tipo)?.requiereMedidas && (
                         <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Alto (mm)</label><input type="number" value={producto.alto} onChange={e=> handleChangeProducto(i,'alto', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Alto" /></div>
                       )}
-                      {producto.tipo === 'Semáforo para Muelles de Carga' && (
-                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Variante</label>
-                          <select value={producto.varianteSemaforo||'sencillo'} onChange={e=> handleChangeProducto(i,'varianteSemaforo', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
-                            <option value="sencillo">Semáforo Sencillo (1 semáforo)</option>
-                            <option value="doble">Semáforo Doble (2 semáforos)</option>
-                            <option value="doble_sensor">Semáforo Doble con Sensor</option>
-                          </select>
-                        </div>
-                      )}
+                      {producto.tipo === 'Semáforo para Muelles de Carga' && (() => {
+                        const variantesDB = productosOverride['Semáforo para Muelles de Carga']?.variantes || getConfigProducto('Semáforo para Muelles de Carga')?.variantes || [];
+                        return (
+                          <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Variante</label>
+                            <select value={producto.varianteSemaforo||variantesDB[0]?.id||'sencillo'} onChange={e=> handleChangeProducto(i,'varianteSemaforo', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
+                              {variantesDB.map(v => <option key={v.id} value={v.id}>{v.nombre} — ${(v.precio||0).toLocaleString('es-CO')}</option>)}
+                            </select>
+                          </div>
+                        );
+                      })()}
                       {producto.tipo === 'Lámpara Industrial' && (
                         <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Modelo</label>
                           <input disabled value="LED 50W" className="w-full border p-2 rounded bg-gray-100 dark:bg-gris-800 dark:border-gris-700 text-gray-600 dark:text-gray-400" />
                         </div>
                       )}
-                      {producto.tipo === 'Cortina Thermofilm' && (
-                        <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Instalación</label>
-                          <select value={producto.conInstalacion? 'si':'no'} onChange={e=> handleChangeProducto(i,'conInstalacion', e.target.value==='si')} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
-                            <option value="si">Con instalación (180.000 / m²)</option>
-                            <option value="no">Sin instalación (175.000 / m²)</option>
-                          </select>
-                        </div>
-                      )}
+                      {producto.tipo === 'Cortina Thermofilm' && (() => {
+                        const dbT = productosOverride['Cortina Thermofilm'];
+                        const precioConIns = (dbT?.precioPorM2ConInstalacion ?? 180000).toLocaleString('es-CO');
+                        const precioSinIns = (dbT?.precioPorM2SinInstalacion ?? 175000).toLocaleString('es-CO');
+                        return (
+                          <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Instalación</label>
+                            <select value={producto.conInstalacion? 'si':'no'} onChange={e=> handleChangeProducto(i,'conInstalacion', e.target.value==='si')} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600">
+                              <option value="si">Con instalación ({precioConIns} / m²)</option>
+                              <option value="no">Sin instalación ({precioSinIns} / m²)</option>
+                            </select>
+                          </div>
+                        );
+                      })()}
                       <div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Información Adicional</label><input type="text" value={producto.infoAdicional||''} onChange={e=> handleChangeProducto(i,'infoAdicional', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="(Ej: Muelle 3, Placa 5, Zona Fría)" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>

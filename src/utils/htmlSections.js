@@ -4,12 +4,12 @@ import { formatearPesos } from "./formatos";
 import { EXTRAS_POR_DEFECTO } from "../data/precios"; // legacy fallback
 import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtrasPorTipo } from '../data/catalogoProductos';
 
-export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0) {
-  const descripcionHTML = generarDescripcion(cotizacion);
-  const especificacionesHTML = generarEspecificaciones(cotizacion);
-  const tablaHTML = generarTablaPrecios(cotizacion);
+export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0, productosOverride = {}) {
+  const descripcionHTML = generarDescripcion(cotizacion, productosOverride);
+  const especificacionesHTML = generarEspecificaciones(cotizacion, productosOverride);
+  const tablaHTML = generarTablaPrecios(cotizacion, productosOverride);
 
-  const condicionesHTML = generarCondicionesComerciales(cotizacion, condicionesProductoIndex);
+  const condicionesHTML = generarCondicionesComerciales(cotizacion, condicionesProductoIndex, productosOverride);
   const terminosHTML = generarTerminosGenerales(cotizacion);
 
   return {
@@ -21,13 +21,13 @@ export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0) {
   };
 }
 
-export function generarSeccionesPorProducto(cotizacion) {
+export function generarSeccionesPorProducto(cotizacion, productosOverride = {}) {
   return (cotizacion.productos || []).map((prod) => {
     const cotSingle = { ...cotizacion, productos: [prod] };
     return {
       tipo: prod.tipo,
-      descripcionHTML: generarDescripcion(cotSingle),
-      especificacionesHTML: generarEspecificaciones(cotSingle),
+      descripcionHTML: generarDescripcion(cotSingle, productosOverride),
+      especificacionesHTML: generarEspecificaciones(cotSingle, productosOverride),
     };
   });
 }
@@ -38,16 +38,16 @@ const p = (text) => `<p>${text}</p>`;
 const termBlock = (title, body) => `<div class="term-item"><p><strong>${title}</strong></p><p>${body}</p></div>`;
 const termGroup = (html) => `<div class="terms-compact">${html}</div>`;
 
-function generarDescripcion(cot) {
+function generarDescripcion(cot, productosOverride = {}) {
   const tipo = cot.productos[0]?.tipo;
-  const descCatalogo = getDescripcionGeneral(tipo);
-  if(descCatalogo) return `<p>${descCatalogo}</p>`;
+  const desc = productosOverride[tipo]?.descripcionGeneral || getDescripcionGeneral(tipo);
+  if(desc) return `<p>${desc}</p>`;
   return "";
 }
 
-function generarEspecificaciones(cot) {
+function generarEspecificaciones(cot, productosOverride = {}) {
   const tipo = cot.productos[0]?.tipo;
-  let raw = getEspecificacionesHTML(tipo);
+  let raw = productosOverride[tipo]?.especificacionesHTML || getEspecificacionesHTML(tipo);
   if(!raw) return '';
   raw = raw.replace(/&nbsp;/gi, ' ');
   raw = raw.replace(/<ul(?![^>]*condiciones-compactas)/gi, '<ul class="condiciones-compactas espec-compactas"');
@@ -63,7 +63,7 @@ function generarEspecificaciones(cot) {
   return raw;
 }
 
-function generarTablaPrecios(cot) {
+function generarTablaPrecios(cot, productosOverride = {}) {
   let html = `
     <table style="width:100%; border-collapse: collapse; font-size: 13px;">
       <thead>
@@ -76,6 +76,9 @@ function generarTablaPrecios(cot) {
       </thead>
       <tbody>
   `;
+
+  const extrasOverridePorTipo = {};
+  Object.entries(productosOverride).forEach(([k, v]) => { if (v?.extras?.length) extrasOverridePorTipo[k] = v.extras; });
 
   cot.productos.forEach((prod) => {
     const cantidad = parseInt(prod.cantidad) || 1;
@@ -135,7 +138,7 @@ function generarTablaPrecios(cot) {
     }
 
   // === Extras por defecto ===
-  const listaExtras = getExtrasPorTipo(prod.tipo) || EXTRAS_POR_DEFECTO[prod.tipo] || [];
+    const listaExtras = getExtrasPorTipo(prod.tipo, extrasOverridePorTipo) || EXTRAS_POR_DEFECTO[prod.tipo] || [];
     if (Array.isArray(prod.extras)) {
       prod.extras.forEach((nombreExtra) => {
         const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
@@ -253,15 +256,17 @@ function generarTablaPrecios(cot) {
 
 
 
-function generarCondicionesComerciales(cot, indiceProducto = 0) {
+export function generarCondicionesComerciales(cot, indiceProducto = 0, productosOverride = {}) {
   const primerTipo = cot.productos?.[indiceProducto]?.tipo || cot.productos?.[0]?.tipo || "";
+  const condicionesDB = productosOverride[primerTipo]?.condicionesComerciales;
+  if (condicionesDB) return condicionesDB;
   const liCond = (arr) => `<ul class='condiciones-compactas'>${arr.map(txt=>`<li>${txt}</li>`).join('')}</ul>`;
   // Condiciones específicas para Sello de Andén
   if (primerTipo === "Sello de Andén") {
     return liCond([
       '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
       '<strong>Tiempo de entrega:</strong> 10 días hábiles a partir del anticipo confirmado.',
-      '<strong>Vigencia de la oferta:</strong> 30 días calendario desde la fecha de emisión.',
+      '<strong>Vigencia de la oferta:</strong> Hasta el 30 de junio del 2026.',
       '<strong>Garantía:</strong> 12 meses contra defectos de fabricación.',
       '<strong>Incluye:</strong> Sello de andén según dimensiones, postes laterales, cortina y/o travesaño, y platinas de anclaje.',
       '<strong>No incluye (en caso de contratar instalación):</strong> Obra civil, adecuaciones del vano, topes de caucho, ni acompañamiento SYSO (estos se cotizan aparte en caso de ser requeridos).',
@@ -281,7 +286,7 @@ function generarCondicionesComerciales(cot, indiceProducto = 0) {
     return liCond([
       '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
       `<strong>Tiempo de entrega:</strong> ${tiempoEntrega}`,
-      '<strong>Vigencia de la oferta:</strong> 30 días calendario.',
+      '<strong>Vigencia de la oferta:</strong> Hasta el 30 de junio del 2026.',
       `<strong>Garantía:</strong> 12 meses contra defectos de fabricación. No cubre desgaste por uso, cortes en lona, exposición a químicos no compatibles, golpes o falta de mantenimiento.${garantiaInflable}`,
       '<strong>Incluye:</strong> Abrigo retráctil según modelo, estructura metálica, lona perimetral y bandas frontales.',
       '<strong>No incluye (en caso de contratar instalación):</strong> Obras civiles, canalizaciones, refuerzos de muro, sistemas eléctricos, ni acompañamiento SYSO, el cual deberá cotizarse por separado en caso de ser requerido.',
@@ -294,7 +299,7 @@ function generarCondicionesComerciales(cot, indiceProducto = 0) {
   (Boolean(cot.incluyeInstalacion) ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas. El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro.' : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro. Si se requiere instalación, deberá solicitarse y cotizarse por separado.'),
       `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo con la orden y 50% antes del despacho / instalación.'}`,
       `<strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || '15 días hábiles contados a partir de anticipo efectivo y confirmación de planos firmados.'}`,
-      `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || '30 días calendario desde la fecha de emisión.'}`,
+      `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || 'Hasta el 30 de junio del 2026.'}`,
       `<strong>Garantía:</strong> ${cot.garantia || '12 meses contra defectos de fabricación (motor y componentes electrónicos). Leer Términos y Condiciones.'}`,
       '<strong>Incluye:</strong> Puerta rápida enrollable según especificaciones, estructura autoportante, motor y tablero de control, elementos de seguridad y acceso descritos, manual básico de operación.',
       '<strong>No incluye:</strong> Acometida eléctrica hasta el punto de conexión, canalizaciones, adecuaciones civiles del vano, obras de refuerzo, sistemas de puesta a tierra, dispositivos adicionales no especificados.',
@@ -317,10 +322,15 @@ function generarCondicionesComerciales(cot, indiceProducto = 0) {
     alcance,
     `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo contra orden de compra y 50% para retiro en planta.'}`,
     `<strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || '15 días hábiles contados a partir de anticipo efectivo.'}`,
-    `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || '30 días calendario desde la fecha de emisión.'}`,
+    `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || 'Hasta el 30 de junio del 2026.'}`,
     `<strong>Garantía:</strong> ${cot.garantia || '12 meses contra defectos de fabricación.'}`
   ];
   return liCond(itemsGenericos);
+}
+
+export function generarTerminosGeneralesHTML() {
+  const mockCot = {};
+  return generarTerminosGenerales(mockCot);
 }
 
 function generarTerminosGenerales(cot) {

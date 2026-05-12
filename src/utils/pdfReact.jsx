@@ -365,7 +365,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
           <View style={styles.quoteMeta}>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Cotización:</Text> #{numeroCotizacion}</Text>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Fecha:</Text> {fecha}</Text>
-            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> 30 días calendario</Text>
+            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> Hasta el 30 de junio del 2026</Text>
             <Text style={[styles.quoteMetaLine, { marginBottom: 0 }]}><Text style={styles.quoteMetaLabel}>Asesor:</Text> Santiago Martinez</Text>
           </View>
         </View>
@@ -396,8 +396,8 @@ function ImageSection({ imagenSeleccionada, imagenesMulti, titulo }) {
   else widthPct = '32%';
 
   return (
-    <View>
-      <Text minPresenceAhead={24} style={styles.sectionTitle}>{titulo}</Text>
+    <View wrap={false}>
+      <Text style={styles.sectionTitle}>{titulo}</Text>
       <View style={styles.imageGrid}>
         {imagenSeleccionada && (
           <View style={[styles.imageCard, { width: widthPct, marginHorizontal: total === 1 ? 'auto' : 0 }]}>
@@ -442,10 +442,7 @@ function ValidityCallout() {
           width: '56%',
         }}>
           <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-            Oferta válida por 30 días calendario desde la fecha de emisión.
-          </Text>
-          <Text style={{ fontSize: 8, color: T.colors.calloutText }}>
-            Precios sujetos a variación de TRM y disponibilidad de materiales.
+            Oferta válida hasta el 30 de junio del 2026.
           </Text>
         </View>
       </View>
@@ -523,16 +520,11 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
     .map(p => p.tipo?.toUpperCase?.() || "PRODUCTO")
     .join(", "));
 
-  // Secciones compartidas (tabla, condiciones, términos)
   const { tablaHTML = "", condicionesHTML = "", terminosHTML = "" } = secciones[0] || {};
 
-  // Si no hay seccionesPorProducto (backward compat), construir desde secciones[0]
   const secsPorProd = seccionesPorProducto.length > 0
     ? seccionesPorProducto
     : [{ tipo: productos?.[0]?.tipo, descripcionHTML: secciones[0]?.descripcionHTML || "", especificacionesHTML: secciones[0]?.especificacionesHTML || "" }];
-
-  // Paginación estimada: N páginas de producto + tabla + términos
-  const totalPagesEst = secsPorProd.length + 2;
 
   const ClienteBlock = () => (
     <View style={styles.datosCliente}>
@@ -567,28 +559,50 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
 
   return (
     <Document>
-      {/* Una página por producto */}
-      {secsPorProd.map((seccion, idx) => {
-        const imgOpt = imagenesOptimizadasPorProducto?.[idx] || {};
-        const imagenPrincipal = imgOpt.principal || null;
-        const imagenesExtras = imgOpt.extras || [];
-        const hasAnyImage = Boolean(imagenPrincipal) || imagenesExtras.length > 0;
+      <Page size="A4" style={[styles.page, { fontFamily: PDF_FONT_FAMILY, paddingBottom: 38 }]} wrap>
 
-        return (
-          <Page key={idx} size="A4" style={[idx === 0 ? styles.page : styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
-            {idx === 0 ? (
-              <>
-                <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
-                <ClienteBlock />
-              </>
-            ) : (
-              <View style={{ marginBottom: T.spacing.sm }}>
-                <Text style={[styles.sectionTitle, { marginTop: 0 }]}>
+        {/* Footer fijo en todas las páginas con paginación real */}
+        <View
+          fixed
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            paddingHorizontal: T.page.marginHorizontal,
+            paddingTop: 4,
+            paddingBottom: 7,
+            borderTopWidth: 1,
+            borderTopColor: T.colors.sectionDivider,
+          }}
+        >
+          <View style={{ height: 1.5, backgroundColor: T.colors.accent, marginBottom: T.spacing.xxs }} />
+          <Text
+            style={[styles.footerText, { textAlign: 'center' }]}
+            render={({ pageNumber, totalPages }) =>
+              `Cotización #${numeroCotizacion} generada por Cold Chain Services S.A.S. | www.ccservices.com.co | Tel. 300 858 2709 | santiago.martinez@ccservices.com.co | Pág. ${pageNumber} / ${totalPages}`
+            }
+          />
+        </View>
+
+        {/* Encabezado (solo aparece en página 1 por estar al inicio del flujo) */}
+        <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
+        <ClienteBlock />
+
+        {/* Secciones de productos — fluyen naturalmente */}
+        {secsPorProd.map((seccion, idx) => {
+          const imgOpt = imagenesOptimizadasPorProducto?.[idx] || {};
+          const imagenPrincipal = imgOpt.principal || null;
+          const imagenesExtras = imgOpt.extras || [];
+          const hasAnyImage = Boolean(imagenPrincipal) || imagenesExtras.length > 0;
+
+          return (
+            <View key={idx}>
+              {idx > 0 && (
+                <Text style={[styles.sectionTitle, { marginTop: T.spacing.sectionGap }]}>
                   Producto {idx + 1}: {(seccion.tipo || 'PRODUCTO').toUpperCase()}
                 </Text>
-              </View>
-            )}
-            <View style={styles.flexGrowContent}>
+              )}
               {seccion.descripcionHTML ? (
                 <View style={styles.htmlContentCompact}>
                   {parseHtmlToPDFComponents(seccion.descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
@@ -605,68 +619,59 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
                 />
               )}
             </View>
-            <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={idx + 1} totalPages={totalPagesEst} />
-          </Page>
-        );
-      })}
+          );
+        })}
 
-      {/* Página tabla + condiciones comerciales */}
-      <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
-        <View style={styles.flexGrowContent}>
-          <Text minPresenceAhead={28} style={styles.sectionTitle}>Detalle Económico</Text>
-          {convertirTablaHTMLaComponentes(tablaHTML, {
-            summaryPanel: true,
-            zebra: true,
-            currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
-            leftPanel: (
-              <View style={{
-                backgroundColor: T.colors.calloutBg,
-                borderLeftWidth: 3,
-                borderLeftColor: T.colors.accent,
-                borderRadius: T.radius.sm,
-                padding: 9,
-              }}>
-                <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-                  Oferta válida por 30 días calendario desde la fecha de emisión.
-                </Text>
-                <Text style={{ fontSize: 8, color: T.colors.calloutText }}>
-                  Precios sujetos a variación de TRM y disponibilidad de materiales.
-                </Text>
-              </View>
-            ),
-          })}
-          <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
-          <SeccionHTML
-            titulo="Condiciones Comerciales"
-            contenido={condicionesHTML}
-            compact
-            dense
-            fontScale={0.9}
-          />
-        </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={secsPorProd.length + 1} totalPages={totalPagesEst} />
-      </Page>
-
-      {/* Página términos y condiciones */}
-      <Page size="A4" style={[styles.pageNoHeader, { fontFamily: PDF_FONT_FAMILY }]} wrap>
-        <View style={styles.flexGrowContent}>
-          <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-            <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
-                DOCUMENTO LEGAL — LEER ANTES DE FIRMAR
+        {/* Detalle económico */}
+        <Text minPresenceAhead={28} style={styles.sectionTitle}>Detalle Económico</Text>
+        {convertirTablaHTMLaComponentes(tablaHTML, {
+          summaryPanel: true,
+          zebra: true,
+          currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
+          leftPanel: (
+            <View style={{
+              backgroundColor: T.colors.calloutBg,
+              borderLeftWidth: 3,
+              borderLeftColor: T.colors.accent,
+              borderRadius: T.radius.sm,
+              padding: 9,
+            }}>
+              <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
+                Oferta válida hasta el 30 de junio del 2026.
               </Text>
             </View>
+          ),
+        })}
+
+        <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
+
+        {/* Condiciones comerciales */}
+        <SeccionHTML
+          titulo="Condiciones Comerciales"
+          contenido={condicionesHTML}
+          compact
+          dense
+          fontScale={0.9}
+        />
+
+        {/* Términos y condiciones */}
+        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+          <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
+              DOCUMENTO LEGAL — LEER ANTES DE FIRMAR
+            </Text>
           </View>
-          <SeccionHTML
-            titulo="Términos y Condiciones Generales"
-            contenido={terminosHTML}
-            compact
-            dense
-            fontScale={0.78}
-          />
-          <SignatureBlock />
         </View>
-        <PdfFooter numeroCotizacion={numeroCotizacion} pageNumber={secsPorProd.length + 2} totalPages={totalPagesEst} />
+        <SeccionHTML
+          titulo="Términos y Condiciones Generales"
+          contenido={terminosHTML}
+          compact
+          dense
+          fontScale={0.78}
+        />
+
+        <SignatureBlock />
+
       </Page>
     </Document>
   );

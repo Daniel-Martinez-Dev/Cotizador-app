@@ -119,6 +119,11 @@ service cloud.firestore {
       allow write: if isActiveStaff();
     }
 
+    match /consecutivos/{docId} {
+      allow read: if isActiveStaff();
+      allow write: if isActiveStaff();
+    }
+
     // ─── Producción: admin o usuario con rol "produccion" ──────────────────────
     match /produccion/{docId} {
       allow read, write: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
@@ -128,12 +133,41 @@ service cloud.firestore {
       allow read, write: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
     }
 
+    // ─── Fichas de División Térmica ────────────────────────────────────────────
+    match /division_fichas/{docId} {
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
+    }
+
+    // Catálogo de insumos: lectura para producción, escritura solo admin
+    match /division_insumos/{docId} {
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
+      allow write: if isAdmin();
+    }
+
+    // Parámetros configurables (IVA, markup, rollo lona, etc.): escritura solo admin
+    match /division_parametros/{docId} {
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
+      allow write: if isAdmin();
+    }
+
     // ─── Inventario: admin o usuario con rol "inventario" ─────────────────────
     match /inventario/{docId} {
       allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
     match /inventario/{docId}/{subCol}/{subId} {
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
+    }
+
+    match /inventario_items/{docId} {
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
+    }
+
+    match /inventario_proveedores/{docId} {
+      allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
+    }
+
+    match /inventario_movimientos/{docId} {
       allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
