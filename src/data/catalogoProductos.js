@@ -374,13 +374,14 @@ function estaFueraDeRangoMatriz(matriz, ancho, alto, usarAbrigo){
   const r = buscarPrecio(matriz, a, h); return r.fueraDeRango;
 }
 
-export function validarRangoProducto(producto, { matricesOverride } = {}){
+export function validarRangoProducto(producto, { matricesOverride, productosOverride } = {}){
   const { tipo, ancho, alto, cliente } = producto;
   const cfg = getConfigProducto(tipo);
   if(!cfg?.requiereMedidas) return false;
   if(!ancho || !alto) return false;
   if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){
-    const r = buscarPrecio(matrizPanamericana, parseInt(ancho), parseInt(alto)); return r.fueraDeRango;
+    const mat = productosOverride?.[tipo]?.matrizPanamericana || matrizPanamericana;
+    const r = buscarPrecio(mat, parseInt(ancho), parseInt(alto)); return r.fueraDeRango;
   }
   if(tipo==='Sello de Andén') return false; // componentes fijos
   if(tipo==='Abrigo Retráctil Estándar'){
@@ -400,9 +401,10 @@ const aplicarAjuste = (v, tipo, p) => {
   return v;
 };
 
-export function getPrecioProducto(producto, { matricesOverride } = {}){
+export function getPrecioProducto(producto, { matricesOverride, productosOverride } = {}){
   const { tipo, ancho, alto, cliente, ajusteTipo, ajusteValor } = producto;
   const cfg = getConfigProducto(tipo);
+  const dbProd = productosOverride?.[tipo]; // doc completo de Firestore
   let base=0; let fuera=false;
 
   const getFactorCliente = () => {
@@ -413,22 +415,61 @@ export function getPrecioProducto(producto, { matricesOverride } = {}){
     if (!baseline) return factor;
     return factor / baseline;
   };
-  // Productos con función personalizada (componentes o especial / fijos)
-  if(cfg?.getPrecioBase){
-    // Si requiere medidas pero faltan, retornar vacío
+
+  // ── Divisiones Térmicas / Carrocerías Panamericana ───────────────────────────
+  if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){
+    const mat = dbProd?.matrizPanamericana || matrizPanamericana;
+    const r = buscarPrecio(mat, parseInt(ancho), parseInt(alto));
+    base = r.precio||0; fuera = r.fueraDeRango;
+
+  // ── Sello de Andén (componentes) con datos de Firestore ──────────────────────
+  } else if(tipo==='Sello de Andén' && dbProd?.matrizComponentes){
+    const {componentes=[]} = producto;
+    if(!ancho || !alto) return { base:0, ajustado:0, fueraDeRango:false };
+    const mat = dbProd.matrizComponentes;
+    let total=0;
+    if(componentes.includes('sello completo')) total=mat.base.completos?.[1]||0;
+    else {
+      if(componentes.includes('cortina')) total+=mat.base.cortina?.[1]||0;
+      if(componentes.includes('postes laterales')) total+=mat.base.postes?.[1]||0;
+      if(componentes.includes('travesaño')) total+=mat.base.travesano?.[1]||0;
+    }
+    base=total;
+
+  // ── Productos tipo "especial" con precios en Firestore ───────────────────────
+  } else if(dbProd && cfg?.getPrecioBase && cfg?.tipoCalculo==='especial'){
+    if(cfg.requiereMedidas && (!ancho || !alto)) return { base:0, ajustado:0, fueraDeRango:false };
+    if(dbProd.variantes?.length){
+      // Semáforos y otros con variantes
+      const v = dbProd.variantes.find(v=>v.id===producto.varianteSemaforo) || dbProd.variantes[0];
+      base = v?.precio||0;
+    } else if(dbProd.precioFijo !== undefined){
+      // Lámpara Industrial, Canastilla de Seguridad
+      base = dbProd.precioFijo;
+    } else if(dbProd.precioPorM2ConInstalacion !== undefined){
+      // Cortina Thermofilm
+      const a=parseFloat(ancho)/1000, h=parseFloat(alto)/1000;
+      if(!isNaN(a)&&!isNaN(h)){
+        const area=(a+0.10)*(h+0.10);
+        const conIns=!!producto.conInstalacion;
+        base=area*(conIns ? dbProd.precioPorM2ConInstalacion : dbProd.precioPorM2SinInstalacion);
+      }
+    } else if(cfg.getPrecioBase){
+      const r=cfg.getPrecioBase(producto); base=r.precio||0; fuera=r.fueraDeRango;
+    }
+
+  // ── Función personalizada hardcodeada (fallback) ─────────────────────────────
+  } else if(cfg?.getPrecioBase){
     if(cfg.requiereMedidas && (!ancho || !alto)) return { base:0, ajustado:0, fueraDeRango:false };
     const r = cfg.getPrecioBase(producto);
     base = r.precio||0; fuera = r.fueraDeRango;
-  } else if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){
-    const r = buscarPrecio(matrizPanamericana, parseInt(ancho), parseInt(alto));
-    base = r.precio||0; fuera = r.fueraDeRango;
+
   } else if(tipo==='Abrigo Retráctil Estándar'){
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
     if(!fuera){ base = Math.round(base * getFactorCliente()); }
   } else if(tipo==='Abrigo Retráctil Inflable'){
-    // Para abrigos retráctiles (inflable), el precio no varía por tipo de cliente
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
@@ -441,6 +482,7 @@ export function getPrecioProducto(producto, { matricesOverride } = {}){
     base = r.precio||0; fuera = r.fueraDeRango;
     if(!fuera){ base = Math.round(base * getFactorCliente()); }
   }
+
   if(fuera) return { base:0, ajustado:0, fueraDeRango:true };
   let ajustado = aplicarAjuste(base, ajusteTipo, parseFloat(ajusteValor)||0);
   return { base: redondear5000(base), ajustado: redondear5000(ajustado), fueraDeRango:false };

@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -27,6 +28,7 @@ if (missingKeys.length) {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 // Exponer helpers para esperar autenticación y reportar errores de auth
 let resolveAuthReady;
@@ -57,4 +59,4 @@ onAuthStateChanged(auth, (user)=>{
 export function waitForAuth(){ return authReady; }
 export function getAuthError(){ return authErrorCode; }
 
-export { db, auth };
+export { db, auth, storage };
