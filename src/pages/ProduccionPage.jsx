@@ -7,9 +7,13 @@ import {
   listarFichasFabricacion,
 } from "../utils/firebaseProduction";
 import DivisionTermicaFicha from "../components/DivisionTermicaFicha";
+import SelloAndenFicha from "../components/SelloAndenFicha";
+import AbrigoAndenFicha from "../components/AbrigoAndenFicha";
 
 const TABS = [
   { id: "division", label: "División Térmica" },
+  { id: "sello",    label: "Sello de Andén" },
+  { id: "abrigo",   label: "Abrigo de Andén" },
   { id: "ordenes",  label: "Órdenes" },
   { id: "fichas",   label: "Fichas básicas" },
 ];
@@ -99,6 +103,12 @@ export default function ProduccionPage() {
       <div className="mt-5">
         {/* ── División Térmica ── */}
         {tab === "division" && <DivisionTermicaFicha />}
+
+        {/* ── Sello de Andén ── */}
+        {tab === "sello" && <SelloAndenFicha />}
+
+        {/* ── Abrigo de Andén ── */}
+        {tab === "abrigo" && <AbrigoAndenFicha />}
 
         {/* ── Órdenes (legado) ── */}
         {tab === "ordenes" && (

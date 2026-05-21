@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { cargarProductos } from '../utils/firebaseProductos';
+import { useAuth } from './AuthContext';
 
 const QuoteContext = createContext();
 
@@ -10,6 +11,7 @@ export function useQuote() {
 }
 
 export function QuoteProvider({ children }) {
+  const { isLoggedIn, loading: authLoading } = useAuth();
   const [quoteData, setQuoteData] = useState({});
   const [imagenSeleccionada, setImagenSeleccionada] = useState(null); // backward compat (single)
   const [imagenesSeleccionadas, setImagenesSeleccionadas] = useState([]); // nuevas múltiples
@@ -53,7 +55,9 @@ export function QuoteProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { recargarProductos(); }, [recargarProductos]);
+  useEffect(() => {
+    if (!authLoading && isLoggedIn) recargarProductos();
+  }, [authLoading, isLoggedIn, recargarProductos]);
 
   const [confirmState, setConfirmState] = useState(null); // {message, resolve}
 

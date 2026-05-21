@@ -741,12 +741,10 @@ function ProductCard({ producto, isAdmin, onEditar, onVerDetalle }) {
             className="flex-1 text-sm py-2 rounded-lg border border-gray-300 dark:border-gris-600 hover:bg-gray-50 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 transition-colors">
             Ver detalle
           </button>
-          {isAdmin && (
-            <button onClick={() => onEditar(producto)}
-              className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">
-              Editar
-            </button>
-          )}
+          <button onClick={() => onEditar(producto)}
+            className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">
+            Editar
+          </button>
         </div>
       </div>
     </div>
