@@ -191,7 +191,6 @@ function AppShell() {
         <MobileNav />
         <Link to="/dashboard" className="flex items-center gap-3 group">
           <img src={logo} alt="Logo" className="h-10 w-auto select-none" />
-          <span className="font-semibold text-sm sm:text-base tracking-wide group-hover:text-trafico dark:group-hover:text-trafico transition-colors">Cotizador Cold Chain Services</span>
         </Link>
         <BackButton />
         <NavBar />

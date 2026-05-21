@@ -459,81 +459,143 @@ export default function DivisionTermicaFicha() {
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
 function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
   const med = f.medidas || {};
-  const datos = [
-    ["Panel",      med.panel       ? `${med.panel.ancho}×${med.panel.alto} mm`             : "—"],
-    ["Funda",      med.funda       ? `${med.funda.ancho}×${med.funda.alto} mm`             : "—"],
-    ["Icopor",     med.icopor      ? `${med.icopor.ancho}×${med.icopor.alto} mm`           : "—"],
-    ["Policarb.",  med.policarbonato ? `${med.policarbonato.ancho}×${med.policarbonato.alto} mm` : "—"],
-    ["Piso",       med.medidaPiso  ? `${med.medidaPiso} mm`                                : "—"],
-    ["Tiras lona", med.lona        ? `${med.lona.tiras} × ${med.lona.largoTira} mm`       : "—"],
-    ["Sobrante",   med.lona        ? `${med.lona.sobranteAncho} mm`                       : "—"],
-    ["Dist. ventana", med.distanciaVentana != null ? `${Number(med.distanciaVentana).toFixed(1)} cm` : "—"],
-    ["Platinas",   f.platinas  || "—"],
-    ["FT",         f.ft        || "—"],
-    ["Color lona", f.colorLona || "—"],
-    ["Logo",       f.logo      || "—"],
-    ["Agujero",    f.agujero   || "—"],
-    ["Placa",      f.placa     || "—"],
+
+  const medidas = [
+    { label: "Panel",     ancho: med.panel?.ancho,         alto: med.panel?.alto,         border: "border-blue-700",  text: "text-blue-700"  },
+    { label: "Icopor",    ancho: med.icopor?.ancho,        alto: med.icopor?.alto,        border: "border-blue-500",  text: "text-blue-500"  },
+    { label: "Funda",     ancho: med.funda?.ancho,         alto: med.funda?.alto,         border: "border-cyan-600",  text: "text-cyan-600"  },
+    { label: "Policarb.", ancho: med.policarbonato?.ancho, alto: med.policarbonato?.alto, border: "border-teal-600",  text: "text-teal-600"  },
+  ];
+
+  const opciones = [
+    ["Placa",      f.placa     || "—", f.placa      === "SI"],
+    ["FT",         f.ft        || "—", f.ft         === "SI"],
+    ["Logo",       f.logo      || "—", f.logo !== "NO" && !!f.logo],
+    ["Platinas",   f.platinas  || "—", f.platinas   === "SI"],
+    ["Factura",    f.factura   || "—", f.factura    === "SI"],
+    ["Color lona", f.colorLona || "—", false],
+    ["Agujero",    f.agujero   || "—", false],
   ];
 
   const consumoVisible = (f.consumo || []).filter((c) => c.cantidad > 0);
 
   return (
-    <div className="bg-gray-50 dark:bg-gris-700 rounded-lg p-4 space-y-4 text-xs">
-      <div className="font-medium text-sm">
-        {f.cliente || "Sin cliente"}{" "}
-        <span className="opacity-60 font-normal">
-          — {f.anchoVehiculo}×{f.altoVehiculo} mm · Cant. {f.cantidad}
-        </span>
+    <div className="bg-gray-50 dark:bg-gris-700/60 rounded-xl p-4 space-y-4 text-xs border border-gray-200 dark:border-gris-600">
+
+      {/* Cabecera del detalle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">{f.cliente || "Sin cliente"}</span>
+          <span className="ml-2 text-gray-400 font-mono">{f.anchoVehiculo}×{f.altoVehiculo} mm · ×{f.cantidad}</span>
+        </div>
+        <button onClick={onVerFicha}
+          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5">
+          Ver ficha
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-        {datos.map(([k, v]) => (
-          <div key={k} className="bg-white dark:bg-gris-800 rounded p-2">
-            <div className="text-gray-500 dark:text-gray-400">{k}</div>
-            <div className="font-mono font-medium mt-0.5 break-all">{v}</div>
+      {/* Medidas de corte */}
+      <div>
+        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Medidas de corte</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {medidas.map(({ label, ancho, alto, border, text }) => (
+            <div key={label} className={`bg-white dark:bg-gris-800 rounded-lg border-2 ${border} overflow-hidden`}>
+              <div className={`text-center text-[10px] font-bold uppercase py-1 px-2 ${text}`}
+                style={{ background: "rgba(0,0,0,0.05)" }}>
+                {label}
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gris-700">
+                {[["Ancho", ancho], ["Alto", alto]].map(([dim, val]) => (
+                  <div key={dim} className="p-2 text-center">
+                    <div className="text-[9px] text-gray-400 uppercase">{dim}</div>
+                    <div className={`font-mono font-bold text-sm leading-tight ${text}`}>
+                      {val != null ? Math.round(val) : "—"}
+                    </div>
+                    <div className="text-[9px] text-gray-400">mm</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Piso, lona y ventana */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2.5">
+          <div className="text-[9px] text-green-700 dark:text-green-400 font-bold uppercase tracking-wide">Piso</div>
+          <div className="font-mono font-bold text-green-800 dark:text-green-300 text-base leading-tight mt-0.5">
+            {med.medidaPiso != null ? Math.round(med.medidaPiso) : "—"} <span className="text-xs font-normal">mm</span>
           </div>
-        ))}
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2.5">
+          <div className="text-[9px] text-blue-700 dark:text-blue-400 font-bold uppercase tracking-wide">
+            Lona · {med.lona?.tiras ?? "—"} tiras
+          </div>
+          <div className="font-mono font-bold text-blue-800 dark:text-blue-300 text-base leading-tight mt-0.5">
+            {med.lona?.largoTira != null ? Math.round(med.lona.largoTira) : "—"} <span className="text-xs font-normal">mm</span>
+          </div>
+          <div className="text-[9px] text-blue-500 mt-0.5">sobrante {med.lona?.sobranteAncho != null ? Math.round(med.lona.sobranteAncho) : "—"} mm</div>
+        </div>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2.5">
+          <div className="text-[9px] text-yellow-700 dark:text-yellow-400 font-bold uppercase tracking-wide">Dist. ventana</div>
+          <div className="font-mono font-bold text-yellow-800 dark:text-yellow-300 text-base leading-tight mt-0.5">
+            {med.distanciaVentana != null ? Number(med.distanciaVentana).toFixed(1) : "—"} <span className="text-xs font-normal">cm</span>
+          </div>
+        </div>
       </div>
 
+      {/* Opciones */}
+      <div>
+        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Opciones</div>
+        <div className="flex flex-wrap gap-1.5">
+          {opciones.map(([label, value, active]) => (
+            <span key={label} className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border font-medium
+              ${active
+                ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300"
+                : "bg-white border-gray-200 text-gray-600 dark:bg-gris-800 dark:border-gris-600 dark:text-gray-400"
+              }`}>
+              <span className="text-[9px] font-normal opacity-70">{label}:</span> {value}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Consumo */}
       {consumoVisible.length > 0 && (
         <div>
-          <div className="font-medium mb-2">Consumo (por unidad)</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Consumo por unidad</div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
             {consumoVisible.map((c) => (
-              <div key={c.insumo} className="bg-white dark:bg-gris-800 rounded p-2">
-                <div className="text-gray-500 dark:text-gray-400">{c.insumo.replace("_", " ")}</div>
-                <div className="font-mono font-medium mt-0.5">
-                  {c.unidad === "m²" ? Number(c.cantidad).toFixed(3) : c.cantidad}{" "}
-                  <span className="text-gray-400 font-normal">{c.unidad}</span>
+              <div key={c.insumo} className="bg-white dark:bg-gris-800 border border-gray-100 dark:border-gris-700 rounded-lg p-2">
+                <div className="text-[9px] text-gray-400 leading-tight mb-1">{c.insumo.replace(/_/g, " ")}</div>
+                <div className="font-mono font-bold text-gray-700 dark:text-gray-200 text-sm">
+                  {c.unidad === "m²" ? Number(c.cantidad).toFixed(3) : c.cantidad}
                 </div>
-                {c.largoMm ? <div className="text-gray-400">{c.largoMm} mm c/u</div> : null}
+                <div className="text-[9px] text-gray-400">{c.unidad}{c.largoMm ? ` · ${c.largoMm}mm` : ""}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 pt-1">
-        <button onClick={onVerFicha}
-          className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 dark:bg-gris-600 dark:hover:bg-gris-500 text-white text-xs font-medium">
-          Ver ficha imprimible
-        </button>
+      {/* Acciones de estado */}
+      <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200 dark:border-gris-600">
         {f.estado !== "en_produccion" && (
           <button onClick={() => onCambiarEstado(f.id, "en_produccion")}
-            className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
             Pasar a producción
           </button>
         )}
         {f.estado !== "terminado" && (
           <button onClick={() => onCambiarEstado(f.id, "terminado")}
-            className="px-3 py-1.5 rounded bg-green-600 hover:bg-green-500 text-white text-xs font-medium">
+            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium">
             Marcar terminada
           </button>
         )}
         {f.estado !== "borrador" && (
           <button onClick={() => onCambiarEstado(f.id, "borrador")}
-            className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gris-600 dark:hover:bg-gris-500 text-xs font-medium">
+            className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gris-600 dark:hover:bg-gris-500 text-xs font-medium">
             Volver a borrador
           </button>
         )}
