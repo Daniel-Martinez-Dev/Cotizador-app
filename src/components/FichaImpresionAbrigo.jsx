@@ -199,23 +199,35 @@ export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
         </div>
 
         {/* ── Contenido imprimible ── */}
-        <div ref={printRef} style={{ fontFamily: "Arial, sans-serif", color: "#111", background: "white", padding: "14px 18px" }}>
+        <div ref={printRef} style={{ fontFamily: "Arial, sans-serif", color: "#111", background: "white" }}>
 
           {/* ── 1. Encabezado ── */}
-          <div style={{ textAlign: "center", marginBottom: "10px" }}>
-            <div style={{ fontSize: "15px", fontWeight: "bold", color: colorHeader }}>
-              COLD CHAIN SERVICES S.A.S.
+          <div style={{
+            background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)",
+            padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <div>
+              <div style={{ color: "white", fontSize: "18px", fontWeight: "bold", letterSpacing: "1px" }}>
+                COLD CHAIN SERVICES S.A.S.
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: "9px", marginTop: "2px", textTransform: "uppercase", letterSpacing: "1px" }}>
+                Departamento de Ingeniería — Fichas de Fabricación
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.9)", fontSize: "9px", marginTop: "3px" }}>
+                TODAS LAS DIMENSIONES EN MILÍMETROS
+              </div>
             </div>
-            <div style={{ fontSize: "13px", fontWeight: "bold", color: colorHeader }}>
-              DEPARTAMENTO DE INGENIERÍA
-            </div>
-            <div style={{ fontSize: "13px", fontWeight: "bold", color: colorHeader }}>
-              FICHA DE FABRICACIÓN DE ABRIGOS DE ANDÉN
-            </div>
-            <div style={{ fontSize: "10px", fontWeight: "bold", marginTop: "3px", color: "#555" }}>
-              TODAS LAS DIMENSIONES EN MILÍMETROS
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "1.5px" }}>
+                Abrigo de Andén
+              </div>
+              <div style={{ color: "white", fontSize: "30px", fontWeight: "bold", lineHeight: 1, letterSpacing: "-1px" }}>
+                #{numero || "—"}
+              </div>
             </div>
           </div>
+
+          <div style={{ padding: "12px 18px 0" }}>
 
           {/* ── 2. Datos del pedido ── */}
           <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: "10px" }}>
@@ -446,11 +458,19 @@ export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
             </tbody>
           </table>
 
+          </div>{/* end content wrapper */}
+
           {/* ── Footer ── */}
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px",
-            color: "#777", borderTop: "1px solid #ccc", paddingTop: "5px" }}>
-            <span>COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN ABRIGOS DE ANDÉN</span>
-            <span>Ficha #{numero || "—"} · {fmtDate(new Date().toISOString())}</span>
+          <div style={{
+            background: "#f1f5f9", borderTop: "2px solid #e2e8f0",
+            padding: "6px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <div style={{ fontSize: "9px", color: "#94a3b8" }}>
+              COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN ABRIGOS DE ANDÉN
+            </div>
+            <div style={{ fontSize: "9px", color: "#94a3b8" }}>
+              Ficha #{numero || "—"} · {fmtDate(new Date().toISOString())}
+            </div>
           </div>
 
         </div>
