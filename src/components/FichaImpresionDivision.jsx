@@ -119,21 +119,24 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           {/* ── Header ── */}
           <div style={{
             background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)",
-            padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <div>
-              <div style={{ color: "white", fontSize: "20px", fontWeight: "bold", letterSpacing: "1px" }}>
-                COLD CHAIN SERVICES
+              <div style={{ color: "white", fontSize: "18px", fontWeight: "bold", letterSpacing: "1px" }}>
+                COLD CHAIN SERVICES S.A.S.
               </div>
-              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "10px", marginTop: "3px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: "9px", marginTop: "2px", textTransform: "uppercase", letterSpacing: "1px" }}>
                 Departamento de Ingeniería — Fichas de Fabricación
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.9)", fontSize: "9px", marginTop: "3px" }}>
+                TODAS LAS DIMENSIONES EN MILÍMETROS
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "1.5px" }}>
+              <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "1.5px" }}>
                 División Térmica
               </div>
-              <div style={{ color: "white", fontSize: "34px", fontWeight: "bold", lineHeight: 1, letterSpacing: "-1px" }}>
+              <div style={{ color: "white", fontSize: "30px", fontWeight: "bold", lineHeight: 1, letterSpacing: "-1px" }}>
                 #{numero || "—"}
               </div>
             </div>
@@ -278,12 +281,14 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           {/* ── Footer ── */}
           <div style={{
             background: "#f1f5f9", borderTop: "2px solid #e2e8f0",
-            padding: "8px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "6px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <div style={{ fontSize: "9px", color: "#94a3b8" }}>
               COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN DIVISIONES TÉRMICAS
             </div>
-            <div style={{ fontSize: "9px", color: "#94a3b8" }}>Ficha #{numero || "—"}</div>
+            <div style={{ fontSize: "9px", color: "#94a3b8" }}>
+              Ficha #{numero || "—"} · {new Date().toLocaleDateString("es-CO")}
+            </div>
           </div>
 
         </div>
