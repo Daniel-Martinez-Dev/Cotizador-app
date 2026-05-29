@@ -5,7 +5,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files \\(x86\\)\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\npm\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\" -ErrorAction SilentlyContinue)",
       "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.nvm\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:USERPROFILE\\\\fnm\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\fnm\" -ErrorAction SilentlyContinue; where.exe node 2>$null; where.exe npm 2>$null)",
       "PowerShell(winget --version)",
-      "PowerShell(winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements)"
+      "PowerShell(winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements)",
+      "PowerShell(npm install)",
+      "PowerShell(npm run dev)"
     ]
   }
 }

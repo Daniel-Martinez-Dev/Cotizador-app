@@ -6,8 +6,14 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { cargarImagenesBase64 } from "./data/imagenesPorProducto";
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { checkForUpdate } from './utils/otaUpdater';
+
+CapacitorUpdater.notifyAppReady();
 
 cargarImagenesBase64().then(() => {
+  checkForUpdate().catch(() => {});
+
   const root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(
     <React.StrictMode>

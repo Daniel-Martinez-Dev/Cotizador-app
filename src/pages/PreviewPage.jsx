@@ -10,14 +10,15 @@ import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
+import { numeroALetras } from "../utils/numeroALetras";
 
 function generarTituloCompacto(productos) {
   if (!productos?.length) return "COTIZACIÓN";
-  const tipos = productos.map(p => (p.tipo || "PRODUCTO").toUpperCase());
+  const tipos = [...new Set(productos.map(p => (p.tipo || "PRODUCTO").toUpperCase()))];
   if (tipos.length === 1) return `COTIZACIÓN DE ${tipos[0]}`;
   if (tipos.length === 2) return `COTIZACIÓN DE ${tipos[0]} Y ${tipos[1]}`;
   const resto = tipos.length - 2;
-  return `COTIZACIÓN DE ${tipos[0]}, ${tipos[1]} Y ${resto} PRODUCTO${resto > 1 ? 'S' : ''} MÁS`;
+  return `COTIZACIÓN DE ${tipos[0]}, ${tipos[1]} Y ${resto} TIPO${resto > 1 ? 'S' : ''} MÁS`;
 }
 
 export default function PreviewPage() {
@@ -391,7 +392,7 @@ export default function PreviewPage() {
               <img
                 src={imagenesBase64Principal[idx]}
                 alt="principal"
-                className="h-40 object-contain border rounded-xl cursor-zoom-in hover:shadow-md transition-shadow bg-gray-50 p-1"
+                className="h-40 object-contain rounded-xl cursor-zoom-in hover:shadow-md transition-shadow"
                 onClick={() => setImagenAmpliada(imagenesBase64Principal[idx])}
               />
               <span className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Principal</span>
@@ -462,7 +463,7 @@ export default function PreviewPage() {
                 <img
                   src={imagenesPorProducto[clave]}
                   alt={clave}
-                  className="h-40 object-contain border rounded-xl w-36 bg-gray-50 p-1 cursor-zoom-in hover:shadow-md transition-shadow"
+                  className="h-40 object-contain rounded-xl w-36 cursor-zoom-in hover:shadow-md transition-shadow"
                   onClick={() => setImagenAmpliada(imagenesPorProducto[clave])}
                 />
                 <span className="absolute top-2 left-2 bg-gray-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">Extra {aidx + 1}</span>
@@ -666,24 +667,31 @@ export default function PreviewPage() {
           </div>
 
           {/* ===== Sección por producto ===== */}
-          {productos.map((prod, idx) => (
-            <div key={idx} className="space-y-4">
-              {/* Encabezado del producto */}
-              <div className="flex items-center gap-3 px-1">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold shrink-0">
-                  {idx + 1}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Producto {idx + 1}</p>
-                  <p className="font-semibold text-gray-800 dark:text-gray-100">{prod.tipo}</p>
-                </div>
-              </div>
+          {(() => {
+            const tiposVistos = new Set();
+            return productos.map((prod, idx) => {
+              const esNuevoTipo = !tiposVistos.has(prod.tipo);
+              if (esNuevoTipo) tiposVistos.add(prod.tipo);
+              return (
+                <div key={idx} className="space-y-4">
+                  {/* Encabezado del producto */}
+                  <div className="flex items-center gap-3 px-1">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold shrink-0">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Producto {idx + 1}</p>
+                      <p className="font-semibold text-gray-800 dark:text-gray-100">{prod.tipo}</p>
+                    </div>
+                  </div>
 
-              {renderCampoProducto("Descripción del Producto", idx, "descripcionHTML")}
-              {renderCampoProducto("Especificaciones Técnicas", idx, "especificacionesHTML")}
-              {renderImagenesProducto(idx, prod)}
-            </div>
-          ))}
+                  {esNuevoTipo && renderCampoProducto("Descripción del Producto", idx, "descripcionHTML")}
+                  {esNuevoTipo && renderCampoProducto("Especificaciones Técnicas", idx, "especificacionesHTML")}
+                  {esNuevoTipo && renderImagenesProducto(idx, prod)}
+                </div>
+              );
+            });
+          })()}
 
           {/* Detalle de Precios */}
           <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 overflow-x-auto force-light">
@@ -720,11 +728,14 @@ export default function PreviewPage() {
                   <td className="text-right px-4 py-3 text-gray-700 dark:text-gray-100">{formatCOP(iva)}</td>
                 </tr>
                 <tr className="bg-green-50 dark:bg-green-900/25 rounded-b-lg">
-                  <td colSpan={2} className="text-right px-4 py-3.5 font-bold text-green-700 dark:text-green-300">TOTAL</td>
+                  <td colSpan={2} className="text-right px-4 py-3.5 font-bold text-green-700 dark:text-green-300">TOTAL COP$</td>
                   <td className="text-right px-4 py-3.5 font-bold text-green-700 dark:text-green-300 text-base">{formatCOP(total)}</td>
                 </tr>
               </tfoot>
             </table>
+            <p className="mt-2 text-[10px] italic text-gray-400 dark:text-gray-500">
+              Son: <strong className="text-gray-600 dark:text-gray-300 not-italic">{numeroALetras(total)}</strong>
+            </p>
           </div>
 
           {/* Condiciones comerciales con selector de producto */}

@@ -26,6 +26,13 @@ import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
 import { compressImageToDataURL } from './pdfImageCompression';
 
+// Desactiva la silabización automática (guiones) en todo el documento.
+// Se divide en espacios cuando el token los contiene, para preservar el ajuste de línea normal.
+Font.registerHyphenationCallback(word => {
+  if (/\s/.test(word)) return word.split(/(\s+)/);
+  return [word];
+});
+
 // Carga lazy de fuentes como data URIs (evita problemas de URL relativa con base:'./')
 let PDF_FONT_FAMILY = 'Helvetica';
 let _fontsLoadPromise = null;
@@ -247,11 +254,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   imageCard: {
-    padding: 4,
-    borderWidth: 1,
-    borderColor: T.colors.border,
-    borderRadius: 4,
-    marginBottom: 8,
+    marginBottom: 5,
     backgroundColor: '#FFFFFF',
   },
   imageCaption: {
@@ -267,16 +270,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sideImageCard: {
-    padding: 4,
-    borderWidth: 1,
-    borderColor: T.colors.border,
-    borderRadius: 4,
     backgroundColor: '#FFFFFF',
     marginBottom: 4,
   },
   sideImage: {
     width: '100%',
-    height: 150,
+    height: 110,
     objectFit: 'contain',
   },
   sideImageCaption: {
@@ -319,9 +318,9 @@ const styles = StyleSheet.create({
   },
 });
 
-function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null }) {
+function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null, noWrap = false }) {
   return (
-    <View>
+    <View wrap={!noWrap}>
       <Text
         minPresenceAhead={24}
         style={{
@@ -386,7 +385,7 @@ function PdfFooter({ numeroCotizacion, pageNumber, totalPages }) {
   );
 }
 
-function ImageSection({ imagenSeleccionada, imagenesMulti, titulo }) {
+function ImageSection({ imagenSeleccionada, imagenesMulti, titulo, tipoProducto }) {
   if (!imagenSeleccionada && imagenesMulti.length === 0) return null;
   const extras = imagenesMulti.slice(0, 2);
   const total = (imagenSeleccionada ? 1 : 0) + extras.length;
@@ -395,19 +394,23 @@ function ImageSection({ imagenSeleccionada, imagenesMulti, titulo }) {
   else if (total === 2) widthPct = '48%';
   else widthPct = '32%';
 
+  const tipoLower = (tipoProducto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const esPuertaRapida = tipoLower.includes('rapida') || tipoLower.includes('puertas rapidas');
+  const imgHeight = esPuertaRapida ? 120 : 190;
+
   return (
     <View wrap={false}>
       <Text style={styles.sectionTitle}>{titulo}</Text>
       <View style={styles.imageGrid}>
         {imagenSeleccionada && (
           <View style={[styles.imageCard, { width: widthPct, marginHorizontal: total === 1 ? 'auto' : 0 }]}>
-            <Image src={imagenSeleccionada} style={{ width: '100%', height: 165, objectFit: 'contain' }} />
+            <Image src={imagenSeleccionada} style={{ width: '100%', height: imgHeight, objectFit: 'contain' }} />
             <Text style={styles.imageCaption}>Referencia visual principal (no contractual)</Text>
           </View>
         )}
         {extras.map((imgSrc, idx) => (
           <View key={idx} style={[styles.imageCard, { width: widthPct }]}>
-            <Image src={imgSrc} style={{ width: '100%', height: 165, objectFit: 'contain' }} />
+            <Image src={imgSrc} style={{ width: '100%', height: imgHeight, objectFit: 'contain' }} />
             <Text style={styles.imageCaption}>Imagen adicional {idx + 1} (referencial)</Text>
           </View>
         ))}
@@ -512,19 +515,26 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
     secciones = [],
     seccionesPorProducto = [],
     tituloCotizacion,
+    total,
   } = cotizacion;
 
   const fecha = new Date().toLocaleDateString("es-CO");
 
-  const tiposProducto = tituloCotizacion || ((productos || [])
-    .map(p => p.tipo?.toUpperCase?.() || "PRODUCTO")
-    .join(", "));
+  const tiposProducto = tituloCotizacion || ([...new Set((productos || [])
+    .map(p => p.tipo?.toUpperCase?.() || "PRODUCTO"))].join(", "));
 
   const { tablaHTML = "", condicionesHTML = "", terminosHTML = "" } = secciones[0] || {};
 
-  const secsPorProd = seccionesPorProducto.length > 0
+  const secsPorProdRaw = seccionesPorProducto.length > 0
     ? seccionesPorProducto
     : [{ tipo: productos?.[0]?.tipo, descripcionHTML: secciones[0]?.descripcionHTML || "", especificacionesHTML: secciones[0]?.especificacionesHTML || "" }];
+
+  const _tiposPDF = new Set();
+  const secsPorProd = secsPorProdRaw.map(s => {
+    const esNuevo = !_tiposPDF.has(s.tipo);
+    if (esNuevo) _tiposPDF.add(s.tipo);
+    return { ...s, esNuevoTipo: esNuevo };
+  });
 
   const ClienteBlock = () => (
     <View style={styles.datosCliente}>
@@ -594,54 +604,58 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
           const imgOpt = imagenesOptimizadasPorProducto?.[idx] || {};
           const imagenPrincipal = imgOpt.principal || null;
           const imagenesExtras = imgOpt.extras || [];
-          const hasAnyImage = Boolean(imagenPrincipal) || imagenesExtras.length > 0;
+          const hasAnyImage = seccion.esNuevoTipo && (Boolean(imagenPrincipal) || imagenesExtras.length > 0);
 
           return (
             <View key={idx}>
-              {idx > 0 && (
-                <Text style={[styles.sectionTitle, { marginTop: T.spacing.sectionGap }]}>
-                  Producto {idx + 1}: {(seccion.tipo || 'PRODUCTO').toUpperCase()}
+              {idx > 0 && seccion.esNuevoTipo && (
+                <Text minPresenceAhead={40} style={[styles.sectionTitle, { marginTop: T.spacing.sectionGap }]}>
+                  {(seccion.tipo || 'PRODUCTO').toUpperCase()}
                 </Text>
               )}
-              {seccion.descripcionHTML ? (
-                <View style={styles.htmlContentCompact}>
+              {seccion.esNuevoTipo && seccion.descripcionHTML ? (
+                <View wrap={false} style={styles.htmlContentCompact}>
                   {parseHtmlToPDFComponents(seccion.descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
                 </View>
               ) : null}
-              {seccion.especificacionesHTML ? (
-                <SeccionHTML titulo="Especificaciones Técnicas" contenido={seccion.especificacionesHTML} compact dense fontScale={0.9} />
+              {seccion.esNuevoTipo && seccion.especificacionesHTML ? (
+                <SeccionHTML titulo="Especificaciones Técnicas" contenido={seccion.especificacionesHTML} compact dense fontScale={0.9} noWrap />
               ) : null}
               {hasAnyImage && (
                 <ImageSection
                   titulo="Imágenes de Referencia"
                   imagenSeleccionada={imagenPrincipal}
                   imagenesMulti={imagenesExtras}
+                  tipoProducto={seccion.tipo}
                 />
               )}
             </View>
           );
         })}
 
-        {/* Detalle económico */}
-        <Text minPresenceAhead={28} style={styles.sectionTitle}>Detalle Económico</Text>
-        {convertirTablaHTMLaComponentes(tablaHTML, {
-          summaryPanel: true,
-          zebra: true,
-          currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
-          leftPanel: (
-            <View style={{
-              backgroundColor: T.colors.calloutBg,
-              borderLeftWidth: 3,
-              borderLeftColor: T.colors.accent,
-              borderRadius: T.radius.sm,
-              padding: 9,
-            }}>
-              <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-                Oferta válida hasta el 30 de junio del 2026.
-              </Text>
-            </View>
-          ),
-        })}
+        {/* Detalle económico — wrap={false} para que la tabla no se corte entre filas */}
+        <View wrap={false}>
+          <Text style={styles.sectionTitle}>Detalle Económico</Text>
+          {convertirTablaHTMLaComponentes(tablaHTML, {
+            summaryPanel: true,
+            zebra: true,
+            currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
+            total,
+            leftPanel: (
+              <View style={{
+                backgroundColor: T.colors.calloutBg,
+                borderLeftWidth: 3,
+                borderLeftColor: T.colors.accent,
+                borderRadius: T.radius.sm,
+                padding: 9,
+              }}>
+                <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
+                  Oferta válida hasta el 30 de junio del 2026.
+                </Text>
+              </View>
+            ),
+          })}
+        </View>
 
         <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
 
@@ -652,10 +666,11 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
           compact
           dense
           fontScale={0.9}
+          noWrap
         />
 
-        {/* Términos y condiciones */}
-        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+        {/* Términos y condiciones — siempre en página nueva */}
+        <View break style={{ flexDirection: 'row', marginBottom: 4 }}>
           <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
               DOCUMENTO LEGAL — LEER ANTES DE FIRMAR

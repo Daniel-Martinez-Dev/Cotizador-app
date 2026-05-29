@@ -1,6 +1,6 @@
 // Catálogo centralizado de productos
 // Permite agregar nuevos productos en un solo lugar (descripción PDF, línea en tabla, etc.)
-import { priceMatrices, EXTRAS_POR_DEFECTO, EXTRAS_UNIVERSALES, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES } from './precios';
+import { priceMatrices, EXTRAS_POR_DEFECTO, EXTRAS_UNIVERSALES, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES, getRangoIndex } from './precios';
 
 // Definición base por etiqueta (coincide con claves existentes en priceMatrices / EXTRAS_POR_DEFECTO)
 // Para cada producto se puede definir:
@@ -178,8 +178,17 @@ const PRODUCT_CATALOG = {
       if(!ancho || !alto) return { precio:null, fueraDeRango:false };
       const matriz = priceMatrices['Sello de Andén'];
       const ranges = matriz.medidaRanges;
-      // Reutilizar lógica simple
-      let total=0; if(componentes.includes('sello completo')) total=matriz.base.completos[1]||0; else { if(componentes.includes('cortina')) total+=matriz.base.cortina[1]||0; if(componentes.includes('postes laterales')) total+=matriz.base.postes[1]||0; if(componentes.includes('travesaño')) total+=matriz.base.travesano[1]||0; }
+      const iAncho = getRangoIndex(ranges, parseInt(ancho));
+      const iAlto  = getRangoIndex(ranges, parseInt(alto));
+      let total=0;
+      if(componentes.includes('sello completo')){
+        total += matriz.base.cortina[iAncho]||0;
+        total += matriz.base.postes[iAlto]||0;
+      } else {
+        if(componentes.includes('cortina')) total+=matriz.base.cortina[iAncho]||0;
+        if(componentes.includes('postes laterales')) total+=matriz.base.postes[iAlto]||0;
+      }
+      if(componentes.includes('travesaño')) total+=matriz.base.travesano[iAncho]||0;
       return { precio: total, fueraDeRango:false };
     }
   },
@@ -427,13 +436,18 @@ export function getPrecioProducto(producto, { matricesOverride, productosOverrid
     const {componentes=[]} = producto;
     if(!ancho || !alto) return { base:0, ajustado:0, fueraDeRango:false };
     const mat = dbProd.matrizComponentes;
+    const ranges = mat.medidaRanges || priceMatrices['Sello de Andén'].medidaRanges;
+    const iAncho = getRangoIndex(ranges, parseInt(ancho));
+    const iAlto  = getRangoIndex(ranges, parseInt(alto));
     let total=0;
-    if(componentes.includes('sello completo')) total=mat.base.completos?.[1]||0;
-    else {
-      if(componentes.includes('cortina')) total+=mat.base.cortina?.[1]||0;
-      if(componentes.includes('postes laterales')) total+=mat.base.postes?.[1]||0;
-      if(componentes.includes('travesaño')) total+=mat.base.travesano?.[1]||0;
+    if(componentes.includes('sello completo')){
+      total += mat.base.cortina?.[iAncho]||0;
+      total += mat.base.postes?.[iAlto]||0;
+    } else {
+      if(componentes.includes('cortina')) total+=mat.base.cortina?.[iAncho]||0;
+      if(componentes.includes('postes laterales')) total+=mat.base.postes?.[iAlto]||0;
     }
+    if(componentes.includes('travesaño')) total+=mat.base.travesano?.[iAncho]||0;
     base=total;
 
   // ── Productos tipo "especial" con precios en Firestore ───────────────────────
