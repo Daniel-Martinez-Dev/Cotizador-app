@@ -449,6 +449,7 @@ export function getPrecioProducto(producto, { matricesOverride, productosOverrid
     }
     if(componentes.includes('travesaño')) total+=mat.base.travesano?.[iAncho]||0;
     base=total;
+    base = Math.round(base * getFactorCliente());
 
   // ── Productos tipo "especial" con precios en Firestore ───────────────────────
   } else if(dbProd && cfg?.getPrecioBase && cfg?.tipoCalculo==='especial'){
@@ -477,6 +478,7 @@ export function getPrecioProducto(producto, { matricesOverride, productosOverrid
     if(cfg.requiereMedidas && (!ancho || !alto)) return { base:0, ajustado:0, fueraDeRango:false };
     const r = cfg.getPrecioBase(producto);
     base = r.precio||0; fuera = r.fueraDeRango;
+    if(tipo==='Sello de Andén' && !fuera){ base = Math.round(base * getFactorCliente()); }
 
   } else if(tipo==='Abrigo Retráctil Estándar'){
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
