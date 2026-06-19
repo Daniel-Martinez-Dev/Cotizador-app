@@ -22,10 +22,14 @@ export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0, p
 }
 
 export function generarSeccionesPorProducto(cotizacion, productosOverride = {}) {
+  const tiposVistos = new Set();
   return (cotizacion.productos || []).map((prod) => {
     const cotSingle = { ...cotizacion, productos: [prod] };
+    const esNuevoTipo = !tiposVistos.has(prod.tipo);
+    if (esNuevoTipo) tiposVistos.add(prod.tipo);
     return {
       tipo: prod.tipo,
+      esNuevoTipo,
       descripcionHTML: generarDescripcion(cotSingle, productosOverride),
       especificacionesHTML: generarEspecificaciones(cotSingle, productosOverride),
     };
@@ -243,7 +247,7 @@ function generarTablaPrecios(cot, productosOverride = {}) {
         <td style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">${formatearPesos(cot.iva)}</td>
       </tr>
       <tr style="font-weight:bold; background-color:#DBEEFF; font-size:11px;">
-        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Total</td>
+        <td colspan="3" style="border: 1px solid #D1D9E4; padding: 10px; text-align:right;">Total COP$</td>
         <td style="border: 1px solid #D1D9E4; padding: 12px; text-align:right;"><strong>${formatearPesos(cot.total)}</strong></td>
       </tr>
     </tbody>
@@ -260,7 +264,8 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
   const primerTipo = cot.productos?.[indiceProducto]?.tipo || cot.productos?.[0]?.tipo || "";
   const condicionesDB = productosOverride[primerTipo]?.condicionesComerciales;
   if (condicionesDB) return condicionesDB;
-  const liCond = (arr) => `<ul class='condiciones-compactas'>${arr.map(txt=>`<li>${txt}</li>`).join('')}</ul>`;
+  // Formato inline: "<strong>Label:</strong> body" en un solo párrafo, compacto y resistente a Quill.
+  const liCond = (arr) => arr.map(txt => `<p>${txt}</p>`).join('');
   // Condiciones específicas para Sello de Andén
   if (primerTipo === "Sello de Andén") {
     return liCond([

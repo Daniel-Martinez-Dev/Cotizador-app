@@ -7,6 +7,7 @@ import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, crearContacto, buscarContactoPorEmail } from '../utils/firebaseCompanies';
 import { waitForAuth, getAuthError } from '../firebase';
 import toast from 'react-hot-toast';
+import { numeroALetras } from '../utils/numeroALetras';
 
 // Utilidades
 const redondear5000 = v => Math.round(v / 5000) * 5000;
@@ -512,17 +513,22 @@ export default function CotizadorApp(){
                                     onChange={()=>{
                                       const actuales = [...(producto.componentes || [])];
 
-                                      // 'sello completo' es excluyente
                                       if (comp === 'sello completo') {
-                                        const nuevos = actuales.includes('sello completo')
-                                          ? actuales.filter(c => c !== 'sello completo')
-                                          : ['sello completo'];
-                                        handleChangeProducto(i, 'componentes', nuevos);
+                                        if (actuales.includes('sello completo')) {
+                                          // Desmarcar sello completo, conservar travesaño si estaba
+                                          handleChangeProducto(i, 'componentes', actuales.filter(c => c !== 'sello completo'));
+                                        } else {
+                                          // Marcar sello completo: quitar cortina y postes por separado, conservar travesaño
+                                          const base = actuales.filter(c => c !== 'cortina' && c !== 'postes laterales');
+                                          handleChangeProducto(i, 'componentes', [...base, 'sello completo']);
+                                        }
                                         return;
                                       }
 
-                                      // Si se selecciona un componente parcial, quitar 'sello completo'
-                                      const sinCompleto = actuales.filter(c => c !== 'sello completo');
+                                      // cortina/postes por separado: quitar 'sello completo'
+                                      const sinCompleto = (comp === 'cortina' || comp === 'postes laterales')
+                                        ? actuales.filter(c => c !== 'sello completo')
+                                        : actuales; // travesaño no quita 'sello completo'
                                       const nuevos = sinCompleto.includes(comp)
                                         ? sinCompleto.filter(c => c !== comp)
                                         : [...sinCompleto, comp];
@@ -534,6 +540,39 @@ export default function CotizadorApp(){
                               );
                             })}
                           </div>
+                          {/* Desglose de precio por componente */}
+                          {producto.ancho && producto.alto && (producto.componentes||[]).length > 0 && (()=>{
+                            const dbMat = productosOverride?.['Sello de Andén']?.matrizComponentes;
+                            const mat = dbMat || priceMatrices['Sello de Andén'];
+                            const ranges = mat.medidaRanges;
+                            const iAncho = getRangoIndex(ranges, parseInt(producto.ancho));
+                            const iAlto  = getRangoIndex(ranges, parseInt(producto.alto));
+                            const comps  = producto.componentes || [];
+                            const lineas = [];
+                            if(comps.includes('sello completo')){
+                              lineas.push({ nombre:'Cortina',   val: mat.base.cortina?.[iAncho]||0 });
+                              lineas.push({ nombre:'Postes',    val: mat.base.postes?.[iAlto]||0 });
+                            } else {
+                              if(comps.includes('cortina'))          lineas.push({ nombre:'Cortina',   val: mat.base.cortina?.[iAncho]||0 });
+                              if(comps.includes('postes laterales')) lineas.push({ nombre:'Postes',    val: mat.base.postes?.[iAlto]||0 });
+                            }
+                            if(comps.includes('travesaño')) lineas.push({ nombre:'Travesaño', val: mat.base.travesano?.[iAncho]||0 });
+                            if(!lineas.length) return null;
+                            const total = lineas.reduce((s,l)=>s+l.val, 0);
+                            const fmt = v => `${(v/1000).toLocaleString('es-CO')}k`;
+                            return (
+                              <div className="mt-2 rounded bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 px-3 py-2 text-[11px] font-mono flex flex-wrap items-center gap-x-1.5 gap-y-1 text-gray-600 dark:text-gray-300">
+                                {lineas.map((l,idx)=>(
+                                  <React.Fragment key={idx}>
+                                    {idx>0 && <span className="text-gray-400 dark:text-gray-500">+</span>}
+                                    <span><span className="text-indigo-500 dark:text-indigo-400">{l.nombre}</span> {fmt(l.val)}</span>
+                                  </React.Fragment>
+                                ))}
+                                <span className="text-gray-400 dark:text-gray-500">=</span>
+                                <span className="font-semibold text-gray-800 dark:text-gray-100">{total.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
@@ -617,6 +656,10 @@ export default function CotizadorApp(){
                 <div className="flex justify-between"><span>Ajustado</span><span>{previewAjustado.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span></div>
                 <div className="flex justify-between"><span>IVA (19%)</span><span>{previewIVA.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span></div>
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-200 dark:border-gris-700 font-semibold"><span>Total</span><span>{previewTotal.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span></div>
+                <div className="mt-2 pt-2 border-t border-dashed border-gray-200 dark:border-gris-700">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-0.5">Son:</p>
+                  <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 leading-tight">{numeroALetras(previewTotal)}</p>
+                </div>
               </div>
               <button onClick={handleSubmit} className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded font-medium shadow focus:outline-none focus:ring-2 focus:ring-green-400">Generar Cotización</button>
             </div>

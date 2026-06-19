@@ -2,6 +2,7 @@
 import React from 'react';
 import { Text, View, StyleSheet } from '@react-pdf/renderer';
 import { pdfTheme } from './pdfTheme';
+import { numeroALetras } from './numeroALetras';
 
 // Theme centralizado (exportable si luego se reutiliza en otros módulos)
 export const theme = {
@@ -40,7 +41,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
     alignItems: 'stretch',
-    minHeight: 20,
+    minHeight: 16,
   },
   headerRow: {
     backgroundColor: theme.colors.headerBg,
@@ -67,8 +68,8 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    paddingVertical: 7,
-    paddingHorizontal: 9,
+    paddingVertical: 5,
+    paddingHorizontal: 7,
     fontSize: theme.font.base,
     color: theme.colors.text,
   },
@@ -76,9 +77,9 @@ const styles = StyleSheet.create({
     fontSize: theme.font.tableHeader,
     fontWeight: 'bold',
     color: theme.colors.headerText,
-    paddingVertical: 11,
-    paddingHorizontal: 11,
-    letterSpacing: 1.2,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    letterSpacing: 0.8,
   },
   boldCell: {
     fontWeight: 'bold',
@@ -110,7 +111,7 @@ function formatCurrency(raw, locale = 'es-CO', currency = 'COP', forceTwoDecimal
 
 export function convertirTablaHTMLaComponentes(html, options = {}) {
   if (!html) return null;
-  const { summaryPanel = false, zebra = false, currencyOptions = { locale: 'es-CO', currency: 'COP', forceTwoDecimals: false }, leftPanel = null } = options;
+  const { summaryPanel = false, zebra = false, currencyOptions = { locale: 'es-CO', currency: 'COP', forceTwoDecimals: false }, leftPanel = null, total = null } = options;
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -136,6 +137,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
     const renderRow = (rowIndexForZebra) => (
       <View
         key={i}
+        wrap={false}
         style={[
           styles.row,
           isHeader && styles.headerRow,
@@ -196,6 +198,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
 
           // Nueva distribución balanceada: Producto 18, Cantidad 4, Precio Unitario 7, Subtotal 7 (total 36)
           const baseFlex = j === 0 ? 18 : (j === 1 ? 4 : 7);
+          const isPriceCol = (j === 2 || j === 3) && !isHeader;
           const cellStyles = [
             styles.cell,
             { flex: baseFlex },
@@ -203,9 +206,10 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
             j === 1 && !isHeader && styles.centerAlign,
             (j === 2 || j === 3) && styles.rightAlign,
             !isHeader && j === 0 && !isExtraRow && !isGrandTotalRow && !isSubtotalIvaRow && styles.boldCell,
+            isPriceCol && { fontSize: theme.font.base + 1, fontWeight: 'bold' },
             j < celdas.length - 1 && { borderRightWidth: 1, borderRightColor: theme.colors.border },
-            isExtraRow && !isHeader && { color: pdfTheme.colors.subtleText, fontSize: theme.font.base - 0.5 },
-            !summaryPanel && isGrandTotalRow && { paddingVertical: 9 },
+            isExtraRow && !isHeader && { color: pdfTheme.colors.subtleText, fontSize: theme.font.base - 0.5, fontWeight: 'normal' },
+            !summaryPanel && isGrandTotalRow && { paddingVertical: 6 },
           ].filter(Boolean);
 
           return <Text key={j} style={cellStyles} wrap>{content}</Text>;
@@ -232,7 +236,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
     <View wrap>
       <View style={styles.table}>{bodyRows}</View>
       {(summaryPanel && summaryRows.length > 0) || leftPanel ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: theme.spacing.md }}>
+        <View wrap={false} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: theme.spacing.md }}>
           {leftPanel && (
             <View style={{ flex: 1, paddingRight: 10 }}>
               {leftPanel}
@@ -288,7 +292,7 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     paddingHorizontal: 10,
-                    paddingVertical: isGrandTotal ? 8 : 6,
+                    paddingVertical: isGrandTotal ? 6 : 4,
                     backgroundColor: rowBg,
                     borderTopWidth: 0.5,
                     borderTopColor: isGrandTotal ? pdfTheme.colors.accent : pdfTheme.colors.border,
@@ -301,12 +305,11 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
                       paddingRight: 4,
                     }}>{r.label}</Text>
                     <Text style={{
-                      fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base,
+                      fontSize: isGrandTotal ? theme.font.summaryTotal : theme.font.base + 1,
                       fontWeight: 'bold',
                       color: textColor,
                       textAlign: 'right',
                       flex: 1.4,
-                      lineHeight: 1.1,
                     }}>{r.value}</Text>
                   </View>
                 );
@@ -315,6 +318,11 @@ export function convertirTablaHTMLaComponentes(html, options = {}) {
           )}
         </View>
       ) : null}
+      {summaryPanel && total != null && (
+        <Text style={{ fontSize: 7.5, color: '#6B7280', marginTop: 3 }}>
+          {`Son: ${numeroALetras(total)}`}
+        </Text>
+      )}
     </View>
   );
 }

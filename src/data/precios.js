@@ -142,7 +142,7 @@ export const EXTRAS_UNIVERSALES = [
 
 
 // 👉 Función auxiliar única
-function getRangoIndex(ranges, valor) {
+export function getRangoIndex(ranges, valor) {
   for (let i = 0; i < ranges.length - 1; i++) {
     if (valor > ranges[i] && valor <= ranges[i + 1]) {
       return i;

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuote } from '../context/QuoteContext';
 import { useAuth } from '../context/AuthContext';
-import { guardarProducto, subirFotoProducto, sembrarProductos, migrarCondicionesComerciales, cargarTerminos, guardarTerminos } from '../utils/firebaseProductos';
+import { guardarProducto, subirFotoProducto, sembrarProductos, cargarTerminos, guardarTerminos } from '../utils/firebaseProductos';
 import { generarTerminosGeneralesHTML } from '../utils/htmlSections';
 import RichTextEditor from '../components/RichTextEditor';
 import 'react-quill-new/dist/quill.snow.css';
@@ -763,7 +763,6 @@ export default function ProductsPage() {
   const [productoEditando, setProductoEditando] = useState(null);
   const [fichaProducto, setFichaProducto] = useState(null);
   const [sembrando, setSembrando] = useState(false);
-  const [migrandoCondiciones, setMigrandoCondiciones] = useState(false);
   const [modalTerminos, setModalTerminos] = useState(false);
   const [terminosHTML, setTerminosHTML] = useState('');
   const [guardandoTerminos, setGuardandoTerminos] = useState(false);
@@ -778,21 +777,6 @@ export default function ProductsPage() {
   const filtrados = productosDB.filter(p =>
     p.activo !== false && p.nombre.toLowerCase().includes(filtro.toLowerCase())
   );
-
-  const handleMigrarCondiciones = async () => {
-    if (!await confirm('¿Actualizar las condiciones comerciales en todos los productos de Firestore?')) return;
-    setMigrandoCondiciones(true);
-    try {
-      await migrarCondicionesComerciales();
-      toast.success('Condiciones comerciales actualizadas');
-      await recargarProductos();
-    } catch (e) {
-      console.error(e);
-      toast.error('Error: ' + e.message);
-    } finally {
-      setMigrandoCondiciones(false);
-    }
-  };
 
   const handleGuardarTerminos = async () => {
     setGuardandoTerminos(true);
@@ -835,12 +819,6 @@ export default function ProductsPage() {
           <button onClick={handleSembrar} disabled={sembrando}
             className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium">
             {sembrando ? 'Migrando...' : 'Migrar datos iniciales'}
-          </button>
-        )}
-        {esAdmin && !productosLoading && productosDB.length > 0 && (
-          <button onClick={handleMigrarCondiciones} disabled={migrandoCondiciones}
-            className="bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium">
-            {migrandoCondiciones ? 'Actualizando...' : 'Migrar condiciones'}
           </button>
         )}
         {esAdmin && (

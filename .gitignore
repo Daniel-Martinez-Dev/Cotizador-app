@@ -1,3 +1,7 @@
+# Secrets
+service-account.json
+*.service-account.json
+
 # Logs
 logs
 *.log
@@ -139,11 +143,11 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Archivos temporales de deploy OTA
+update-*.zip
+
 # Claude Code local settings
 .claude/settings.local.json
 
 # Android IDE files
 android/.idea/
-
-# Capacitor Android build artifacts
-android/app/build/

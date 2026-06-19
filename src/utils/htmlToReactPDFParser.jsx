@@ -166,9 +166,8 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
           </Text>
         );
       case "p": {
-        // Render directo, sin agrupación
         return (
-          <Text key={index} style={s.paragraph}>
+          <Text key={index} style={{ ...s.paragraph, lineHeight: Math.max(s.paragraph.lineHeight || 1.35, 1.45) }}>
             {parseChildren(node)}
           </Text>
         );
@@ -196,18 +195,18 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
         const className = node.getAttribute && node.getAttribute('class');
         if (className && className.includes('condiciones-compactas')) {
           const isEspec = className.includes('espec-compactas');
-          const extraIndent = isEspec ? 4 : 0; // indent base
-          if (!isEspec) {
-            // Condiciones / Términos: render en bloques con bullet preservando negrilla inline (<strong>).
+          const itemLineHeight = Math.max(s.paragraph.lineHeight || 1.35, 1.45);
+          const itemMarginBottom = isEspec ? 3 : 4;
+          if (isEspec) {
             return (
-              <View key={index} style={{ marginTop: 1, marginBottom: 1, paddingLeft: extraIndent }}>
+              <View key={index} style={{ ...s.list, marginTop: 1, marginBottom: 1 }}>
                 {[...node.children].map((liNode, i) => {
                   const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
                   if (!liText) return null;
                   return (
-                    <View key={i} style={{ flexDirection: 'row', marginBottom: 2.5 }}>
-                      <Text style={{ width: 8, fontSize: baseFont, lineHeight: s.paragraph.lineHeight, color: T.colors?.accent || '#1A4A7A' }}>•</Text>
-                      <Text style={{ ...s.paragraph, marginBottom: 0, flex: 1, lineHeight: s.paragraph.lineHeight }}>
+                    <View key={i} wrap={false} style={{ ...s.listItem, marginBottom: itemMarginBottom }}>
+                      <Text style={s.bullet}>•</Text>
+                      <Text style={{ ...s.listItemText, lineHeight: itemLineHeight }}>
                         {parseChildren(liNode)}
                       </Text>
                     </View>
@@ -216,18 +215,15 @@ export function parseHtmlToPDFComponents(html, { compact = false, dense = false,
               </View>
             );
           }
-          // Especificaciones: mostrar bullets compactos
-          const compactLineHeight = Math.min((s.listItemText?.lineHeight || s.paragraph.lineHeight || 1.35), 1.2);
           return (
-            <View key={index} style={{ marginTop:0.5, marginBottom:0.5, paddingLeft: extraIndent }}>
+            <View key={index} style={{ marginTop: 1, marginBottom: 1 }}>
               {[...node.children].map((liNode, i) => {
                 const liText = (liNode.textContent || '').replace(/\s+/g, ' ').trim();
                 if (!liText) return null;
                 return (
-                  <View wrap={false} key={i} style={{ flexDirection:'row', marginBottom: 0.2 }}>
-                    <Text style={{ width:6, textAlign:'center', lineHeight: compactLineHeight }}>•</Text>
-                    <Text style={{ ...s.listItemText, flex:1, marginBottom:0.1, lineHeight: compactLineHeight }}>
-                      {liText}
+                  <View key={i} style={{ marginBottom: itemMarginBottom }}>
+                    <Text style={{ ...s.paragraph, marginBottom: 0, lineHeight: itemLineHeight }}>
+                      {parseChildren(liNode)}
                     </Text>
                   </View>
                 );
