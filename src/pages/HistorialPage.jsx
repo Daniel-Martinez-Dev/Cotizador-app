@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 import { collection, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, waitForAuth, getAuthError } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ export default function HistorialPage() {
     "CANCELADA"
   ];
 
+  const [editandoNota, setEditandoNota] = useState(null); // { id, valor }
   const [startDate, endDate] = rangoFecha;
   const navigate = useNavigate();
   const { setQuoteData, confirm } = useQuote();
@@ -64,7 +66,7 @@ export default function HistorialPage() {
         setProductosUnicos([
           ...new Set(
             datos
-              .map(c => c.productos?.[0])
+              .flatMap(c => c.productos || [])
               .filter(Boolean)
               .map(p => p.nombrePersonalizado || p.tipo || "")
               .filter(Boolean)
@@ -115,10 +117,10 @@ export default function HistorialPage() {
   // Filtro
   const filtradas = cotizaciones.filter(c => {
     const nombreCliente = c.nombreCliente || c.cliente || "";
-    const primerProd = c.productos?.[0];
-    const nombreProducto = primerProd ? (primerProd.nombrePersonalizado || primerProd.tipo || "") : "";
     const coincideCliente = filtroCliente ? nombreCliente === filtroCliente : true;
-    const coincideProducto = filtroProducto ? nombreProducto === filtroProducto : true;
+    const coincideProducto = filtroProducto
+      ? (c.productos || []).some(p => (p.nombrePersonalizado || p.tipo || "") === filtroProducto)
+      : true;
     const coincideEstado = filtroEstado ? c.estadoSeguimiento === filtroEstado : true;
 
     // Filtro número: si el input son solo dígitos -> coincidencia exacta; si no, substring
@@ -219,8 +221,7 @@ export default function HistorialPage() {
     navigate("/preview");
   };
   const manejarEditar = cot => {
-    // Marca modo edición para mostrar aviso en el formulario
-    setQuoteData({ ...cot, modoEdicion: true });
+    setQuoteData({ ...cot, modoEdicion: true, _editToken: Date.now() });
     navigate("/cotizar");
   };
   const manejarEliminar = async cot => {
@@ -367,17 +368,7 @@ export default function HistorialPage() {
                           {estados.map(es=> <option key={es} value={es}>{es}</option>)}
                         </select>
                         <button
-                          onClick={async ()=>{
-                            const nota = window.prompt('Nota / acuerdo con el cliente:', c.notaEstado || '');
-                            if(nota===null) return; // cancelado
-                            try {
-                              await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
-                              setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
-                            } catch(err){
-                              console.error(err);
-                              alert('No se pudo guardar la nota');
-                            }
-                          }}
+                          onClick={() => setEditandoNota({ id: c.id, valor: c.notaEstado || '' })}
                           title={c.notaEstado ? `Nota: ${c.notaEstado}` : 'Agregar nota'}
                           className={`p-1 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-trafico/50 ${c.notaEstado
                             ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-600 dark:text-white dark:border-green-400 dark:hover:bg-green-500'
@@ -386,11 +377,44 @@ export default function HistorialPage() {
                           <FaRegCommentDots />
                         </button>
                       </div>
-                      {c.notaEstado && (
+                      {editandoNota?.id === c.id ? (
+                        <div className="flex gap-1 mt-1">
+                          <input
+                            autoFocus
+                            type="text"
+                            className="flex-1 border rounded px-2 py-1 text-[10px] bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 min-w-0"
+                            value={editandoNota.valor}
+                            onChange={e => setEditandoNota(prev => ({ ...prev, valor: e.target.value }))}
+                            onKeyDown={async e => {
+                              if (e.key === 'Escape') { setEditandoNota(null); return; }
+                              if (e.key === 'Enter') {
+                                const nota = editandoNota.valor;
+                                try {
+                                  await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
+                                  setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
+                                  setEditandoNota(null);
+                                } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={async () => {
+                              const nota = editandoNota.valor;
+                              try {
+                                await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
+                                setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
+                                setEditandoNota(null);
+                              } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
+                            }}
+                            className="px-1.5 py-1 bg-green-600 text-white rounded text-[10px] hover:bg-green-700 shrink-0"
+                          >✓</button>
+                          <button onClick={() => setEditandoNota(null)} className="px-1.5 py-1 bg-gray-400 text-white rounded text-[10px] hover:bg-gray-500 shrink-0">✕</button>
+                        </div>
+                      ) : c.notaEstado ? (
                         <div className="text-[9px] md:text-[10px] leading-tight text-left line-clamp-2 max-w-[120px]" title={c.notaEstado}>
                           {c.notaEstado}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                   <td className="border px-2 py-1 space-x-2 whitespace-nowrap">

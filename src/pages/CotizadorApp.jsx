@@ -60,8 +60,7 @@ export default function CotizadorApp(){
 
   const [productos, setProductos] = useState([crearProductoInicial()]);
   const [cliente, setCliente] = useState('');
-  const [extraInput, setExtraInput] = useState('');
-  const [extraPrecioInput, setExtraPrecioInput] = useState('');
+  const [extrasInputs, setExtrasInputs] = useState({});
   const [alertas, setAlertas] = useState([]);
   const [ajusteTotalTipo, setAjusteTotalTipo] = useState('Descuento');
   const [ajusteTotalValor, setAjusteTotalValor] = useState(0);
@@ -88,7 +87,7 @@ export default function CotizadorApp(){
       if(quoteData.clienteEmail) setContactoEmailInput(quoteData.clienteEmail);
       if(quoteData.clienteTelefono) setContactoTelInput(quoteData.clienteTelefono);
     }
-  }, []);
+  }, [quoteData?._editToken]);
   // Cargar datos de empresa/contacto al entrar en modo edicion
   const clienteCargadoRef = useRef(false);
   useEffect(()=>{
@@ -122,7 +121,7 @@ export default function CotizadorApp(){
     })();
   }, [quoteData?.modoEdicion, quoteData?.empresaId, quoteData?.empresaNIT]);
   // Reset externo
-  useEffect(()=>{ if(resetToken){ setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); setQuoteData({}); setResetToken(null);} },[resetToken]);
+  useEffect(()=>{ if(resetToken){ setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); setExtrasInputs({}); setQuoteData({}); setResetToken(null);} },[resetToken]);
   // Sincronizar collapsed
   useEffect(()=>{ setCollapsed(prev=> productos.map((_,i)=> prev[i]??false)); }, [productos.length]);
   // Alertas rango
@@ -139,7 +138,11 @@ export default function CotizadorApp(){
       document.getElementById(`producto-card-${newIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 80);
   };
-  const handleEliminarProducto = (i)=>{ setProductos(p=> p.filter((_,idx)=> idx!==i)); setAlertas(a=> a.filter((_,idx)=> idx!==i)); };
+  const handleEliminarProducto = (i)=>{
+    setProductos(p=> p.filter((_,idx)=> idx!==i));
+    setAlertas(a=> a.filter((_,idx)=> idx!==i));
+    setExtrasInputs(prev=>{ const next={}; Object.entries(prev).forEach(([k,v])=>{ const ki=parseInt(k); if(ki<i) next[ki]=v; else if(ki>i) next[ki-1]=v; }); return next; });
+  };
   const handleChangeProducto = (i,campo,valor)=>{ setProductos(p=> { const n=[...p]; n[i][campo]=valor; if(campo==='tipo'){ n[i].extras=[]; n[i].extrasCantidades={}; n[i].extrasPersonalizados=[]; n[i].extrasPersonalizadosCant={}; n[i].precioManual=''; n[i].precioEditado=''; n[i].componentes = valor === 'Sello de Andén' ? ['sello completo'] : []; n[i].cliente='Cliente Final Contado'; } if(campo==='cliente'){ n[i].precioManual=''; n[i].precioEditado=''; } return n;}); };
   const handleToggleExtra = (i, extra)=>{
     setProductos(prev=> prev.map((prod, idx)=>{
@@ -160,22 +163,29 @@ export default function CotizadorApp(){
   };
   const handleChangeCantidadExtra = (ip, nombre, val)=> setProductos(p=>{ const n=[...p]; n[ip].extrasCantidades={...(n[ip].extrasCantidades||{}), [nombre]:val}; return n;});
   const handleAgregarExtraPersonalizado = (i)=>{
-    if(!extraInput || !extraPrecioInput) return;
+    const inp = extrasInputs[i] || {};
+    if(!inp.nombre || !inp.precio) return;
     setProductos(prev => prev.map((prod, idx)=>{
       if(idx!==i) return prod;
       const lista = prod.extrasPersonalizados ? [...prod.extrasPersonalizados] : [];
-      lista.push({ nombre: extraInput, precio: parseInt(extraPrecioInput)||0 });
-      const nuevoIndex = lista.length - 1; // index del que acabamos de agregar
+      lista.push({ nombre: inp.nombre, precio: parseInt(inp.precio)||0 });
+      const nuevoIndex = lista.length - 1;
       return {
         ...prod,
         extrasPersonalizados: lista,
         extrasPersonalizadosCant: { ...(prod.extrasPersonalizadosCant||{}), [nuevoIndex]: 1 }
       };
     }));
-    setExtraInput('');
-    setExtraPrecioInput('');
+    setExtrasInputs(prev => ({ ...prev, [i]: { nombre: '', precio: '' } }));
   };
-  const handleEliminarExtraPersonalizado = (ip, idx)=> setProductos(p=>{ const n=[...p]; n[ip].extrasPersonalizados.splice(idx,1); const c={...(n[ip].extrasPersonalizadosCant||{})}; delete c[idx]; n[ip].extrasPersonalizadosCant=c; return n;});
+  const handleEliminarExtraPersonalizado = (ip, idx) => setProductos(p => p.map((prod, i) => {
+    if (i !== ip) return prod;
+    const lista = prod.extrasPersonalizados.filter((_, j) => j !== idx);
+    const oldCant = prod.extrasPersonalizadosCant || {};
+    const nuevaCant = {};
+    lista.forEach((_, j) => { nuevaCant[j] = oldCant[j >= idx ? j + 1 : j] ?? 1; });
+    return { ...prod, extrasPersonalizados: lista, extrasPersonalizadosCant: nuevaCant };
+  }));
   const handleChangeCantidadExtraPersonalizado = (ip, idx,val)=> setProductos(p=>{ const n=[...p]; n[ip].extrasPersonalizadosCant={...(n[ip].extrasPersonalizadosCant||{}), [idx]:val}; return n;});
 
   // Precios
@@ -288,10 +298,13 @@ export default function CotizadorApp(){
       return;
     }
     setCreandoEntidad(true);
+    let ensureOk = false;
     try {
       await ensureEmpresaContacto();
+      ensureOk = true;
     } catch(e){ console.error(e); toast.error('Error creando empresa/contacto'); }
     finally { setCreandoEntidad(false); }
+    if (!ensureOk) return;
 
     const productosCotizados = productos.map((p,i)=> ({...p, precioCalculado: calcularPrecio(p,i), subtotalExtras: calcularSubtotalExtras(p)}));
     let subtotal = productosCotizados.reduce((s,p)=> s + (p.precioCalculado||0)*(parseInt(p.cantidad)||1) + (p.subtotalExtras||0), 0);
@@ -492,7 +505,7 @@ export default function CotizadorApp(){
                       <div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Información Adicional</label><input type="text" value={producto.infoAdicional||''} onChange={e=> handleChangeProducto(i,'infoAdicional', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="(Ej: Muelle 3, Placa 5, Zona Fría)" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>
-                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Ajuste (%)</label><div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div></div>
+                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase" title="Ajuste sobre el precio de este producto. El ajuste global (sidebar) se aplica encima del total.">Ajuste (%)</label><div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div></div>
                       {producto.tipo==='Sello de Andén' && (
                         <div className="space-y-2 md:col-span-2">
                           <label className="block text-xs font-semibold tracking-wide uppercase">Componentes Sello</label>
@@ -605,8 +618,8 @@ export default function CotizadorApp(){
                       <div>
                         <label className="block text-xs font-semibold tracking-wide uppercase mb-1">Extras Personalizados</label>
                         <div className="flex flex-wrap gap-2 mb-2">
-                          <input type="text" placeholder="Nombre" className="flex-1 min-w-[160px] border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" value={extraInput} onChange={e=> setExtraInput(e.target.value)} />
-                          <input type="number" placeholder="Precio" className="w-32 border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" value={extraPrecioInput} onChange={e=> setExtraPrecioInput(e.target.value)} />
+                          <input type="text" placeholder="Nombre" className="flex-1 min-w-[160px] border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" value={extrasInputs[i]?.nombre||''} onChange={e=> setExtrasInputs(prev=>({...prev,[i]:{...(prev[i]||{}),nombre:e.target.value}}))} />
+                          <input type="number" placeholder="Precio" className="w-32 border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" value={extrasInputs[i]?.precio||''} onChange={e=> setExtrasInputs(prev=>({...prev,[i]:{...(prev[i]||{}),precio:e.target.value}}))} />
                           <button type="button" onClick={()=> handleAgregarExtraPersonalizado(i)} className="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs">Añadir</button>
                         </div>
                         <div className="space-y-1">
@@ -646,7 +659,8 @@ export default function CotizadorApp(){
                   <div className="border-t border-gray-200 dark:border-gris-700 mt-2 pt-1" />
                 </div>
               )}
-              <h2 className="text-sm font-semibold tracking-wide uppercase mb-3 text-gray-600 dark:text-gray-300">Ajuste general</h2>
+              <h2 className="text-sm font-semibold tracking-wide uppercase mb-1 text-gray-600 dark:text-gray-300">Ajuste general</h2>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-3">Se aplica sobre el subtotal, después del ajuste por producto.</p>
               <div className="flex items-center gap-3 mb-4">
                 <select value={ajusteTotalTipo} onChange={e=> setAjusteTotalTipo(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"><option value='Descuento'>Descuento</option><option value='Incremento'>Incremento</option></select>
                 <input type="number" value={ajusteTotalValor} onChange={e=> setAjusteTotalValor(e.target.value)} placeholder="%" className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" /><span className="text-xs">%</span>

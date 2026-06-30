@@ -20,7 +20,8 @@
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
     "android:apk": "npm run android:build && powershell -Command \"Get-ChildItem -Path android\\\\app\\\\src\\\\main\\\\assets -Recurse -File | ForEach-Object { try { $s=[System.IO.File]::Open($_.FullName,'Open','Read','ReadWrite'); $s.Close() } catch {} }\" && cross-env JAVA_HOME=\"C:\\Program Files\\Android\\Android Studio\\jbr\" .\\android\\gradlew.bat -p android assembleDebug",
-    "deploy:update": "npm run build && node scripts/deploy-update.js && npx cap sync android"
+    "deploy:update": "npm run build && node scripts/deploy-update.js && npx cap sync android",
+    "android:release": "npm run android:build && cross-env JAVA_HOME=\"C:\\Program Files\\Android\\Android Studio\\jbr\" .\\android\\gradlew.bat -p android bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

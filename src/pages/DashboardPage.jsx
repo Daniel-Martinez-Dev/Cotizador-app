@@ -26,11 +26,11 @@ function Card({ title, desc, to, enabled, icon, tone }) {
         {enabled ? (
           <span className="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Activo</span>
         ) : (
-          <span className="text-[10px] uppercase tracking-wide text-gray-400">Bloqueado</span>
+          <span className="text-[10px] uppercase tracking-wide text-gray-400" title="Contacta al administrador para habilitar este módulo">Bloqueado</span>
         )}
       </div>
       <div className="mt-5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>Acceder al módulo</span>
+        <span>{enabled ? 'Acceder al módulo' : 'Contacta al administrador para activar'}</span>
         <span className={`text-base transition ${enabled ? 'group-hover:translate-x-1' : ''}`}>→</span>
       </div>
     </div>

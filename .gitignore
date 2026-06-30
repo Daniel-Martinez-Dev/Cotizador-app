@@ -151,3 +151,8 @@ update-*.zip
 
 # Android IDE files
 android/.idea/
+
+# Android signing secrets
+android/keystore.properties
+android/app/*.jks
+android/app/*.keystore

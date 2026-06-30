@@ -187,46 +187,53 @@ export default function PreviewPage() {
     const telefonoContacto = formCliente.clienteTelefono?.trim();
     const nombreContacto = formCliente.clienteContacto?.trim();
 
-    if(!nit){ toast.error('NIT requerido ahora'); return; }
+    // Si no hay datos de empresa, solo guardar en quoteData y cerrar
+    if(!nit && !nombreEmpresa) {
+      setEditandoCliente(false);
+      return;
+    }
 
     try {
-      let empresa = await obtenerEmpresaPorNIT(nit);
-      if(!empresa){
-        const empresaId = await crearEmpresa({ nit, nombre: nombreEmpresa, ciudad });
-        empresa = { id: empresaId, nit, nombre: nombreEmpresa, ciudad };
+      let empresa = null;
+      if(nit) { empresa = await obtenerEmpresaPorNIT(nit); }
+      if(!empresa && nombreEmpresa) {
+        const empresaId = await crearEmpresa({ nit: nit || '', nombre: nombreEmpresa, ciudad });
+        empresa = { id: empresaId, nit: nit || '', nombre: nombreEmpresa, ciudad };
         toast.success("Empresa creada");
-      } else {
+      } else if(empresa) {
         const cambios = {};
         if(nombreEmpresa && nombreEmpresa !== empresa.nombre) cambios.nombre = nombreEmpresa;
         if(ciudad && ciudad !== empresa.ciudad) cambios.ciudad = ciudad;
         if(Object.keys(cambios).length){ await actualizarEmpresa(empresa.id, cambios); }
       }
 
-      let contacto = null;
-      if(emailContacto){
-        contacto = await buscarContactoPorEmail(empresa.id, emailContacto);
-      }
-      if(!contacto && nombreContacto){
-        const listaC = await listarContactos(empresa.id);
-        contacto = listaC.find(c=> c.nombre?.toLowerCase() === nombreContacto.toLowerCase());
-      }
-      if(!contacto){
-        const contactoId = await crearContacto(empresa.id, { nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto });
-        contacto = { id: contactoId, nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto };
-        toast.success("Contacto creado");
-      } else {
-        const cambiosC = {};
-        if(nombreContacto && nombreContacto !== contacto.nombre) cambiosC.nombre = nombreContacto;
-        if(emailContacto && emailContacto !== contacto.email) cambiosC.email = emailContacto;
-        if(telefonoContacto && telefonoContacto !== contacto.telefono) cambiosC.telefono = telefonoContacto;
-        if(Object.keys(cambiosC).length){ await actualizarContacto(empresa.id, contacto.id, cambiosC); }
-        toast.success("Contacto actualizado (sobrescrito)");
-      }
+      if(empresa) {
+        let contacto = null;
+        if(emailContacto){
+          contacto = await buscarContactoPorEmail(empresa.id, emailContacto);
+        }
+        if(!contacto && nombreContacto){
+          const listaC = await listarContactos(empresa.id);
+          contacto = listaC.find(c=> c.nombre?.toLowerCase() === nombreContacto.toLowerCase());
+        }
+        if(!contacto && (nombreContacto || emailContacto)){
+          const contactoId = await crearContacto(empresa.id, { nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto });
+          contacto = { id: contactoId, nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto };
+          toast.success("Contacto creado");
+        } else if(contacto) {
+          const cambiosC = {};
+          if(nombreContacto && nombreContacto !== contacto.nombre) cambiosC.nombre = nombreContacto;
+          if(emailContacto && emailContacto !== contacto.email) cambiosC.email = emailContacto;
+          if(telefonoContacto && telefonoContacto !== contacto.telefono) cambiosC.telefono = telefonoContacto;
+          if(Object.keys(cambiosC).length){ await actualizarContacto(empresa.id, contacto.id, cambiosC); }
+          toast.success("Contacto actualizado (sobrescrito)");
+        }
 
-      const listaEmp = await listarEmpresas();
-      setEmpresas(listaEmp);
-      setEmpresaSeleccionada(listaEmp.find(e=> e.id===empresa.id) || empresa);
-      setContactoSeleccionado(contacto);
+        const listaEmp = await listarEmpresas();
+        setEmpresas(listaEmp);
+        setEmpresaSeleccionada(listaEmp.find(e=> e.id===empresa.id) || empresa);
+        if(contacto) setContactoSeleccionado(contacto);
+      }
 
     } catch(e){
       console.error("Error guardando empresa/contacto", e);
