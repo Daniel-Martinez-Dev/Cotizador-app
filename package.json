@@ -16,6 +16,7 @@
     "electron:prod": "npm run build && electron .",
     "build:desktop": "vite build && electron-builder --win",
     "build:desktop:public": "cross-env VITE_REQUIRE_LOGIN=false VITE_ENABLE_PRODUCCION=false VITE_ENABLE_INVENTARIO=false vite build && electron-builder --win",
+    "build:desktop:mac": "vite build && electron-builder --mac",
     "android:build": "npm run build && npx cap sync android",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
@@ -75,7 +76,7 @@
     ],
     "directories": {
       "buildResources": "build",
-      "output": "C:\\Users\\danma\\OneDrive\\LUZ AMPARO\\release\\release"
+      "output": "release"
     },
     "win": {
       "icon": "build/icon.png",
@@ -87,6 +88,13 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
     }
   }
 }
