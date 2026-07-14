@@ -2,7 +2,7 @@
   "name": "cotizador-app",
   "version": "1.2.0",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "test": "vitest run",
     "dev": "vite",

@@ -1,11 +1,7 @@
-import { app, BrowserWindow } from 'electron'
-import path from 'node:path'
-import fs from 'node:fs'
-import http from 'node:http'
-import { fileURLToPath } from 'node:url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const { app, BrowserWindow } = require('electron')
+const path = require('node:path')
+const fs = require('node:fs')
+const http = require('node:http')
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.

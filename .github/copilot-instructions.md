@@ -15,7 +15,7 @@ This project is a React + Vite web app with optional Electron desktop packaging.
 - Quoting: `src/pages/CotizadorApp.jsx` builds products, computes item prices + extras, and sets `quoteData`. It then navigates to preview.
 - Preview/PDF: `src/pages/PreviewPage.jsx` derives HTML sections via `src/utils/htmlSections.js`, lets users edit them, selects images, and calls `generarPDFReact()`.
 - Persistence: `generarPDFReact()` saves new quotes to Firestore (`src/utils/firebaseQuotes.js`) and obtains sequence numbers via `src/utils/quoteNumberFirebase.js`.
-- Desktop: `electron/main.js` loads `/#/` in dev and `dist/index.html` in prod; `preload.js` exposes `appInfo.env`.
+- Desktop: `electron/main.cjs` loads `/#/` in dev and `dist/index.html` in prod; `preload.js` exposes `appInfo.env`.
 
 ## Pricing & Products
 - Catalog: `src/data/catalogoProductos.js` centralizes product definitions: `tipoCalculo`, `requiereMedidas`, `extrasKey`, `descripcionGeneral`, `especificacionesHTML`, `lineaTabla`, optional `getPrecioBase()`.
