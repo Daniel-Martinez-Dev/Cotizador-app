@@ -22,8 +22,10 @@ allprojects {
         google()
         mavenCentral()
     }
-    // Build fuera de OneDrive para evitar bloqueos de archivos durante la sincronización
-    buildDir = "C:/Users/danma/AppData/Local/CotizadorBuild/${project.name}"
+    // Build fuera de OneDrive para evitar bloqueos de archivos durante la sincronización (solo Windows)
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        buildDir = "C:/Users/danma/AppData/Local/CotizadorBuild/${project.name}"
+    }
 }
 
 task clean(type: Delete) {
