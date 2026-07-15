@@ -8,6 +8,8 @@ import {
   actualizarRoles,
   upsertUserProfileByEmail,
 } from "../utils/firebaseUsers";
+import { useQuote } from "../context/QuoteContext";
+import Tabs from "../components/ui/Tabs";
 
 const ALL_ROLES = ["admin", "vendedor", "produccion", "inventario"];
 
@@ -287,6 +289,7 @@ function PreRegisterForm({ onSaved }) {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function UsuariosPage() {
+  const { confirm } = useQuote();
   const [tab, setTab] = React.useState("solicitudes");
   const [allUsers, setAllUsers] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -322,6 +325,8 @@ export default function UsuariosPage() {
   };
 
   const handleDeactivate = async (uid) => {
+    const ok = await confirm("¿Deshabilitar el acceso de este usuario?");
+    if (!ok) return;
     try {
       await desactivarUsuario(uid);
       toast.success("Usuario desactivado");
@@ -344,9 +349,9 @@ export default function UsuariosPage() {
   };
 
   const tabs = [
-    { key: "solicitudes", label: "Solicitudes", count: pending.length },
-    { key: "usuarios",    label: "Usuarios",    count: active.length },
-    { key: "preregistro", label: "Pre-registro", count: null },
+    { key: "solicitudes", label: "Solicitudes", badge: pending.length, badgeTone: "warning" },
+    { key: "usuarios",    label: "Usuarios",    badge: active.length },
+    { key: "preregistro", label: "Pre-registro" },
   ];
 
   return (
@@ -357,28 +362,8 @@ export default function UsuariosPage() {
       </p>
 
       {/* Tabs */}
-      <div className="flex gap-1 mt-5 border-b border-gray-200 dark:border-gris-700">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-              tab === t.key
-                ? "border-trafico text-gray-900 dark:text-white"
-                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {t.label}
-            {t.count !== null && t.count > 0 && (
-              <span className={`ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full font-semibold ${
-                t.key === "solicitudes" ? "bg-amber-500 text-white" : "bg-gray-200 dark:bg-gris-600 text-gray-700 dark:text-gray-300"
-              }`}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="mt-5">
+        <Tabs items={tabs} active={tab} onChange={setTab} variant="underline" />
       </div>
 
       {/* Tab: Solicitudes */}

@@ -1,18 +1,24 @@
 import React, { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
-import { collection, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, waitForAuth, getAuthError } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
 import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye, FaRegCommentDots } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import EmptyState from "../components/ui/EmptyState";
+import Button from "../components/ui/Button";
+
+const CARGA_INICIAL = 300;
 
 export default function HistorialPage() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [permisoError, setPermisoError] = useState("");
   const [clientesUnicos, setClientesUnicos] = useState([]);
   const [productosUnicos, setProductosUnicos] = useState([]);
+  const [historialCompleto, setHistorialCompleto] = useState(false);
+  const [cargandoHistorialCompleto, setCargandoHistorialCompleto] = useState(false);
 
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroNumero, setFiltroNumero] = useState("");
@@ -39,7 +45,33 @@ export default function HistorialPage() {
   const navigate = useNavigate();
   const { setQuoteData, confirm } = useQuote();
 
-  // Fetch inicial
+  const aplicarSnapshot = (snap) => {
+    const mapa = new Map();
+    snap.docs.forEach(d => {
+      const data = d.data();
+      mapa.set(d.id, {
+        id: d.id,
+        ...data,
+        estadoSeguimiento: data.estadoSeguimiento || "COTIZACIÓN ENVIADA",
+        estadoFecha: data.estadoFecha || data.estadoCambio || data.timestamp || null
+      });
+    });
+    const datos = Array.from(mapa.values());
+    setCotizaciones(datos);
+    setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
+    setProductosUnicos([
+      ...new Set(
+        datos
+          .flatMap(c => c.productos || [])
+          .filter(Boolean)
+          .map(p => p.nombrePersonalizado || p.tipo || "")
+          .filter(Boolean)
+      )
+    ].sort());
+  };
+
+  // Fetch inicial: solo las cotizaciones más recientes (rápido incluso si el
+  // historial crece mucho). "Cargar historial completo" trae el resto.
   useEffect(() => {
     (async () => {
       // Esperar autenticación (anónima o la que sea) antes de leer
@@ -49,35 +81,30 @@ export default function HistorialPage() {
         setPermisoError('La autenticación anónima no está habilitada en Firebase. Actívala en Authentication > Sign-in method o inicia sesión con otro proveedor.');
       }
       try {
-        const snap = await getDocs(collection(db, "cotizaciones"));
-        const mapa = new Map();
-        snap.docs.forEach(d => {
-          const data = d.data();
-          mapa.set(d.id, {
-            id: d.id,
-            ...data,
-            estadoSeguimiento: data.estadoSeguimiento || "COTIZACIÓN ENVIADA",
-            estadoFecha: data.estadoFecha || data.estadoCambio || data.timestamp || null
-          });
-        });
-        const datos = Array.from(mapa.values());
-        setCotizaciones(datos);
-        setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
-        setProductosUnicos([
-          ...new Set(
-            datos
-              .flatMap(c => c.productos || [])
-              .filter(Boolean)
-              .map(p => p.nombrePersonalizado || p.tipo || "")
-              .filter(Boolean)
-          )
-        ].sort());
+        const snap = await getDocs(query(collection(db, "cotizaciones"), orderBy("timestamp", "desc"), limit(CARGA_INICIAL)));
+        aplicarSnapshot(snap);
+        setHistorialCompleto(snap.size < CARGA_INICIAL);
       } catch (e) {
         console.error('Error cargando cotizaciones', e);
         setPermisoError('No se pudo leer Firestore: permisos insuficientes. Verifica las reglas o habilita autenticación.');
       }
     })();
   }, []);
+
+  const cargarHistorialCompleto = async () => {
+    setCargandoHistorialCompleto(true);
+    try {
+      const snap = await getDocs(collection(db, "cotizaciones"));
+      aplicarSnapshot(snap);
+      setHistorialCompleto(true);
+      toast.success(`Historial completo cargado (${snap.size} cotizaciones)`);
+    } catch (e) {
+      console.error('Error cargando historial completo', e);
+      toast.error('No se pudo cargar el historial completo');
+    } finally {
+      setCargandoHistorialCompleto(false);
+    }
+  };
 
   // Helpers
   const iconoOrden = useCallback(
@@ -231,7 +258,7 @@ export default function HistorialPage() {
       setCotizaciones(prev => prev.filter(c => c.id !== cot.id));
     } catch (e) {
       console.error("Error eliminando", e);
-      alert("No se pudo eliminar");
+      toast.error("No se pudo eliminar");
     }
   };
 
@@ -270,11 +297,90 @@ export default function HistorialPage() {
     return items;
   };
 
+  const renderEstadoNotaCell = (c) => (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <select
+          value={c.estadoSeguimiento}
+          onChange={async e=>{
+            const nuevo = e.target.value;
+            try {
+              await updateDoc(doc(db,'cotizaciones', c.id), { estadoSeguimiento: nuevo, estadoFecha: serverTimestamp() });
+              setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, estadoSeguimiento:nuevo, estadoFecha:{ toDate:()=> new Date() } } : x));
+            } catch(err){
+              console.error(err);
+              toast.error('No se pudo actualizar el estado');
+            }
+          }}
+          className={`flex-1 text-[10px] md:text-xs border rounded px-2 py-1 font-semibold transition-colors border-gray-300 dark:border-gris-600 focus:outline-none focus:ring-2 focus:ring-trafico/50 ${claseEstado(c.estadoSeguimiento)}`}
+        >
+          {estados.map(es=> <option key={es} value={es}>{es}</option>)}
+        </select>
+        <button
+          onClick={() => setEditandoNota({ id: c.id, valor: c.notaEstado || '' })}
+          title={c.notaEstado ? `Nota: ${c.notaEstado}` : 'Agregar nota'}
+          aria-label={c.notaEstado ? 'Editar nota' : 'Agregar nota'}
+          className={`p-1 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-trafico/50 ${c.notaEstado
+            ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-600 dark:text-white dark:border-green-400 dark:hover:bg-green-500'
+            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200 dark:bg-gris-700 dark:text-gray-200 dark:border-gris-500 dark:hover:bg-gris-600'}`}
+        >
+          <FaRegCommentDots />
+        </button>
+      </div>
+      {editandoNota?.id === c.id ? (
+        <div className="flex gap-1 mt-1">
+          <input
+            autoFocus
+            type="text"
+            className="flex-1 border rounded px-2 py-1 text-[10px] bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 min-w-0"
+            value={editandoNota.valor}
+            onChange={e => setEditandoNota(prev => ({ ...prev, valor: e.target.value }))}
+            onKeyDown={async e => {
+              if (e.key === 'Escape') { setEditandoNota(null); return; }
+              if (e.key === 'Enter') {
+                const nota = editandoNota.valor;
+                try {
+                  await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
+                  setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
+                  setEditandoNota(null);
+                } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
+              }
+            }}
+          />
+          <button
+            onClick={async () => {
+              const nota = editandoNota.valor;
+              try {
+                await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
+                setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
+                setEditandoNota(null);
+              } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
+            }}
+            className="px-1.5 py-1 bg-green-600 text-white rounded text-[10px] hover:bg-green-700 shrink-0"
+          >✓</button>
+          <button onClick={() => setEditandoNota(null)} className="px-1.5 py-1 bg-gray-400 text-white rounded text-[10px] hover:bg-gray-500 shrink-0">✕</button>
+        </div>
+      ) : c.notaEstado ? (
+        <div className="text-[9px] md:text-[10px] leading-tight text-left line-clamp-2 max-w-full md:max-w-[120px]" title={c.notaEstado}>
+          {c.notaEstado}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
   <div className="max-w-7xl mx-auto p-6 bg-white dark:bg-gris-900 shadow rounded">      
       {permisoError && (
         <div className="mb-4 p-3 rounded border border-red-300 bg-red-50 text-red-700 text-xs">
           {permisoError}
+        </div>
+      )}
+      {!historialCompleto && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 p-3 rounded border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-800 dark:text-amber-200">
+          <span>Mostrando las {CARGA_INICIAL} cotizaciones más recientes. Los filtros y la búsqueda solo alcanzan este rango.</span>
+          <Button variant="secondary" size="sm" onClick={cargarHistorialCompleto} disabled={cargandoHistorialCompleto}>
+            {cargandoHistorialCompleto ? 'Cargando...' : 'Cargar historial completo'}
+          </Button>
         </div>
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -315,118 +421,80 @@ export default function HistorialPage() {
           className="border p-2 rounded w-full"
           dateFormat="dd/MM/yyyy"
         />
-        <button onClick={()=>{ setFiltroCliente(''); setFiltroNumero(''); setFiltroProducto(''); setFiltroEstado(''); setRangoFecha([null,null]); }} className="bg-gray-500 text-white px-3 py-2 rounded text-sm">Limpiar</button>
+        <Button variant="secondary" onClick={()=>{ setFiltroCliente(''); setFiltroNumero(''); setFiltroProducto(''); setFiltroEstado(''); setRangoFecha([null,null]); }}>Limpiar</Button>
       </div>
 
       {/* Tabla */}
       {ordenadas.length === 0 ? (
-        <p className="text-sm text-gray-600">No se encontraron cotizaciones.</p>
+        <EmptyState icon="🧾" title="No se encontraron cotizaciones" />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto border text-xs md:text-sm dark:border-gray-700">
-            <thead className="bg-gray-100 dark:bg-gris-800">
-              <tr>
-                <th className="border px-2 py-2 cursor-pointer" onClick={()=>{ setOrdenarPor('numero'); setOrdenAscendente(o=>ordenarPor==='numero' ? !o : true); }}># {iconoOrden('numero')}</th>
-                <th className="border px-2 py-2">Cliente</th>
-                <th className="border px-2 py-2">Producto</th>
-                <th className="border px-2 py-2 cursor-pointer" onClick={()=>{ setOrdenarPor('fecha'); setOrdenAscendente(o=>ordenarPor==='fecha' ? !o : false); }}>Fecha {iconoOrden('fecha')}</th>
-                <th
-                  className="border px-2 py-2 cursor-pointer"
-                  onClick={()=>{ setOrdenarPor('total'); setOrdenAscendente(o=> ordenarPor==='total' ? !o : false); }}
-                >Total {iconoOrden('total')}</th>
-                <th className="border px-2 py-2">Último Cambio</th>
-                <th className="border px-2 py-2">Estado</th>
-                <th className="border px-2 py-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginaDatos.map(c => (
-                <tr key={c.id} className="text-center hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="border px-2 py-1">{c.numero}</td>
-                  <td className="border px-2 py-1">{c.nombreCliente || c.cliente}</td>
-                  <td className="border px-2 py-1">{c.productos?.[0]?.nombrePersonalizado || c.productos?.[0]?.tipo || '-'}</td>
-                  <td className="border px-2 py-1">{c.timestamp?.toDate ? c.timestamp.toDate().toLocaleDateString('es-CO') : '—'}</td>
-                  <td className="border px-2 py-1">{c.total?.toLocaleString('es-CO',{ style:'currency', currency:'COP', minimumFractionDigits:0 })}</td>
-                  <td className="border px-2 py-1">{c.estadoFecha?.toDate ? c.estadoFecha.toDate().toLocaleDateString('es-CO') : '—'}</td>
-                  <td className="border px-2 py-1">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={c.estadoSeguimiento}
-                          onChange={async e=>{
-                            const nuevo = e.target.value;
-                            try {
-                              await updateDoc(doc(db,'cotizaciones', c.id), { estadoSeguimiento: nuevo, estadoFecha: serverTimestamp() });
-                              setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, estadoSeguimiento:nuevo, estadoFecha:{ toDate:()=> new Date() } } : x));
-                            } catch(err){
-                              console.error(err);
-                              alert('No se pudo actualizar');
-                            }
-                          }}
-                          className={`flex-1 text-[10px] md:text-xs border rounded px-2 py-1 font-semibold transition-colors border-gray-300 dark:border-gris-600 focus:outline-none focus:ring-2 focus:ring-trafico/50 ${claseEstado(c.estadoSeguimiento)}`}
-                        >
-                          {estados.map(es=> <option key={es} value={es}>{es}</option>)}
-                        </select>
-                        <button
-                          onClick={() => setEditandoNota({ id: c.id, valor: c.notaEstado || '' })}
-                          title={c.notaEstado ? `Nota: ${c.notaEstado}` : 'Agregar nota'}
-                          className={`p-1 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-trafico/50 ${c.notaEstado
-                            ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200 dark:bg-green-600 dark:text-white dark:border-green-400 dark:hover:bg-green-500'
-                            : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200 dark:bg-gris-700 dark:text-gray-200 dark:border-gris-500 dark:hover:bg-gris-600'}`}
-                        >
-                          <FaRegCommentDots />
-                        </button>
-                      </div>
-                      {editandoNota?.id === c.id ? (
-                        <div className="flex gap-1 mt-1">
-                          <input
-                            autoFocus
-                            type="text"
-                            className="flex-1 border rounded px-2 py-1 text-[10px] bg-white dark:bg-gris-800 dark:border-gris-600 dark:text-gray-100 min-w-0"
-                            value={editandoNota.valor}
-                            onChange={e => setEditandoNota(prev => ({ ...prev, valor: e.target.value }))}
-                            onKeyDown={async e => {
-                              if (e.key === 'Escape') { setEditandoNota(null); return; }
-                              if (e.key === 'Enter') {
-                                const nota = editandoNota.valor;
-                                try {
-                                  await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
-                                  setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
-                                  setEditandoNota(null);
-                                } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={async () => {
-                              const nota = editandoNota.valor;
-                              try {
-                                await updateDoc(doc(db,'cotizaciones', c.id), { notaEstado: nota, notaEstadoFecha: serverTimestamp() });
-                                setCotizaciones(prev=> prev.map(x=> x.id===c.id ? { ...x, notaEstado: nota, notaEstadoFecha:{ toDate:()=> new Date() } } : x));
-                                setEditandoNota(null);
-                              } catch(err){ console.error(err); toast.error('No se pudo guardar la nota'); }
-                            }}
-                            className="px-1.5 py-1 bg-green-600 text-white rounded text-[10px] hover:bg-green-700 shrink-0"
-                          >✓</button>
-                          <button onClick={() => setEditandoNota(null)} className="px-1.5 py-1 bg-gray-400 text-white rounded text-[10px] hover:bg-gray-500 shrink-0">✕</button>
-                        </div>
-                      ) : c.notaEstado ? (
-                        <div className="text-[9px] md:text-[10px] leading-tight text-left line-clamp-2 max-w-[120px]" title={c.notaEstado}>
-                          {c.notaEstado}
-                        </div>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="border px-2 py-1 space-x-2 whitespace-nowrap">
-                    <button onClick={()=>manejarVer(c)} className="text-blue-600 hover:text-blue-800" title="Ver"><FaEye /></button>
-                    <button onClick={()=>manejarEditar(c)} className="text-yellow-500 hover:text-yellow-600" title="Editar"><FaEdit /></button>
-                    <button onClick={()=>manejarEliminar(c)} className="text-red-600 hover:text-red-800" title="Eliminar"><FaTrash /></button>
-                  </td>
+        <>
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full table-auto border text-xs md:text-sm dark:border-gray-700">
+              <thead className="bg-gray-100 dark:bg-gris-800">
+                <tr>
+                  <th className="border px-2 py-2 cursor-pointer" onClick={()=>{ setOrdenarPor('numero'); setOrdenAscendente(o=>ordenarPor==='numero' ? !o : true); }}># {iconoOrden('numero')}</th>
+                  <th className="border px-2 py-2">Cliente</th>
+                  <th className="border px-2 py-2">Producto</th>
+                  <th className="border px-2 py-2 cursor-pointer" onClick={()=>{ setOrdenarPor('fecha'); setOrdenAscendente(o=>ordenarPor==='fecha' ? !o : false); }}>Fecha {iconoOrden('fecha')}</th>
+                  <th
+                    className="border px-2 py-2 cursor-pointer"
+                    onClick={()=>{ setOrdenarPor('total'); setOrdenAscendente(o=> ordenarPor==='total' ? !o : false); }}
+                  >Total {iconoOrden('total')}</th>
+                  <th className="border px-2 py-2">Último Cambio</th>
+                  <th className="border px-2 py-2">Estado</th>
+                  <th className="border px-2 py-2">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paginaDatos.map(c => (
+                  <tr key={c.id} className="text-center hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="border px-2 py-1">{c.numero}</td>
+                    <td className="border px-2 py-1">{c.nombreCliente || c.cliente}</td>
+                    <td className="border px-2 py-1">{c.productos?.[0]?.nombrePersonalizado || c.productos?.[0]?.tipo || '-'}</td>
+                    <td className="border px-2 py-1">{c.timestamp?.toDate ? c.timestamp.toDate().toLocaleDateString('es-CO') : '—'}</td>
+                    <td className="border px-2 py-1">{c.total?.toLocaleString('es-CO',{ style:'currency', currency:'COP', minimumFractionDigits:0 })}</td>
+                    <td className="border px-2 py-1">{c.estadoFecha?.toDate ? c.estadoFecha.toDate().toLocaleDateString('es-CO') : '—'}</td>
+                    <td className="border px-2 py-1">
+                      {renderEstadoNotaCell(c)}
+                    </td>
+                    <td className="border px-2 py-1 space-x-2 whitespace-nowrap">
+                      <button onClick={()=>manejarVer(c)} className="text-blue-600 hover:text-blue-800" title="Ver" aria-label="Ver cotización"><FaEye /></button>
+                      <button onClick={()=>manejarEditar(c)} className="text-yellow-500 hover:text-yellow-600" title="Editar" aria-label="Editar cotización"><FaEdit /></button>
+                      <button onClick={()=>manejarEliminar(c)} className="text-red-600 hover:text-red-800" title="Eliminar" aria-label="Eliminar cotización"><FaTrash /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Tarjetas (móvil / tablet) */}
+          <div className="md:hidden space-y-3">
+            {paginaDatos.map(c => (
+              <div key={c.id} className="border rounded-lg p-3 bg-white dark:bg-gris-800 dark:border-gris-700 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm">#{c.numero} · {c.nombreCliente || c.cliente || '—'}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{c.productos?.[0]?.nombrePersonalizado || c.productos?.[0]?.tipo || '-'}</div>
+                  </div>
+                  <div className="flex gap-3 text-base shrink-0">
+                    <button onClick={()=>manejarVer(c)} className="text-blue-600" title="Ver" aria-label="Ver cotización"><FaEye /></button>
+                    <button onClick={()=>manejarEditar(c)} className="text-yellow-500" title="Editar" aria-label="Editar cotización"><FaEdit /></button>
+                    <button onClick={()=>manejarEliminar(c)} className="text-red-600" title="Eliminar" aria-label="Eliminar cotización"><FaTrash /></button>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+                  <span>{c.timestamp?.toDate ? c.timestamp.toDate().toLocaleDateString('es-CO') : '—'}</span>
+                  <span className="font-semibold">{c.total?.toLocaleString('es-CO',{ style:'currency', currency:'COP', minimumFractionDigits:0 })}</span>
+                </div>
+                <div className="mt-2">
+                  {renderEstadoNotaCell(c)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Paginación */}

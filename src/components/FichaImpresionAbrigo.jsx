@@ -1,14 +1,6 @@
 import React from "react";
-
-// ─── Formateadores ────────────────────────────────────────────────────────────
-const fmtMm   = (n) => (n == null ? "—" : Math.round(Number(n)).toString());
-const fmtM2   = (n) => (n == null ? "—" : Number(n).toFixed(3));
-const fmtDec  = (n, d = 2) => (n == null ? "—" : Number(n).toFixed(d));
-const fmtN    = (n) => (n == null ? "—" : Number(n).toString());
-const fmtDate = (s) => {
-  if (!s) return "—";
-  try { return new Date(s).toLocaleDateString("es-CO"); } catch { return s; }
-};
+import FichaImpresionShell from "./fichas/FichaImpresionShell";
+import { fmtMm, fmtM2, fmtDec, fmtN, fmtDate } from "../utils/fichaFormat";
 
 // ─── Estilos de celda reutilizables ──────────────────────────────────────────
 const base = {
@@ -120,7 +112,6 @@ function PlanoTecnico({ ancho, alto, casas }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
-  const printRef = React.useRef();
   if (!ficha) return null;
 
   const f   = ficha;
@@ -130,24 +121,6 @@ export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
   const ali = f.alistamiento          || {};
   const des = f.despacho              || {};
   const cant = Number(f.cantidad)     || 1;
-
-  const handlePrint = () => {
-    const win = window.open("", "_blank", "width=1120,height=980");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="utf-8"/>
-      <title>Ficha Abrigo Andén #${numero} — ${f.cliente || ""}</title>
-      <style>
-        * { box-sizing: border-box; }
-        body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #111; }
-        table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #999; padding: 4px 7px; font-size: 11px; vertical-align: middle; }
-        @media print { body { margin: 5mm; } @page { size: A4 landscape; } }
-      </style>
-    </head><body>${printRef.current.innerHTML}</body></html>`);
-    win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 300);
-  };
 
   // ── Insumos consumo materia prima ─────────────────────────────────────────
   const insumos = [
@@ -178,29 +151,14 @@ export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
   const colorHeader = "#1a3f8f";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-auto py-6 px-4">
-      <div className="bg-white w-full max-w-5xl rounded-xl shadow-2xl overflow-hidden">
-
-        {/* ── Barra de acciones ── */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b print:hidden">
-          <span className="text-sm font-semibold text-gray-700">
-            Ficha #{numero} — Abrigo de Andén
-          </span>
-          <div className="flex gap-2">
-            <button onClick={handlePrint}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium">
-              Imprimir / PDF
-            </button>
-            <button onClick={onClose}
-              className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-lg">
-              Cerrar
-            </button>
-          </div>
-        </div>
-
-        {/* ── Contenido imprimible ── */}
-        <div ref={printRef} style={{ fontFamily: "Arial, sans-serif", color: "#111", background: "white" }}>
-
+    <FichaImpresionShell
+      productLabel="Abrigo de Andén"
+      numero={numero}
+      cliente={f.cliente}
+      onClose={onClose}
+      maxWidthClass="max-w-5xl"
+      windowSize={{ width: 1120, height: 980 }}
+    >
           {/* ── 1. Encabezado ── */}
           <div style={{
             background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)",
@@ -472,9 +430,6 @@ export default function FichaImpresionAbrigo({ ficha, numero, onClose }) {
               Ficha #{numero || "—"} · {fmtDate(new Date().toISOString())}
             </div>
           </div>
-
-        </div>
-      </div>
-    </div>
+    </FichaImpresionShell>
   );
 }

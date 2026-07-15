@@ -692,7 +692,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
   );
 }
 
-export async function generarPDFReact(cotizacion, estaEditando) {
+export async function generarPDFReact(cotizacion, estaEditando, { mode = 'download', onBlobReady } = {}) {
   let numeroCotizacion = cotizacion.numero;
 
   if (!estaEditando || !cotizacion.id) {
@@ -755,6 +755,16 @@ export async function generarPDFReact(cotizacion, estaEditando) {
   const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
   const empresaNorm = normalizarTitulo(empresaBase);
   const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
+
+  if (onBlobReady) onBlobReady({ blob, nombreArchivo });
+  await entregarPDFBlob(blob, nombreArchivo, mode);
+}
+
+// Entrega (descarga / imprime / comparte) un PDF ya generado, sin volver a
+// guardar la cotización. Se expone por separado para poder reutilizar el
+// mismo blob en más de una acción (ej: "Descargar" y luego "Imprimir")
+// sin duplicar el registro guardado en Firestore.
+export async function entregarPDFBlob(blob, nombreArchivo, mode = 'download') {
   if (Capacitor.isNativePlatform()) {
     // Android: guardar en almacenamiento del dispositivo y compartir
     const base64 = await blobToBase64(blob);
@@ -772,6 +782,11 @@ export async function generarPDFReact(cotizacion, estaEditando) {
       url: uri,
       dialogTitle: "Guardar o compartir cotización",
     });
+  } else if (mode === 'print') {
+    // Web / Electron: abrir el PDF en una pestaña nueva para imprimir desde el visor del navegador
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, "_blank");
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
   } else {
     // Web / Electron: descarga estándar del navegador
     const link = document.createElement("a");

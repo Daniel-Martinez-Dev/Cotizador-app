@@ -1,8 +1,10 @@
 import React from "react";
+import FichaImpresionShell from "./fichas/FichaImpresionShell";
+import { fmtMm, fmtCm as fmt1, fmtDate } from "../utils/fichaFormat";
 
-const toM  = (mm) => (mm == null ? "—" : (Math.round(Number(mm) / 10) / 100).toFixed(2));
-const fmt1 = (n)  => (n  == null ? "—" : Number(n).toFixed(1));
-const fmtMm = (n) => (n  == null ? "—" : Math.round(Number(n)).toString());
+// Convierte un valor en milímetros a metros (2 decimales) — distinto de fmtM2,
+// que formatea un área en m² ya calculada.
+const toM = (mm) => (mm == null ? "—" : (Math.round(Number(mm) / 10) / 100).toFixed(2));
 
 // ── Sub-componentes de diseño (todos con inline-styles para imprimir) ──────────
 
@@ -67,55 +69,105 @@ function SectionTitle({ children }) {
   );
 }
 
+// ── Plano técnico (SVG 2D vista frontal) ──────────────────────────────────────
+// La división se arma con dos paneles del mismo tamaño lado a lado (ver
+// calcularMedidas en utils/divisionTermica.js: anchoPanel = (anchoVehiculo+40)/2),
+// cada uno con un núcleo de icopor más pequeño que el panel que lo contiene.
+function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor }) {
+  const W = 520, H = 260;
+  const margin = { top: 34, right: 70, bottom: 46, left: 70 };
+  const drawW = W - margin.left - margin.right;
+  const drawH = H - margin.top - margin.bottom;
+
+  const scale = Math.min(drawW / anchoVehiculo, drawH / altoVehiculo) * 0.9;
+  const fw = anchoVehiculo * scale;
+  const fh = altoVehiculo * scale;
+  const pw = fw / 2;
+
+  const cx = W / 2;
+  const cy = margin.top + drawH / 2;
+  const x0 = cx - fw / 2;
+  const y0 = cy - fh / 2;
+
+  const insetX = Math.max(4, ((panel.ancho - icopor.ancho) / 2) * scale);
+  const insetY = Math.max(4, ((panel.alto - icopor.alto) / 2) * scale);
+
+  const marco = "#1a3f8f";
+  const nucleo = "#0891b2";
+  const bg = "#f0f4ff";
+
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      <defs>
+        <marker id="arrDivA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#555" />
+        </marker>
+        <marker id="arrDivB" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
+          <path d="M6,0 L0,3 L6,6 Z" fill="#555" />
+        </marker>
+      </defs>
+
+      {/* Panel izquierdo + núcleo de icopor */}
+      <rect x={x0} y={y0} width={pw} height={fh} fill={bg} stroke={marco} strokeWidth="2" />
+      <rect x={x0 + insetX} y={y0 + insetY} width={Math.max(1, pw - insetX * 2)} height={Math.max(1, fh - insetY * 2)} fill="white" stroke={nucleo} strokeWidth="1.2" strokeDasharray="4,2" />
+
+      {/* Panel derecho + núcleo de icopor */}
+      <rect x={x0 + pw} y={y0} width={pw} height={fh} fill={bg} stroke={marco} strokeWidth="2" />
+      <rect x={x0 + pw + insetX} y={y0 + insetY} width={Math.max(1, pw - insetX * 2)} height={Math.max(1, fh - insetY * 2)} fill="white" stroke={nucleo} strokeWidth="1.2" strokeDasharray="4,2" />
+
+      {/* Línea de unión central */}
+      <line x1={x0 + pw} y1={y0} x2={x0 + pw} y2={y0 + fh} stroke={marco} strokeWidth="1" strokeDasharray="2,2" />
+
+      {/* Etiquetas de panel */}
+      <text x={x0 + pw / 2} y={y0 - 8} fontSize="8" fill={marco} textAnchor="middle" fontWeight="bold">PANEL IZQ.</text>
+      <text x={x0 + pw + pw / 2} y={y0 - 8} fontSize="8" fill={marco} textAnchor="middle" fontWeight="bold">PANEL DER.</text>
+      <text x={x0 + pw / 2} y={y0 + fh / 2 + 3} fontSize="7" fill={nucleo} textAnchor="middle">ICOPOR</text>
+      <text x={x0 + pw + pw / 2} y={y0 + fh / 2 + 3} fontSize="7" fill={nucleo} textAnchor="middle">ICOPOR</text>
+
+      {/* Cota ANCHO (inferior) */}
+      <line x1={x0} y1={y0 + fh + 14} x2={x0 + fw} y2={y0 + fh + 14} stroke="#555" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
+      <text x={cx} y={y0 + fh + 26} fontSize="9" fill="#333" textAnchor="middle">
+        ANCHO VEHÍCULO: {fmtMm(anchoVehiculo)} mm (paneles {fmtMm(panel.ancho)} c/u)
+      </text>
+
+      {/* Cota ALTO (derecha) */}
+      <line x1={x0 + fw + 12} y1={y0} x2={x0 + fw + 12} y2={y0 + fh} stroke="#555" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
+      <text
+        x={x0 + fw + 26}
+        y={cy}
+        fontSize="9" fill="#333" textAnchor="middle"
+        transform={`rotate(90,${x0 + fw + 26},${cy})`}
+      >
+        ALTO VEHÍCULO: {fmtMm(altoVehiculo)} mm
+      </text>
+
+      {/* Título */}
+      <text x={W / 2} y={H - 4} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#333">
+        VISTA FRONTAL — DIVISIÓN TÉRMICA (2 PANELES)
+      </text>
+    </svg>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function FichaImpresionDivision({ ficha, numero, onClose }) {
-  const printRef = React.useRef();
-
   if (!ficha) return null;
   const f   = ficha;
   const med = f.medidas || {};
 
-  const handlePrint = () => {
-    const win = window.open("", "_blank", "width=1050,height=900");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="utf-8"/>
-      <title>Ficha División Térmica #${numero} — ${f.cliente || ""}</title>
-      <style>
-        * { box-sizing: border-box; }
-        body { margin: 8mm; font-family: Arial, sans-serif; background: white; }
-        @media print { body { margin: 5mm; } }
-      </style>
-    </head><body>${printRef.current.innerHTML}</body></html>`);
-    win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 300);
-  };
-
   const consumoVisible = (f.consumo || []).filter((c) => c.cantidad > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-auto py-6 px-4">
-      <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden">
-
-        {/* Barra de acciones — no se imprime */}
-        <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b print:hidden">
-          <span className="text-sm font-semibold text-gray-700">Ficha #{numero} — División Térmica</span>
-          <div className="flex gap-2">
-            <button onClick={handlePrint}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium">
-              Imprimir / PDF
-            </button>
-            <button onClick={onClose}
-              className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-lg">
-              Cerrar
-            </button>
-          </div>
-        </div>
-
-        {/* ─ Contenido imprimible ─ */}
-        <div ref={printRef} style={{ fontFamily: "Arial, sans-serif", color: "#1a1a2e", fontSize: "12px", background: "white" }}>
-
+    <FichaImpresionShell
+      productLabel="División Térmica"
+      numero={numero}
+      cliente={f.cliente}
+      onClose={onClose}
+      maxWidthClass="max-w-4xl"
+      windowSize={{ width: 1050, height: 900 }}
+    >
+        <div style={{ color: "#1a1a2e", fontSize: "12px" }}>
           {/* ── Header ── */}
           <div style={{
             background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)",
@@ -179,12 +231,22 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           {/* ── Medidas de corte ── */}
           <div style={{ padding: "14px 20px" }}>
             <SectionTitle>Medidas de Corte</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginBottom: "12px" }}>
               <MedidaCard label="Panel"                  ancho={med.panel?.ancho}          alto={med.panel?.alto}          color="#1a3f8f" />
               <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0f6cbf" />
               <MedidaCard label="Funda"                  ancho={med.funda?.ancho}          alto={med.funda?.alto}          color="#0891b2" />
               <MedidaCard label="Policarb. / Cartonplast" ancho={med.policarbonato?.ancho} alto={med.policarbonato?.alto}  color="#0d9488" />
             </div>
+            {med.panel && med.icopor && (
+              <div style={{ border: "1px solid #ccc", borderRadius: "8px", padding: "6px", background: "#fafafa", display: "flex", justifyContent: "center" }}>
+                <PlanoTecnicoDivision
+                  anchoVehiculo={f.anchoVehiculo}
+                  altoVehiculo={f.altoVehiculo}
+                  panel={med.panel}
+                  icopor={med.icopor}
+                />
+              </div>
+            )}
           </div>
 
           {/* ── Lona + Piso ── */}
@@ -287,12 +349,10 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
               COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN DIVISIONES TÉRMICAS
             </div>
             <div style={{ fontSize: "9px", color: "#94a3b8" }}>
-              Ficha #{numero || "—"} · {new Date().toLocaleDateString("es-CO")}
+              Ficha #{numero || "—"} · {fmtDate(new Date().toISOString())}
             </div>
           </div>
-
         </div>
-      </div>
-    </div>
+    </FichaImpresionShell>
   );
 }

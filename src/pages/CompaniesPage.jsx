@@ -6,6 +6,8 @@ import { validateNIT, validateEmail, validateText } from '../utils/validateInput
 import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaBuilding, FaUser, FaSync } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { waitForAuth, getAuthError } from '../firebase';
+import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
 
 export default function CompaniesPage(){
   const { empresas, setEmpresas, setEmpresaSeleccionada, setContactoSeleccionado, confirm } = useQuote();
@@ -168,8 +170,8 @@ export default function CompaniesPage(){
           <FaSearch className="text-gray-500" />
           <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar empresa..." className="bg-transparent flex-1 py-2 outline-none text-sm" />
         </div>
-        <button onClick={()=> setModoNuevaEmpresa(m=>!m)} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 text-sm">{modoNuevaEmpresa? <FaTimes/>:<FaPlus/>}{modoNuevaEmpresa? 'Cancelar':'Nueva Empresa'}</button>
-        <button onClick={cargarEmpresas} className="bg-gray-500 text-white px-4 py-2 rounded flex items-center gap-2 text-sm"><FaSync className={cargando? 'animate-spin':''}/> Refrescar</button>
+        <Button variant="accent" className="flex items-center gap-2" onClick={()=> setModoNuevaEmpresa(m=>!m)}>{modoNuevaEmpresa? <FaTimes/>:<FaPlus/>}{modoNuevaEmpresa? 'Cancelar':'Nueva Empresa'}</Button>
+        <Button variant="secondary" className="flex items-center gap-2" onClick={cargarEmpresas}><FaSync className={cargando? 'animate-spin':''}/> Refrescar</Button>
       </div>
 
       {modoNuevaEmpresa && (
@@ -177,13 +179,13 @@ export default function CompaniesPage(){
           <div className="flex flex-col"><label className="text-xs font-semibold uppercase">Nombre</label><input value={formEmpresa.nombre} onChange={e=>setFormEmpresa(f=>({...f,nombre:e.target.value}))} className="border rounded px-2 py-1 bg-white dark:bg-gris-700 dark:text-white" /></div>
           <div className="flex flex-col"><label className="text-xs font-semibold uppercase">NIT</label><input value={formEmpresa.nit} onChange={e=>setFormEmpresa(f=>({...f,nit:e.target.value}))} className="border rounded px-2 py-1 bg-white dark:bg-gris-700" /></div>
             <div className="flex flex-col"><label className="text-xs font-semibold uppercase">Ciudad</label><input value={formEmpresa.ciudad} onChange={e=>setFormEmpresa(f=>({...f,ciudad:e.target.value}))} className="border rounded px-2 py-1 bg-white dark:bg-gris-700" /></div>
-          <div className="flex items-end"><button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2 text-sm"><FaSave/> Guardar</button></div>
+          <div className="flex items-end"><Button type="submit" variant="primary" className="flex items-center gap-2"><FaSave/> Guardar</Button></div>
         </form>
       )}
 
       <div className="space-y-4">
         {filtradas.length===0 && (
-          <div className="text-center py-10 text-sm opacity-70">Sin resultados</div>
+          <EmptyState icon="🏢" title="Sin resultados" />
         )}
         {filtradas.map(emp => {
           const contactos = contactosCache[emp.id];
@@ -197,8 +199,8 @@ export default function CompaniesPage(){
                       <input value={formEmpresaEdit.nit} onChange={e=>setFormEmpresaEdit(v=>({...v,nit:e.target.value}))} className="border rounded px-2 py-1" />
                       <input value={formEmpresaEdit.ciudad} onChange={e=>setFormEmpresaEdit(v=>({...v,ciudad:e.target.value}))} className="border rounded px-2 py-1" />
                       <div className="flex gap-2">
-                        <button type="button" onClick={()=>guardarEdicionEmpresa(emp.id)} className="text-green-600" title="Guardar"><FaSave/></button>
-                        <button type="button" onClick={()=> setEditEmpresaId(null)} className="text-gray-500" title="Cancelar"><FaTimes/></button>
+                        <button type="button" onClick={()=>guardarEdicionEmpresa(emp.id)} className="text-green-600" title="Guardar" aria-label="Guardar"><FaSave/></button>
+                        <button type="button" onClick={()=> setEditEmpresaId(null)} className="text-gray-500" title="Cancelar" aria-label="Cancelar"><FaTimes/></button>
                       </div>
                     </div>
                   ) : (
@@ -206,16 +208,16 @@ export default function CompaniesPage(){
                       <div className="font-medium text-sm flex items-center gap-2"><FaBuilding className="text-gray-400" /> {emp.nombre} <span className="text-xs font-normal text-gray-500 dark:text-gray-400">{sanitizeNIT(emp.nit)}</span></div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-3">
                         {emp.ciudad && <span>{emp.ciudad}</span>}
-                        <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/cotizar'); }}>Usar en cotización</span>
-                        <span className="cursor-pointer text-indigo-600" onClick={()=> toggleContactos(emp)}>{contactos? 'Ocultar contactos':'Ver contactos'}</span>
+                        <button type="button" className="text-indigo-600 hover:underline" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/cotizar'); }}>Usar en cotización</button>
+                        <button type="button" className="text-indigo-600 hover:underline" onClick={()=> toggleContactos(emp)}>{contactos? 'Ocultar contactos':'Ver contactos'}</button>
                       </div>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-4 text-base">
-                  {editEmpresaId!==emp.id && <button onClick={()=> startEditarEmpresa(emp)} className="text-yellow-600" title="Editar"><FaEdit/></button>}
-                  <button onClick={()=> eliminarEmpresaAccion(emp.id)} className="text-red-600" title="Eliminar"><FaTrash/></button>
-                  <button onClick={()=> startNuevoContacto(emp.id)} className="text-blue-600 text-sm flex items-center gap-1" title="Nuevo contacto"><FaUser/>+</button>
+                  {editEmpresaId!==emp.id && <button onClick={()=> startEditarEmpresa(emp)} className="text-yellow-600" title="Editar" aria-label="Editar empresa"><FaEdit/></button>}
+                  <button onClick={()=> eliminarEmpresaAccion(emp.id)} className="text-red-600" title="Eliminar" aria-label="Eliminar empresa"><FaTrash/></button>
+                  <button onClick={()=> startNuevoContacto(emp.id)} className="text-blue-600 text-sm flex items-center gap-1" title="Nuevo contacto" aria-label="Nuevo contacto"><FaUser/>+</button>
                 </div>
               </div>
               {modoNuevoContactoEmpresa===emp.id && (
@@ -225,8 +227,8 @@ export default function CompaniesPage(){
                     <input placeholder="Email" value={formContacto.email} onChange={e=>setFormContacto(v=>({...v,email:e.target.value}))} className="border rounded px-2 py-1" />
                     <input placeholder="Teléfono" value={formContacto.telefono} onChange={e=>setFormContacto(v=>({...v,telefono:e.target.value}))} className="border rounded px-2 py-1" />
                     <div className="flex items-center gap-2">
-                      <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded flex items-center gap-1"><FaSave/> Guardar</button>
-                      <button type="button" onClick={()=> setModoNuevoContactoEmpresa(null)} className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded"><FaTimes/></button>
+                      <Button type="submit" variant="primary" size="sm" className="flex items-center gap-1"><FaSave/> Guardar</Button>
+                      <Button type="button" variant="secondary" size="sm" onClick={()=> setModoNuevoContactoEmpresa(null)} aria-label="Cancelar"><FaTimes/></Button>
                     </div>
                   </div>
                 </form>
@@ -241,8 +243,8 @@ export default function CompaniesPage(){
                           <input value={formContactoEdit.email} onChange={e=>setFormContactoEdit(v=>({...v,email:e.target.value}))} className="border rounded px-1 py-0.5" />
                           <input value={formContactoEdit.telefono} onChange={e=>setFormContactoEdit(v=>({...v,telefono:e.target.value}))} className="border rounded px-1 py-0.5" />
                           <div className="flex gap-2">
-                            <button type="button" onClick={()=> guardarEdicionContacto(emp.id, cont.id)} className="text-green-600" title="Guardar"><FaSave/></button>
-                            <button type="button" onClick={()=> setEditContactoId(null)} className="text-gray-500" title="Cancelar"><FaTimes/></button>
+                            <button type="button" onClick={()=> guardarEdicionContacto(emp.id, cont.id)} className="text-green-600" title="Guardar" aria-label="Guardar"><FaSave/></button>
+                            <button type="button" onClick={()=> setEditContactoId(null)} className="text-gray-500" title="Cancelar" aria-label="Cancelar"><FaTimes/></button>
                           </div>
                         </div>
                       ) : (
@@ -251,12 +253,12 @@ export default function CompaniesPage(){
                             <div className="font-medium flex flex-wrap items-center gap-2"><FaUser className="text-gray-400" /> {cont.nombre} {cont.email && <span className="text-gray-500 font-normal">({cont.email})</span>}</div>
                             <div className="flex flex-wrap gap-3 text-[10px] text-gray-600 dark:text-gray-400">
                               {cont.telefono && <span>{cont.telefono}</span>}
-                              <span className="cursor-pointer text-indigo-600" onClick={()=>{ setEmpresaSeleccionada(emp); setContactoSeleccionado(cont); toast.success('Contacto seleccionado'); navigate('/cotizar'); }}>Usar en cotización</span>
+                              <button type="button" className="text-indigo-600 hover:underline" onClick={()=>{ setEmpresaSeleccionada(emp); setContactoSeleccionado(cont); toast.success('Contacto seleccionado'); navigate('/cotizar'); }}>Usar en cotización</button>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-sm">
-                            <button onClick={()=> startEditarContacto(emp.id, cont)} className="text-yellow-600" title="Editar"><FaEdit/></button>
-                            <button onClick={()=> eliminarContactoAccion(emp.id, cont.id)} className="text-red-600" title="Eliminar"><FaTrash/></button>
+                            <button onClick={()=> startEditarContacto(emp.id, cont)} className="text-yellow-600" title="Editar" aria-label="Editar contacto"><FaEdit/></button>
+                            <button onClick={()=> eliminarContactoAccion(emp.id, cont.id)} className="text-red-600" title="Eliminar" aria-label="Eliminar contacto"><FaTrash/></button>
                           </div>
                         </>
                       )}

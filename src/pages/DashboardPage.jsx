@@ -3,6 +3,21 @@ import { Link, useLocation } from "react-router-dom";
 import { ENABLE_INVENTARIO, ENABLE_PRODUCCION } from "../utils/featureFlags";
 import { useAuth } from "../context/AuthContext";
 
+function useOnlineStatus() {
+  const [online, setOnline] = React.useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  React.useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+  return online;
+}
+
 function Card({ title, desc, to, enabled, icon, tone }) {
   const base = "group relative block overflow-hidden rounded-2xl border px-5 py-5 transition";
   const cls = enabled
@@ -15,7 +30,7 @@ function Card({ title, desc, to, enabled, icon, tone }) {
       <div className={`absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-br ${accent}`} />
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl border border-gray-200/80 dark:border-gris-700/70 bg-white/80 dark:bg-gris-800/70 flex items-center justify-center text-lg">
+          <div className="h-11 w-11 rounded-xl border border-gray-200/80 dark:border-gris-700/70 bg-white/80 dark:bg-gris-800/70 flex items-center justify-center text-lg" aria-hidden="true">
             {icon}
           </div>
           <div>
@@ -45,6 +60,7 @@ export default function DashboardPage() {
   const denied = location.state?.denied;
   const disabled = location.state?.disabled;
   const { hasRole, isMainAdmin } = useAuth();
+  const online = useOnlineStatus();
 
   const isAdmin = isMainAdmin || hasRole("admin");
   const showProduccion = ENABLE_PRODUCCION && (isAdmin || hasRole("produccion"));
@@ -64,7 +80,12 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="rounded-2xl border border-gray-200/80 dark:border-gris-700/80 bg-white/80 dark:bg-gris-900/70 px-4 py-3 text-xs text-gray-500 dark:text-gray-300">
-            Estado del sistema: <span className="text-emerald-600 dark:text-emerald-300 font-medium">Operativo</span>
+            Conexión:{" "}
+            {online ? (
+              <span className="text-emerald-600 dark:text-emerald-300 font-medium">Conectado</span>
+            ) : (
+              <span className="text-red-600 dark:text-red-400 font-medium">Sin conexión</span>
+            )}
           </div>
         </div>
 

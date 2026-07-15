@@ -5,6 +5,8 @@ import { listarClientes, crearCliente, actualizarCliente, eliminarCliente } from
 import { useQuote } from '../context/QuoteContext';
 import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaUserCheck } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
 
 export default function ClientsPage() {
   const { clientes, setClientes, setClienteSeleccionado, confirm } = useQuote();
@@ -88,8 +90,8 @@ export default function ClientsPage() {
           <FaSearch className="text-gray-500" />
           <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar..." className="border p-2 rounded w-full" />
         </div>
-        <button onClick={()=>{ resetForm(); setModoNuevo(m=>!m); setEditandoId(null); }} className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2">{modoNuevo? <FaTimes/>:<FaPlus/>}{modoNuevo? 'Cancelar':'Nuevo'}</button>
-        <button onClick={cargar} className="bg-gray-500 text-white px-4 py-2 rounded">Refrescar</button>
+        <Button variant="accent" className="flex items-center gap-2" onClick={()=>{ resetForm(); setModoNuevo(m=>!m); setEditandoId(null); }}>{modoNuevo? <FaTimes/>:<FaPlus/>}{modoNuevo? 'Cancelar':'Nuevo'}</Button>
+        <Button variant="secondary" onClick={cargar}>Refrescar</Button>
       </div>
 
       {modoNuevo && (
@@ -101,63 +103,108 @@ export default function ClientsPage() {
             </div>
           ))}
           <div className="col-span-full flex gap-3">
-            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2 dark:bg-green-500 dark:hover:bg-green-400"><FaSave/> Guardar</button>
+            <Button type="submit" variant="primary" className="flex items-center gap-2"><FaSave/> Guardar</Button>
           </div>
         </form>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-2 py-1">Nombre</th>
-              <th className="border px-2 py-1">Contacto</th>
-              <th className="border px-2 py-1">NIT</th>
-              <th className="border px-2 py-1">Ciudad</th>
-              <th className="border px-2 py-1">Email</th>
-              <th className="border px-2 py-1">Teléfono</th>
-              <th className="border px-2 py-1">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cargando ? (
-              <tr><td colSpan={7} className="text-center py-4">Cargando...</td></tr>
-            ) : filtrados.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-4">Sin resultados</td></tr>
-            ) : filtrados.map(c => (
-              <tr key={c.id} className="odd:bg-white even:bg-gray-50">
+      {cargando ? (
+        <EmptyState icon="⏳" title="Cargando..." />
+      ) : filtrados.length === 0 ? (
+        <EmptyState icon="🗂️" title="Sin resultados" />
+      ) : (
+        <>
+          {/* Tabla (pantallas medianas y grandes) */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm border">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border px-2 py-1">Nombre</th>
+                  <th className="border px-2 py-1">Contacto</th>
+                  <th className="border px-2 py-1">NIT</th>
+                  <th className="border px-2 py-1">Ciudad</th>
+                  <th className="border px-2 py-1">Email</th>
+                  <th className="border px-2 py-1">Teléfono</th>
+                  <th className="border px-2 py-1">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map(c => (
+                  <tr key={c.id} className="odd:bg-white even:bg-gray-50">
+                    {editandoId === c.id ? (
+                      <>
+                        {['nombre','contacto','nit','ciudad','email','telefono'].map(campo => (
+                          <td key={campo} className="border px-1 py-1">
+                            <input value={form[campo]} onChange={e=>setForm(f=>({...f,[campo]:e.target.value}))} className="border rounded px-1 py-0.5 w-full text-xs" />
+                          </td>
+                        ))}
+                        <td className="border px-1 py-1 flex gap-2">
+                          <button onClick={()=>handleGuardarEdicion(c.id)} className="text-green-600" title="Guardar" aria-label="Guardar"><FaSave/></button>
+                          <button onClick={()=>{ setEditandoId(null); resetForm(); }} className="text-gray-500" title="Cancelar" aria-label="Cancelar"><FaTimes/></button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="border px-2 py-1 font-medium">{c.nombre}</td>
+                        <td className="border px-2 py-1">{c.contacto}</td>
+                        <td className="border px-2 py-1">{c.nit}</td>
+                        <td className="border px-2 py-1">{c.ciudad}</td>
+                        <td className="border px-2 py-1">{c.email}</td>
+                        <td className="border px-2 py-1">{c.telefono}</td>
+                        <td className="border px-2 py-1 flex gap-2 text-base">
+                          <button onClick={()=>{ setClienteSeleccionado(c); toast.success('Cliente seleccionado'); }} className="text-blue-600" title="Seleccionar" aria-label="Seleccionar cliente"><FaUserCheck/></button>
+                          <button onClick={()=>startEditar(c)} className="text-yellow-600" title="Editar" aria-label="Editar cliente"><FaEdit/></button>
+                          <button onClick={()=>handleEliminar(c.id)} className="text-red-600" title="Eliminar" aria-label="Eliminar cliente"><FaTrash/></button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Tarjetas (móvil) */}
+          <div className="sm:hidden space-y-3">
+            {filtrados.map(c => (
+              <div key={c.id} className="border rounded-lg p-3 bg-white dark:bg-gris-800 dark:border-gris-700 shadow-sm">
                 {editandoId === c.id ? (
-                  <>
+                  <div className="space-y-2">
                     {['nombre','contacto','nit','ciudad','email','telefono'].map(campo => (
-                      <td key={campo} className="border px-1 py-1">
-                        <input value={form[campo]} onChange={e=>setForm(f=>({...f,[campo]:e.target.value}))} className="border rounded px-1 py-0.5 w-full text-xs" />
-                      </td>
+                      <div key={campo} className="flex flex-col">
+                        <label className="text-[10px] font-semibold uppercase text-gray-500 dark:text-gray-400">{campo}</label>
+                        <input value={form[campo]} onChange={e=>setForm(f=>({...f,[campo]:e.target.value}))} className="border rounded px-2 py-1 text-sm bg-white dark:bg-gris-700 dark:border-gris-600" />
+                      </div>
                     ))}
-                    <td className="border px-1 py-1 flex gap-2">
-                      <button onClick={()=>handleGuardarEdicion(c.id)} className="text-green-600" title="Guardar"><FaSave/></button>
-                      <button onClick={()=>{ setEditandoId(null); resetForm(); }} className="text-gray-500" title="Cancelar"><FaTimes/></button>
-                    </td>
-                  </>
+                    <div className="flex gap-3 pt-1">
+                      <button onClick={()=>handleGuardarEdicion(c.id)} className="text-green-600 flex items-center gap-1 text-sm" aria-label="Guardar"><FaSave/> Guardar</button>
+                      <button onClick={()=>{ setEditandoId(null); resetForm(); }} className="text-gray-500 flex items-center gap-1 text-sm" aria-label="Cancelar"><FaTimes/> Cancelar</button>
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <td className="border px-2 py-1 font-medium">{c.nombre}</td>
-                    <td className="border px-2 py-1">{c.contacto}</td>
-                    <td className="border px-2 py-1">{c.nit}</td>
-                    <td className="border px-2 py-1">{c.ciudad}</td>
-                    <td className="border px-2 py-1">{c.email}</td>
-                    <td className="border px-2 py-1">{c.telefono}</td>
-                    <td className="border px-2 py-1 flex gap-2 text-base">
-                      <button onClick={()=>{ setClienteSeleccionado(c); toast.success('Cliente seleccionado'); }} className="text-blue-600" title="Seleccionar"><FaUserCheck/></button>
-                      <button onClick={()=>startEditar(c)} className="text-yellow-600" title="Editar"><FaEdit/></button>
-                      <button onClick={()=>handleEliminar(c.id)} className="text-red-600" title="Eliminar"><FaTrash/></button>
-                    </td>
-                  </>
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-semibold text-sm">{c.nombre || '—'}</div>
+                      <div className="flex gap-3 text-base shrink-0">
+                        <button onClick={()=>{ setClienteSeleccionado(c); toast.success('Cliente seleccionado'); }} className="text-blue-600" aria-label="Seleccionar cliente"><FaUserCheck/></button>
+                        <button onClick={()=>startEditar(c)} className="text-yellow-600" aria-label="Editar cliente"><FaEdit/></button>
+                        <button onClick={()=>handleEliminar(c.id)} className="text-red-600" aria-label="Eliminar cliente"><FaTrash/></button>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
+                      {c.contacto && <div>Contacto: {c.contacto}</div>}
+                      {c.nit && <div>NIT: {c.nit}</div>}
+                      {c.ciudad && <div>Ciudad: {c.ciudad}</div>}
+                      {c.email && <div>Email: {c.email}</div>}
+                      {c.telefono && <div>Teléfono: {c.telefono}</div>}
+                    </div>
+                  </div>
                 )}
-              </tr>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

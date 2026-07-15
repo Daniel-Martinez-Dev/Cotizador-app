@@ -7,6 +7,10 @@ import {
   actualizarFichaAbrigo,
 } from "../utils/firebaseAbrigos";
 import FichaImpresionAbrigo from "./FichaImpresionAbrigo";
+import { fmtMm, fmtM2, fmtDec, fmtN } from "../utils/fichaFormat";
+import { ESTADO_LABEL } from "./fichas/estadoFicha";
+import EstadoBadge from "./fichas/EstadoBadge";
+import EstadoActions from "./fichas/EstadoActions";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -20,22 +24,6 @@ const genOP = () => {
   const hh = String(now.getHours()).padStart(2, "0");
   const mi = String(now.getMinutes()).padStart(2, "0");
   return `AP-${yy}${mm}${dd}-${hh}${mi}`;
-};
-
-const fmtMm = (n) => (n == null ? "—" : Math.round(Number(n)).toString());
-const fmtM2 = (n) => (n == null ? "—" : Number(n).toFixed(3));
-const fmtDec = (n, d = 2) => (n == null ? "—" : Number(n).toFixed(d));
-const fmtN  = (n) => (n == null ? "—" : Number(n).toString());
-
-const ESTADO_LABEL = {
-  borrador:      "Borrador",
-  en_produccion: "En producción",
-  terminado:     "Terminado",
-};
-const ESTADO_CLS = {
-  borrador:      "bg-gray-100 text-gray-700 dark:bg-gris-700 dark:text-gray-300",
-  en_produccion: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  terminado:     "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
 };
 
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
@@ -420,9 +408,7 @@ export default function AbrigoAndenFicha() {
                         <td className="py-2 text-center font-mono">{f.casas}</td>
                         <td className="py-2 text-center">{f.cantidad}</td>
                         <td className="py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ESTADO_CLS[f.estado] || ESTADO_CLS.borrador}`}>
-                            {ESTADO_LABEL[f.estado] || f.estado || "Borrador"}
-                          </span>
+                          <EstadoBadge estado={f.estado} />
                         </td>
                         <td className="py-2 text-gray-500">
                           {f.createdAt?.toDate
@@ -541,27 +527,7 @@ function FichaDetalleAbrigo({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
         ))}
       </div>
 
-      {/* Acciones de estado */}
-      <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200 dark:border-gris-600">
-        {f.estado !== "en_produccion" && (
-          <button onClick={() => onCambiarEstado(f.id, "en_produccion")}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
-            Pasar a producción
-          </button>
-        )}
-        {f.estado !== "terminado" && (
-          <button onClick={() => onCambiarEstado(f.id, "terminado")}
-            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium">
-            Marcar terminada
-          </button>
-        )}
-        {f.estado !== "borrador" && (
-          <button onClick={() => onCambiarEstado(f.id, "borrador")}
-            className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gris-600 dark:hover:bg-gris-500 text-xs font-medium">
-            Volver a borrador
-          </button>
-        )}
-      </div>
+      <EstadoActions estado={f.estado} onCambiarEstado={(estado) => onCambiarEstado(f.id, estado)} />
     </div>
   );
 }

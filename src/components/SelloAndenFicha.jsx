@@ -8,6 +8,10 @@ import {
   actualizarFichaSello,
 } from "../utils/firebaseSellos";
 import FichaImpresionSello from "./FichaImpresionSello";
+import { fmtMm as fmtMmBase, fmtM2, fmtN } from "../utils/fichaFormat";
+import { ESTADO_LABEL } from "./fichas/estadoFicha";
+import EstadoBadge from "./fichas/EstadoBadge";
+import EstadoActions from "./fichas/EstadoActions";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 const en5dias = () => {
@@ -37,20 +41,8 @@ const INITIAL_FORM = {
   bandaSuperior:     "",
 };
 
-const fmtMm  = (n) => (n == null || n === 0 ? "—" : Math.round(Number(n)).toString());
-const fmtM2  = (n) => (n == null ? "—" : Number(n).toFixed(3));
-const fmtN   = (n) => (n == null ? "—" : Number(n).toString());
-
-const ESTADO_LABEL = {
-  borrador:      "Borrador",
-  en_produccion: "En producción",
-  terminado:     "Terminado",
-};
-const ESTADO_CLS = {
-  borrador:      "bg-gray-100 text-gray-700 dark:bg-gris-700 dark:text-gray-300",
-  en_produccion: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  terminado:     "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-};
+// Las medidas de corte del sello nunca son 0 legítimamente: se tratan como "—".
+const fmtMm = (n) => fmtMmBase(n, { hideZero: true });
 
 const inputCls  = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
 const labelCls  = "text-xs text-gray-600 dark:text-gray-300";
@@ -418,9 +410,7 @@ export default function SelloAndenFicha() {
                         <td className="py-2 text-center">{f.materialBase || "—"}</td>
                         <td className="py-2 text-center">{f.llevaCortina ? "SÍ" : "NO"}</td>
                         <td className="py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ESTADO_CLS[f.estado] || ESTADO_CLS.borrador}`}>
-                            {ESTADO_LABEL[f.estado] || f.estado}
-                          </span>
+                          <EstadoBadge estado={f.estado} />
                         </td>
                         <td className="py-2 text-gray-500">
                           {f.createdAt?.toDate
@@ -474,9 +464,6 @@ function FichaDetalleSello({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
   const med = f.medidas    || {};
   const mp  = f.materiaPrima || {};
   const cantidad = Number(f.cantidad) || 1;
-  const fmtMm = (n) => (n == null ? "—" : Math.round(Number(n)).toString());
-  const fmtM2 = (n) => (n == null ? "—" : Number(n).toFixed(3));
-  const fmtN  = (n) => (n == null ? "—" : Number(n).toString());
 
   const filas = [
     { label: "Sello principal", d1: med.selloAncho,        d2: med.selloAlto,          color: "#1a3f8f" },
@@ -552,27 +539,7 @@ function FichaDetalleSello({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
         </div>
       </div>
 
-      {/* Acciones de estado */}
-      <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200 dark:border-gris-600">
-        {f.estado !== "en_produccion" && (
-          <button onClick={() => onCambiarEstado(f.id, "en_produccion")}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
-            Pasar a producción
-          </button>
-        )}
-        {f.estado !== "terminado" && (
-          <button onClick={() => onCambiarEstado(f.id, "terminado")}
-            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium">
-            Marcar terminada
-          </button>
-        )}
-        {f.estado !== "borrador" && (
-          <button onClick={() => onCambiarEstado(f.id, "borrador")}
-            className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gris-600 dark:hover:bg-gris-500 text-xs font-medium">
-            Volver a borrador
-          </button>
-        )}
-      </div>
+      <EstadoActions estado={f.estado} onCambiarEstado={(estado) => onCambiarEstado(f.id, estado)} />
     </div>
   );
 }

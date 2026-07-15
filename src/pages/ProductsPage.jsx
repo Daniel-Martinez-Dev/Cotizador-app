@@ -7,8 +7,13 @@ import { generarTerminosGeneralesHTML } from '../utils/htmlSections';
 import RichTextEditor from '../components/RichTextEditor';
 import 'react-quill-new/dist/quill.snow.css';
 import toast from 'react-hot-toast';
+import EmptyState from '../components/ui/EmptyState';
+import Badge from '../components/ui/Badge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const TIPO_CALCULO_TONE = { matriz: 'info', componentes: 'purple', especial: 'warning' };
+const TIPO_CALCULO_LABEL = { matriz: 'Matriz', componentes: 'Componentes', especial: 'Especial' };
 
 function labelRango(ranges, i) {
   if (!ranges || ranges.length === 0) return '';
@@ -231,6 +236,7 @@ function ListaExtrasEditable({ extras = [], onChange, confirm: confirmFn }) {
                 </td>
                 <td className="border px-1 py-1 text-center">
                   <button onClick={async () => { if (await confirmFn('¿Eliminar este extra?')) { const copia = [...extras]; copia.splice(i, 1); onChange(copia); } }}
+                    aria-label="Eliminar extra" title="Eliminar extra"
                     className="text-red-500 hover:text-red-400 text-xs px-1">✕</button>
                 </td>
               </tr>
@@ -359,6 +365,7 @@ function EditorFotos({ fotos, productoId, onChange, confirm: confirmFn }) {
             <div key={i} className="relative group">
               <img src={url} alt="" className="w-24 h-24 object-cover rounded border dark:border-gris-600" />
               <button onClick={() => handleEliminar(i)}
+                aria-label="Quitar esta foto" title="Quitar esta foto"
                 className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
             </div>
           ))}
@@ -471,7 +478,7 @@ function PanelEdicion({ producto, onClose, onGuardado, confirm: confirmFn }) {
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium">
               {guardando ? 'Guardando...' : 'Guardar'}
             </button>
-            <button onClick={onClose} className="bg-gray-200 dark:bg-gris-700 hover:bg-gray-300 dark:hover:bg-gris-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded text-sm">✕</button>
+            <button onClick={onClose} aria-label="Cerrar" title="Cerrar" className="bg-gray-200 dark:bg-gris-700 hover:bg-gray-300 dark:hover:bg-gris-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded text-sm">✕</button>
           </div>
         </div>
 
@@ -599,13 +606,6 @@ const TABS = ['Descripción', 'Especificaciones', 'Precios', 'Extras', 'Condicio
 function FichaProducto({ producto, onClose }) {
   const [tab, setTab] = useState('Descripción');
 
-  const chipColor = {
-    'matriz': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    'componentes': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-    'especial': 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
-  }[producto.tipoCalculo] || '';
-  const chipLabel = { 'matriz': 'Matriz', 'componentes': 'Componentes', 'especial': 'Especial' }[producto.tipoCalculo] || '';
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -615,10 +615,10 @@ function FichaProducto({ producto, onClose }) {
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">{producto.nombre}</h2>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${chipColor}`}>{chipLabel}</span>
+              <Badge tone={TIPO_CALCULO_TONE[producto.tipoCalculo]} className="shrink-0">{TIPO_CALCULO_LABEL[producto.tipoCalculo]}</Badge>
             </div>
           </div>
-          <button onClick={onClose}
+          <button onClick={onClose} aria-label="Cerrar" title="Cerrar"
             className="bg-gray-200 dark:bg-gris-700 hover:bg-gray-300 dark:hover:bg-gris-600 text-gray-700 dark:text-gray-200 w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0">
             ✕
           </button>
@@ -710,14 +710,6 @@ function FichaProducto({ producto, onClose }) {
 // ─── Card de producto ─────────────────────────────────────────────────────────
 
 function ProductCard({ producto, isAdmin, onEditar, onVerDetalle }) {
-  const chipColor = {
-    'matriz': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    'componentes': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-    'especial': 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
-  }[producto.tipoCalculo] || '';
-
-  const chipLabel = { 'matriz': 'Matriz', 'componentes': 'Componentes', 'especial': 'Especial' }[producto.tipoCalculo] || '';
-
   return (
     <div className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-xl shadow-sm overflow-hidden flex flex-col">
       {/* Foto */}
@@ -727,7 +719,7 @@ function ProductCard({ producto, isAdmin, onEditar, onVerDetalle }) {
       <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-bold text-gray-900 dark:text-white text-base leading-snug">{producto.nombre}</h3>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${chipColor}`}>{chipLabel}</span>
+          <Badge tone={TIPO_CALCULO_TONE[producto.tipoCalculo]} className="shrink-0">{TIPO_CALCULO_LABEL[producto.tipoCalculo]}</Badge>
         </div>
 
         {producto.descripcionGeneral && (
@@ -841,22 +833,19 @@ export default function ProductsPage() {
 
       {/* Estado de carga */}
       {productosLoading && (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-3xl mb-2">⏳</div>
-          <p className="text-sm">Cargando catálogo...</p>
-        </div>
+        <EmptyState icon="⏳" title="Cargando catálogo..." />
       )}
 
       {/* Sin productos migrados */}
       {!productosLoading && productosDB.length === 0 && (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 dark:border-gris-700 rounded-xl">
-          <div className="text-4xl mb-3">📦</div>
-          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-1">Catálogo vacío</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            {esAdmin
+        <div className="border-2 border-dashed border-gray-200 dark:border-gris-700 rounded-xl">
+          <EmptyState
+            icon="📦"
+            title="Catálogo vacío"
+            description={esAdmin
               ? 'Usa el botón "Migrar datos iniciales" para cargar el catálogo de productos a la base de datos.'
               : 'El catálogo aún no ha sido configurado. Contacta al administrador.'}
-          </p>
+          />
         </div>
       )}
 
@@ -877,9 +866,7 @@ export default function ProductsPage() {
 
       {/* Sin resultados de búsqueda */}
       {!productosLoading && productosDB.length > 0 && filtrados.length === 0 && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
-          Sin coincidencias para "{filtro}"
-        </p>
+        <EmptyState icon="🔍" title="Sin coincidencias" description={`Para "${filtro}"`} />
       )}
 
       {/* Ficha popup de producto */}
@@ -903,7 +890,7 @@ export default function ProductsPage() {
           <div className="bg-white dark:bg-gris-900 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gris-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Términos y Condiciones Generales</h2>
-              <button onClick={() => setModalTerminos(false)} className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold">✕</button>
+              <button onClick={() => setModalTerminos(false)} aria-label="Cerrar" title="Cerrar" className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold">✕</button>
             </div>
             <div className="p-6 flex-1 min-h-0">
               <p className="text-xs text-gray-400 mb-3">Este texto se incluye en todas las propuestas. Puedes personalizarlo con formato enriquecido.</p>

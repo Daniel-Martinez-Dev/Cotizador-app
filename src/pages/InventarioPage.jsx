@@ -1,14 +1,18 @@
 import React from "react";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx";
 import { PRODUCTOS_ACTIVOS } from "../data/catalogoProductos";
 import { compressImageFileToDataURL, dataUrlSizeLabel } from "../utils/imageCompress";
+import { useQuote } from "../context/QuoteContext";
+import EmptyState from "../components/ui/EmptyState";
+import Button from "../components/ui/Button";
+import MaterialesTab from "./inventario/MaterialesTab";
+import ProveedoresTab from "./inventario/ProveedoresTab";
+import MovimientosTab from "./inventario/MovimientosTab";
+import { toggleSort, sortArrow, compareValues, normalizeTerms, formatCOP, formatMovimientoFecha } from "./inventario/inventarioUtils";
 import {
   actualizarItemInventario,
   crearItemInventario,
-  crearItemsInventarioBulk,
   crearProveedor,
-  crearProveedoresBulk,
   actualizarProveedor,
   eliminarProveedor,
   eliminarItemInventario,
@@ -23,18 +27,16 @@ import {
 } from "../utils/firebaseInventory";
 
 export default function InventarioPage() {
+  const { confirm } = useQuote();
   const [activeTab, setActiveTab] = React.useState("materiales"); // materiales | proveedores | movimientos
   const [showItemModal, setShowItemModal] = React.useState(false);
   const [showProveedorModal, setShowProveedorModal] = React.useState(false);
   const [showMovimientoModal, setShowMovimientoModal] = React.useState(false);
   const [showProveedorOverlay, setShowProveedorOverlay] = React.useState(false);
-  const showImportSections = false;
   const [sectionsOpen, setSectionsOpen] = React.useState({
     inventario: true,
     proveedores: true,
     movimientos: true,
-    importProveedores: false,
-    importItems: false,
   });
   const emptySede = React.useMemo(() => ({ direccion: "", ciudad: "" }), []);
   const emptyContacto = React.useMemo(() => ({ nombre: "", telefono: "", correo: "" }), []);
@@ -79,17 +81,6 @@ export default function InventarioPage() {
   const [itemsSort, setItemsSort] = React.useState({ key: "nombre", dir: "asc" });
   const [provSort, setProvSort] = React.useState({ key: "razonSocial", dir: "asc" });
 
-  const [provImportFileName, setProvImportFileName] = React.useState("");
-  const [provImportPreview, setProvImportPreview] = React.useState([]);
-  const [provImportRows, setProvImportRows] = React.useState([]);
-  const [provImportBusy, setProvImportBusy] = React.useState(false);
-  const [provImportSummary, setProvImportSummary] = React.useState(null);
-
-  const [itemImportFileName, setItemImportFileName] = React.useState("");
-  const [itemImportRows, setItemImportRows] = React.useState([]);
-  const [itemImportBusy, setItemImportBusy] = React.useState(false);
-  const [itemImportSummary, setItemImportSummary] = React.useState(null);
-
   const [movGeneralLoaded, setMovGeneralLoaded] = React.useState(false);
   const [movGeneralLoading, setMovGeneralLoading] = React.useState(false);
   const [movGeneralSearch, setMovGeneralSearch] = React.useState("");
@@ -101,43 +92,10 @@ export default function InventarioPage() {
     setSectionsOpen((p) => ({ ...p, [key]: !p[key] }));
   };
 
-  const toggleSort = (stateSetter, current, key) => {
-    stateSetter((p) => {
-      if (p.key !== key) return { key, dir: "asc" };
-      return { key, dir: p.dir === "asc" ? "desc" : "asc" };
-    });
-  };
-
-  const sortArrow = (sortState, key) => {
-    if (sortState.key !== key) return "";
-    return sortState.dir === "asc" ? " ▲" : " ▼";
-  };
-
-  const formatCOP = React.useMemo(() => {
-    try {
-      const fmt = new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        maximumFractionDigits: 0,
-      });
-      return (n) => fmt.format(Number(n || 0));
-    } catch {
-      return (n) => `$ ${Number(n || 0)}`;
-    }
-  }, []);
-
   const parseDigits = (value) => {
     const s = String(value ?? "");
     const digits = s.replace(/\D+/g, "");
     return digits;
-  };
-
-  const compareValues = (a, b) => {
-    if (a === b) return 0;
-    if (a === null || typeof a === "undefined") return -1;
-    if (b === null || typeof b === "undefined") return 1;
-    if (typeof a === "number" && typeof b === "number") return a - b;
-    return String(a).localeCompare(String(b));
   };
 
   const load = async () => {
@@ -195,286 +153,6 @@ export default function InventarioPage() {
     // Normalizar separadores comunes (puntos/guiones), dejando solo dígitos.
     s = s.replace(/[^0-9]/g, "");
     return s;
-  };
-
-  const sanitizePhone = (phone) => {
-    if (phone === null || typeof phone === 'undefined') return '';
-    if (typeof phone === 'number' && Number.isFinite(phone)) {
-      const n = Math.trunc(phone);
-      return n === 0 ? '' : String(n);
-    }
-    let s = String(phone).trim();
-    if (!s) return '';
-    s = s.replace(/\s+/g, '');
-
-    if (/^\d+(?:\.\d+)?e\+\d+$/i.test(s)) {
-      const asNum = Number(s);
-      if (Number.isFinite(asNum)) s = String(Math.trunc(asNum));
-    }
-
-    s = s.replace(/[^0-9]/g, '');
-    if (!s || s === '0') return '';
-    return s;
-  };
-
-  const normalizeHeader = (s) => (s || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_\-./\\]+/g, " ")
-    .replace(/[^a-z0-9 ]+/g, " ")
-    .replace(/([a-z])([0-9])/g, "$1 $2")
-    .replace(/([0-9])([a-z])/g, "$1 $2")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const getRowValue = (row, candidates) => {
-    if (!row) return "";
-    const keys = Object.keys(row);
-    const keyByNorm = {};
-    for (const k of keys) keyByNorm[normalizeHeader(k)] = k;
-    for (const c of candidates) {
-      const real = keyByNorm[normalizeHeader(c)];
-      if (!real) continue;
-      const v = row[real];
-      if (v === null || typeof v === 'undefined') continue;
-      const s = sanitizeText(v);
-      if (s) return s;
-    }
-    return "";
-  };
-
-  const normalizeModalidadEntrega = (s) => {
-    const v = (s || "").toString().toLowerCase();
-    if (!v) return "";
-    if (v.includes('recog') || v.includes('retiro') || v.includes('bodega')) return 'recoger';
-    if (v.includes('bogota') || v.includes('bogotá')) return 'envio_bogota';
-    if (v.includes('nacion') || v.includes('envio') || v.includes('envío') || v.includes('transport')) return 'envio_nacional';
-    return "";
-  };
-
-  const normalizeTipoPago = (s) => {
-    const v = (s || "").toString().toLowerCase();
-    if (!v) return "";
-    if (v.includes('credit')) return 'credito';
-    if (v.includes('pedir') || v.includes('anticip')) return 'al_pedir';
-    if (v.includes('recog') || v.includes('retiro')) return 'al_recoger';
-    if (v.includes('contado')) return 'al_pedir';
-    return "";
-  };
-
-  const parseProveedorRow = (row) => {
-    const razonSocial = sanitizeText(getRowValue(row, [
-      'razon social', 'razón social', 'proveedor', 'empresa', 'nombre', 'nombre proveedor', 'razon_social', 'razonSocial'
-    ]));
-    const nit = sanitizeNIT(getRowValue(row, [
-      'nit', 'n.i.t', 'n i t', 'nit.',
-      'identificacion', 'identificación',
-      'numero nit', 'número nit',
-      'nit proveedor', 'nit empresa'
-    ]));
-    const leadTimeStr = getRowValue(row, ['lead time', 'leadtime', 'tiempo entrega', 'dias entrega', 'días entrega', 'lead_time_dias']);
-    const leadTimeDias = leadTimeStr ? Number(String(leadTimeStr).replace(/[^0-9.-]/g, '')) : 0;
-
-    const modalidadEntrega = normalizeModalidadEntrega(getRowValue(row, ['modalidad entrega', 'entrega', 'envio', 'envío', 'modo entrega']));
-    const tipoPago = normalizeTipoPago(getRowValue(row, ['tipo pago', 'pago', 'condicion pago', 'condición pago', 'terminos pago', 'términos pago']));
-
-    const direccion = sanitizeText(getRowValue(row, ['direccion', 'dirección', 'direccion sede', 'dirección sede', 'direccion 1', 'dirección 1']));
-    const ciudad = sanitizeText(getRowValue(row, ['ciudad', 'ciudad sede', 'ciudad 1']));
-
-    const contactoNombre = sanitizeText(getRowValue(row, ['contacto', 'nombre contacto', 'contacto 1', 'nombre contacto 1']));
-    const contactoTelefono = getRowValue(row, [
-      'telefono', 'teléfono', 'celular', 'movil', 'móvil',
-      'telefono contacto', 'teléfono contacto',
-      'telefono 1', 'teléfono 1', 'telefono1', 'tel1', 'tel 1'
-    ]);
-    const contactoCorreo = sanitizeText(getRowValue(row, ['correo', 'email', 'e-mail', 'correo contacto', 'email contacto', 'correo 1', 'email 1']));
-
-    const contactoTelefonoNorm = sanitizePhone(contactoTelefono);
-
-    const contactos = (contactoNombre || contactoTelefono || contactoCorreo)
-      ? [{ nombre: contactoNombre, telefono: contactoTelefonoNorm, correo: contactoCorreo }]
-      : [];
-    const sedes = (direccion || ciudad)
-      ? [{ direccion, ciudad }]
-      : [];
-
-    return {
-      razonSocial,
-      nit,
-      leadTimeDias: Number.isNaN(leadTimeDias) ? 0 : leadTimeDias,
-      sedes,
-      contactos,
-      modalidadEntrega,
-      tipoPago,
-    };
-  };
-
-  const parseItemRow = (row) => {
-    const nombre = sanitizeText(getRowValue(row, [
-      'item', 'nombre', 'material', 'materia prima', 'materia_prima'
-    ]));
-    const productosRaw = sanitizeText(getRowValue(row, [
-      'productos', 'producto', 'producto(s)', 'linea', 'linea producto'
-    ]));
-    const categoria = sanitizeText(getRowValue(row, [
-      'categoria', 'categoría', 'tipo'
-    ]));
-    const unidad = sanitizeText(getRowValue(row, [
-      'unidad', 'u', 'unidad medida', 'unidad_medida'
-    ]));
-
-    const productoTipos = productosRaw
-      ? productosRaw.split(/[,;|]+/).map((p) => sanitizeText(p)).filter(Boolean)
-      : [];
-
-    return {
-      nombre,
-      productoTipos,
-      categoria,
-      unidad,
-      proveedorIds: [],
-    };
-  };
-
-  const onProvImportFile = async (file) => {
-    setProvImportSummary(null);
-    setProvImportRows([]);
-    setProvImportPreview([]);
-    setProvImportFileName(file?.name || "");
-    if (!file) return;
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const sheetName = wb.SheetNames?.[0];
-      if (!sheetName) return toast.error('El archivo no tiene hojas');
-      const ws = wb.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
-
-      const parsed = [];
-      const errors = [];
-      for (let idx = 0; idx < json.length; idx += 1) {
-        const r = json[idx];
-        const p = parseProveedorRow(r);
-        if (!p.razonSocial && !p.nit) continue; // fila vacía
-        if (!p.razonSocial) {
-          errors.push({ row: idx + 2, reason: 'Falta razón social' });
-          continue;
-        }
-        if (!p.nit) {
-          errors.push({ row: idx + 2, reason: 'Falta NIT' });
-          continue;
-        }
-        parsed.push(p);
-      }
-
-      setProvImportRows(parsed);
-      setProvImportPreview(parsed.slice(0, 5));
-      setProvImportSummary({ total: json.length, valid: parsed.length, skipped: errors.length, errors: errors.slice(0, 10) });
-      if (parsed.length === 0) toast.error('No se encontraron filas válidas para importar');
-    } catch (e) {
-      console.error(e);
-      toast.error('No se pudo leer el archivo');
-    }
-  };
-
-  const runProvImport = async () => {
-    try {
-      if (!provImportRows.length) return toast.error('No hay filas para importar');
-      setProvImportBusy(true);
-
-      const existingByNit = new Set((proveedores || []).map((p) => sanitizeNIT(p.nit)).filter(Boolean));
-      const unique = [];
-      let dup = 0;
-      const seen = new Set();
-      for (const r of provImportRows) {
-        const nit = sanitizeNIT(r.nit);
-        if (!nit) continue;
-        if (seen.has(nit)) { dup += 1; continue; }
-        seen.add(nit);
-        if (existingByNit.has(nit)) { dup += 1; continue; }
-        unique.push(r);
-      }
-
-      if (unique.length === 0) {
-        toast.error('Todo ya existe (duplicados por NIT)');
-        return;
-      }
-
-      const res = await crearProveedoresBulk(unique);
-      toast.success(`Importados: ${res.created}. Duplicados omitidos: ${dup}`);
-      setProvImportSummary((p) => ({ ...(p || {}), imported: res.created, duplicates: dup }));
-      await load();
-    } catch (e) {
-      console.error(e);
-      toast.error(e?.message || 'No se pudo importar');
-    } finally {
-      setProvImportBusy(false);
-    }
-  };
-
-  const onItemImportFile = async (file) => {
-    setItemImportSummary(null);
-    setItemImportRows([]);
-    setItemImportFileName(file?.name || "");
-    if (!file) return;
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const sheetName = wb.SheetNames?.[0];
-      if (!sheetName) return toast.error('El archivo no tiene hojas');
-      const ws = wb.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
-
-      const parsed = [];
-      const errors = [];
-      for (let idx = 0; idx < json.length; idx += 1) {
-        const r = json[idx];
-        const p = parseItemRow(r);
-        if (!p.nombre) {
-          errors.push({ row: idx + 2, reason: 'Falta item' });
-          continue;
-        }
-        parsed.push({ ...p, rowId: `row-${idx}` });
-      }
-
-      setItemImportRows(parsed);
-      setItemImportSummary({ total: json.length, valid: parsed.length, skipped: errors.length, errors: errors.slice(0, 10) });
-      if (parsed.length === 0) toast.error('No se encontraron filas validas para importar');
-    } catch (e) {
-      console.error(e);
-      toast.error('No se pudo leer el archivo');
-    }
-  };
-
-  const runItemImport = async () => {
-    try {
-      if (!itemImportRows.length) return toast.error('No hay filas para importar');
-      setItemImportBusy(true);
-
-      const payload = itemImportRows.map((r) => ({
-        nombre: r.nombre,
-        productoTipos: r.productoTipos,
-        categoria: r.categoria,
-        unidad: r.unidad,
-        stockActual: 0,
-        stockMinimo: 0,
-        costoUnitario: 0,
-        proveedorIds: Array.isArray(r.proveedorIds) ? r.proveedorIds : [],
-      }));
-
-      const res = await crearItemsInventarioBulk(payload);
-      toast.success(`Items importados: ${res.created}`);
-      setItemImportSummary((p) => ({ ...(p || {}), imported: res.created }));
-      await load();
-    } catch (e) {
-      console.error(e);
-      toast.error(e?.message || 'No se pudo importar');
-    } finally {
-      setItemImportBusy(false);
-    }
   };
 
   const validarProveedorForm = (form) => {
@@ -636,7 +314,7 @@ export default function InventarioPage() {
       toast.error("No se puede eliminar: hay items asociados a este proveedor");
       return;
     }
-    const ok = window.confirm(`¿Eliminar el proveedor "${prov.nombre || ""}"?`);
+    const ok = await confirm(`¿Eliminar el proveedor "${prov.nombre || ""}"?`);
     if (!ok) return;
     try {
       await eliminarProveedor(prov.id);
@@ -816,7 +494,7 @@ export default function InventarioPage() {
   };
 
   const handleEliminarItem = async (item) => {
-    const ok = window.confirm(`¿Eliminar el item "${item.nombre || ""}"?`);
+    const ok = await confirm(`¿Eliminar el item "${item.nombre || ""}"?`);
     if (!ok) return;
     try {
       await eliminarItemInventario(item.id);
@@ -865,13 +543,6 @@ export default function InventarioPage() {
     for (const it of items) map[it.id] = it;
     return map;
   }, [items]);
-
-  const normalizeTerms = (q) => (q || "")
-    .toString()
-    .toLowerCase()
-    .split(/\s+/)
-    .map((t) => t.trim())
-    .filter(Boolean);
 
   const filteredProveedores = React.useMemo(() => {
     const terms = normalizeTerms(proveedoresSearch);
@@ -973,7 +644,7 @@ export default function InventarioPage() {
       toast.error("Solo se puede borrar el último movimiento del item");
       return;
     }
-    const ok = window.confirm("¿Eliminar este movimiento? Esto revertirá el stock.");
+    const ok = await confirm("¿Eliminar este movimiento? Esto revertirá el stock.");
     if (!ok) return;
     try {
       await eliminarMovimientoInventario(movimiento.id);
@@ -1148,16 +819,6 @@ export default function InventarioPage() {
     }
   };
 
-  const formatMovimientoFecha = (ts) => {
-    try {
-      const d = ts?.toDate ? ts.toDate() : (ts?.seconds ? new Date(ts.seconds * 1000) : null);
-      if (!d) return "";
-      return d.toLocaleString();
-    } catch {
-      return "";
-    }
-  };
-
   const toggleMovimientos = async (itemId) => {
     if (!itemId) return;
     if (movimientosOpenItemId === itemId) {
@@ -1203,28 +864,28 @@ export default function InventarioPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
+          <Button
+            variant="brand"
+            size="sm"
             onClick={() => { resetItemForm(); setShowItemModal(true); setActiveTab("materiales"); }}
-            className="text-xs px-3 py-2 rounded bg-trafico text-black hover:opacity-90"
           >
             Nuevo material
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => { resetProveedorForm(); setShowProveedorModal(true); setActiveTab("proveedores"); }}
-            className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
           >
             Nuevo proveedor
-          </button>
+          </Button>
           {activeTab === "movimientos" && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={loadMovGeneral}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
             >
               {movGeneralLoaded ? "Refrescar movimientos" : "Cargar movimientos"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -1274,715 +935,87 @@ export default function InventarioPage() {
         ))}
       </div>
 
-      <section className={`${activeTab === "materiales" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="font-medium">Materiales</div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            {showImportSections && (
-              <button
-                type="button"
-                onClick={() => toggleSection('importItems')}
-                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-              >
-                {sectionsOpen.importItems ? 'Ocultar importacion' : 'Mostrar importacion'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => toggleSection('inventario')}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {sectionsOpen.inventario ? 'Ocultar listado' : 'Mostrar listado'}
-            </button>
-          </div>
-        </div>
+      <MaterialesTab
+        isActive={activeTab === "materiales"}
+        sectionOpen={sectionsOpen.inventario}
+        onToggleSection={() => toggleSection('inventario')}
+        itemsSearch={itemsSearch}
+        setItemsSearch={setItemsSearch}
+        filteredCount={filteredItems.length}
+        totalCount={items.length}
+        loading={loading}
+        sortedItems={sortedItems}
+        itemsSort={itemsSort}
+        setItemsSort={setItemsSort}
+        proveedorLabelById={proveedorLabelById}
+        proveedorById={proveedorById}
+        proveedorNameById={proveedorNameById}
+        selectedItemId={selectedItemId}
+        setSelectedItemId={setSelectedItemId}
+        setSelectedProveedorId={setSelectedProveedorId}
+        setShowProveedorOverlay={setShowProveedorOverlay}
+        ensureMovimientosForItem={ensureMovimientosForItem}
+        startMovimiento={startMovimiento}
+        selectedItem={selectedItem}
+        selectedItemProveedorIds={selectedItemProveedorIds}
+        showSelectedItemMovs={showSelectedItemMovs}
+        setShowSelectedItemMovs={setShowSelectedItemMovs}
+        cancelMovimiento={cancelMovimiento}
+        movimientosLoadingItemId={movimientosLoadingItemId}
+        setMovimientosLoadingItemId={setMovimientosLoadingItemId}
+        movimientosCache={movimientosCache}
+        setMovimientosCache={setMovimientosCache}
+        startEditarItem={startEditarItem}
+        handleEliminarItem={handleEliminarItem}
+      />
 
-        {showImportSections && sectionsOpen.importItems && (
-          <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-            <div className="text-sm font-medium">Importar materiales (Excel/CSV)</div>
-            <div className="text-[11px] opacity-70 mt-1">Columnas esperadas: ITEM, PRODUCTOS, CATEGORIA, UNIDAD.</div>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-              <div>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={(e) => onItemImportFile(e.target.files?.[0])}
-                  className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
-                />
-                {itemImportFileName && (
-                  <div className="text-[11px] opacity-70 mt-1">Archivo: {itemImportFileName}</div>
-                )}
-                {itemImportSummary && (
-                  <div className="text-[11px] opacity-70 mt-1">
-                    Filas: {itemImportSummary.total ?? 0} - Validas: {itemImportSummary.valid ?? 0} - Omitidas: {itemImportSummary.skipped ?? 0}
-                    {typeof itemImportSummary.imported !== 'undefined' ? ` - Importadas: ${itemImportSummary.imported}` : ''}
-                  </div>
-                )}
-                {itemImportSummary?.errors?.length ? (
-                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
-                    Primeros errores: {itemImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' - ')}
-                  </div>
-                ) : null}
-              </div>
+      <ProveedoresTab
+        isActive={activeTab === "proveedores"}
+        sectionOpen={sectionsOpen.proveedores}
+        onToggleSection={() => toggleSection('proveedores')}
+        proveedoresSearch={proveedoresSearch}
+        setProveedoresSearch={setProveedoresSearch}
+        filteredCount={filteredProveedores.length}
+        totalCount={proveedores.length}
+        sortedProveedores={sortedProveedores}
+        provSort={provSort}
+        setProvSort={setProvSort}
+        selectedProveedorId={selectedProveedorId}
+        setSelectedProveedorId={setSelectedProveedorId}
+        setSelectedItemId={setSelectedItemId}
+        showProveedorOverlay={showProveedorOverlay}
+        setShowProveedorOverlay={setShowProveedorOverlay}
+        selectedProveedor={selectedProveedor}
+        selectedProveedorItemList={selectedProveedorItemList}
+        showSelectedProveedorItems={showSelectedProveedorItems}
+        setShowSelectedProveedorItems={setShowSelectedProveedorItems}
+        ensureMovimientosForItem={ensureMovimientosForItem}
+        startEditarProveedor={startEditarProveedor}
+        handleEliminarProveedor={handleEliminarProveedor}
+      />
 
-              <button
-                type="button"
-                onClick={runItemImport}
-                disabled={itemImportBusy || itemImportRows.length === 0}
-                className={`text-xs px-3 py-2 rounded ${itemImportBusy || itemImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
-              >
-                {itemImportBusy ? 'Importando...' : 'Importar a Firebase'}
-              </button>
-            </div>
-
-            {itemImportRows.length > 0 && (
-              <div className="mt-3 overflow-x-auto">
-                <div className="text-[11px] opacity-70 mb-2">Selecciona proveedores por item antes de importar.</div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left opacity-70">
-                      <th className="py-1 pr-3">Item</th>
-                      <th className="py-1 pr-3">Productos</th>
-                      <th className="py-1 pr-3">Categoria</th>
-                      <th className="py-1 pr-3">Unidad</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {itemImportRows.map((r) => (
-                      <tr key={r.rowId} className="border-t border-gray-200/60 dark:border-gris-600/60">
-                        <td className="py-1 pr-3">{r.nombre}</td>
-                        <td className="py-1 pr-3">{Array.isArray(r.productoTipos) ? r.productoTipos.join(' | ') : ''}</td>
-                        <td className="py-1 pr-3">{r.categoria || '—'}</td>
-                        <td className="py-1 pr-3">{r.unidad || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {sectionsOpen.inventario && (
-          <>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-              <div className="rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 px-3 py-2">
-                <div className="text-[11px] opacity-70">Buscar (nombre, SKU, categoría, ubicación, productos, proveedor). Soporta varios términos.</div>
-                <input
-                  value={itemsSearch}
-                  onChange={(e) => setItemsSearch(e.target.value)}
-                  placeholder="Ej: espuma pu bodega bogotá proveedorX"
-                  className="mt-1 w-full bg-transparent outline-none text-sm"
-                />
-              </div>
-              <div className="text-xs opacity-70 pt-2">Mostrando: {filteredItems.length} / {items.length}</div>
-            </div>
-
-            {loading ? (
-              <div className="text-sm opacity-70 mt-3">Cargando…</div>
-            ) : (
-              <>
-                {sortedItems.length === 0 ? (
-                  <div className="text-center py-12 text-sm opacity-60">
-                    <div className="text-3xl mb-2">📦</div>
-                    {itemsSearch
-                      ? <>Sin materiales que coincidan con <strong>"{itemsSearch}"</strong>.</>
-                      : <>No hay materiales registrados. Crea el primero con el botón <strong>"Nuevo material"</strong>.</>
-                    }
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-lg border border-gray-200 dark:border-gris-700 overflow-auto max-h-[420px]">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-left opacity-70">
-                          <th className="py-2 pr-3">Estado</th>
-                          <th className="py-2 pr-3">Foto</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'nombre')}>Material{sortArrow(itemsSort, 'nombre')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockActual')}>Stock{sortArrow(itemsSort, 'stockActual')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'stockMinimo')}>Mín{sortArrow(itemsSort, 'stockMinimo')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'ubicacion')}>Ubicación{sortArrow(itemsSort, 'ubicacion')}</th>
-                          <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setItemsSort, itemsSort, 'proveedores')}>Proveedores{sortArrow(itemsSort, 'proveedores')}</th>
-                          <th className="py-2">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedItems.map((i) => {
-                          const ids = Array.isArray(i.proveedorIds) ? i.proveedorIds : (i.proveedorId ? [i.proveedorId] : []);
-                          const provNames = ids.map((id) => proveedorLabelById[id] || '—').filter(Boolean);
-                          const low = Number(i.stockActual || 0) < Number(i.stockMinimo || 0);
-                          const isSelected = selectedItemId === i.id;
-                          return (
-                            <tr
-                              key={i.id}
-                              onClick={() => {
-                                setSelectedProveedorId('');
-                                setSelectedItemId(i.id);
-                                ensureMovimientosForItem(i.id);
-                              }}
-                              className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top cursor-pointer ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20'}`}
-                            >
-                              <td className="py-2 pr-3">
-                                <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium ${low ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'}`}>
-                                  {low ? 'Bajo' : 'Ok'}
-                                </span>
-                              </td>
-                              <td className="py-2 pr-3">
-                                {i.fotoDataUrl ? (
-                                  <img
-                                    src={i.fotoDataUrl}
-                                    alt={i.nombre || 'foto'}
-                                    className="h-10 w-10 rounded object-cover border border-gray-200 dark:border-gris-600"
-                                  />
-                                ) : (
-                                  <div className="h-10 w-10 rounded border border-dashed border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800" />
-                                )}
-                              </td>
-                              <td className="py-2 pr-3">
-                                <div className="font-medium truncate max-w-[260px]" title={i.nombre || ''}>{i.nombre || '—'}</div>
-                                <div className="text-[11px] opacity-70">SKU: {i.sku || '—'}{i.categoria ? ` · ${i.categoria}` : ''}</div>
-                              </td>
-                              <td className={`py-2 pr-3 whitespace-nowrap ${low ? 'text-red-600 dark:text-red-300 font-medium' : ''}`}>
-                                <div>{i.stockActual ?? 0} {i.unidad || ''}</div>
-                                {Number(i.stockMinimo || 0) > 0 && (
-                                  <div className="mt-1 h-1.5 w-16 rounded-full bg-gray-200 dark:bg-gris-600 overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${low ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                      style={{ width: `${Math.min(100, Math.round((Number(i.stockActual || 0) / Number(i.stockMinimo)) * 100))}%` }}
-                                    />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{i.stockMinimo ?? 0}</td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{i.ubicacion || '—'}</td>
-                              <td className="py-2 pr-3">
-                                <div className="truncate max-w-[260px]" title={provNames.join(' · ')}>
-                                  {provNames.length ? provNames.join(' · ') : '—'}
-                                </div>
-                              </td>
-                              <td className="py-2">
-                                <div className="flex flex-wrap gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'ingreso'); }}
-                                    className="text-[11px] px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-                                    title="Registrar ingreso"
-                                  >↑ Entrada</button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); startMovimiento(i, 'salida'); }}
-                                    className="text-[11px] px-2.5 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-medium"
-                                    title="Registrar salida"
-                                  >↓ Salida</button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {selectedItem && (
-                  <div className="fixed inset-0 z-50">
-                    <div
-                      className="absolute inset-0 bg-black/40"
-                      onClick={() => { setSelectedItemId(''); setShowSelectedItemMovs(true); cancelMovimiento(); }}
-                    />
-                    <div className="absolute inset-0 p-4 flex items-start justify-center">
-                      <div
-                        role="dialog"
-                        aria-modal="true"
-                        className="w-full max-w-3xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden"
-                      >
-                        <div className="p-4 border-b border-gray-200 dark:border-gris-700 relative">
-                          <button
-                            type="button"
-                            onClick={() => { setSelectedItemId(''); setShowSelectedItemMovs(true); cancelMovimiento(); }}
-                            className="absolute top-3 right-3 h-9 w-9 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
-                            aria-label="Cerrar"
-                            title="Cerrar"
-                          >
-                            <span className="text-base leading-none">✕</span>
-                          </button>
-
-                          <div className="text-sm font-medium">Ficha del item</div>
-                          <div className="text-lg font-semibold mt-1 break-words">{selectedItem.nombre || '—'}</div>
-                          <div className="text-xs opacity-70 mt-1">
-                            SKU: {selectedItem.sku || '—'}{selectedItem.categoria ? ` · Cat: ${selectedItem.categoria}` : ''}{selectedItem.ubicacion ? ` · Ubic: ${selectedItem.ubicacion}` : ''}
-                          </div>
-                        </div>
-
-                        <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                              <div className="text-xs opacity-70">Stock</div>
-                              <div className="text-sm font-medium">{selectedItem.stockActual ?? 0} {selectedItem.unidad || ''}</div>
-                              <div className="text-xs opacity-70">Mínimo: {selectedItem.stockMinimo ?? 0}</div>
-                            </div>
-                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                              <div className="text-xs opacity-70">Costo unitario</div>
-                              <div className="text-sm font-medium">{formatCOP(selectedItem.costoUnitario ?? 0)}</div>
-                              <div className="text-xs opacity-70">Ubicación: {selectedItem.ubicacion || '—'}</div>
-                            </div>
-                            <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                              <div className="text-xs opacity-70">Proveedores</div>
-                              <div className="text-sm flex flex-wrap gap-1.5">
-                                {selectedItemProveedorIds.length ? (
-                                  selectedItemProveedorIds.map((id) => {
-                                    const prov = proveedorById[id];
-                                    const label = prov?.razonSocial || prov?.nombre || proveedorNameById[id] || id;
-                                    return (
-                                      <button
-                                        key={id}
-                                        type="button"
-                                        onClick={() => { setSelectedProveedorId(id); setShowProveedorOverlay(true); }}
-                                        className="text-xs px-2 py-1 rounded-full border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700"
-                                        title="Ver proveedor"
-                                      >
-                                        {label}
-                                      </button>
-                                    );
-                                  })
-                                ) : (
-                                  <span>Sin proveedores</span>
-                                )}
-                              </div>
-                              <div className="text-xs opacity-70 mt-1">Productos: {Array.isArray(selectedItem.productoTipos) ? (selectedItem.productoTipos.filter(Boolean).join(' · ') || '—') : (selectedItem.productoTipo || '—')}</div>
-                            </div>
-                          </div>
-
-                          {selectedItem.fotoDataUrl ? (
-                            <div className="mt-3 flex items-start gap-3">
-                              <img
-                                src={selectedItem.fotoDataUrl}
-                                alt={selectedItem.nombre || 'foto'}
-                                className="w-24 h-24 object-cover rounded border border-gray-200 dark:border-gris-700"
-                              />
-                              <div className="text-xs opacity-70">
-                                <div>Imagen: {selectedItem.fotoFileName || '—'}</div>
-                                <div>Tamaño: {dataUrlSizeLabel(selectedItem.fotoDataUrl)}</div>
-                              </div>
-                            </div>
-                          ) : null}
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => startMovimiento(selectedItem, 'ingreso')}
-                              className="text-xs px-3 py-2 rounded bg-green-600 hover:bg-green-500 text-white"
-                            >Ingreso</button>
-                            <button
-                              type="button"
-                              onClick={() => startMovimiento(selectedItem, 'salida')}
-                              className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"
-                            >Salida</button>
-                            <button
-                              type="button"
-                              onClick={() => setShowSelectedItemMovs((v) => !v)}
-                              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                            >{showSelectedItemMovs ? 'Ocultar movimientos' : 'Mostrar movimientos'}</button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  setMovimientosLoadingItemId(selectedItem.id);
-                                  const lista = await listarMovimientosPorItem(selectedItem.id, { max: 50 });
-                                  setMovimientosCache((c) => ({ ...c, [selectedItem.id]: lista }));
-                                } catch (e) {
-                                  console.error(e);
-                                  toast.error('No se pudo refrescar');
-                                } finally {
-                                  setMovimientosLoadingItemId("");
-                                }
-                              }}
-                              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                            >Refrescar movimientos</button>
-                          </div>
-
-                          {showSelectedItemMovs && (
-                            <div className="mt-3 rounded border border-gray-200 dark:border-gris-600 bg-white/60 dark:bg-gris-800/40 p-3">
-                              <div className="text-sm font-medium">Ultimos movimientos</div>
-                              {movimientosLoadingItemId === selectedItem.id ? (
-                                <div className="text-sm opacity-70 mt-2">Cargando...</div>
-                              ) : (Array.isArray(movimientosCache[selectedItem.id]) && movimientosCache[selectedItem.id].length === 0) ? (
-                                <div className="text-sm opacity-70 mt-2">Sin movimientos.</div>
-                              ) : Array.isArray(movimientosCache[selectedItem.id]) ? (
-                                <div className="mt-2 overflow-x-auto">
-                                  <table className="w-full text-xs">
-                                    <thead>
-                                      <tr className="text-left opacity-70">
-                                        <th className="py-1 pr-3">Fecha</th>
-                                        <th className="py-1 pr-3">Tipo</th>
-                                        <th className="py-1 pr-3">Cant.</th>
-                                        <th className="py-1 pr-3">Stock</th>
-                                        <th className="py-1 pr-3">Proveedor</th>
-                                        <th className="py-1 pr-3">Costo</th>
-                                        <th className="py-1">Nota</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {movimientosCache[selectedItem.id].map((m) => (
-                                        <tr key={m.id} className="border-t border-gray-200/60 dark:border-gris-600/60">
-                                          <td className="py-1 pr-3 whitespace-nowrap">{formatMovimientoFecha(m.createdAt)}</td>
-                                          <td className="py-1 pr-3">{m.tipo === 'salida' ? 'Salida' : 'Ingreso'}</td>
-                                          <td className="py-1 pr-3">{m.cantidad ?? ''}</td>
-                                          <td className="py-1 pr-3">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} -> ${m.stockDespues}` : ''}</td>
-                                          <td className="py-1 pr-3">{proveedorLabelById[m.proveedorId] || '—'}</td>
-                                          <td className="py-1 pr-3">{m.costoUnitario ? formatCOP(m.costoUnitario) : '—'}</td>
-                                          <td className="py-1">{m.nota || ''}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div className="text-sm opacity-70 mt-2">Selecciona "Refrescar movimientos".</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="p-4 border-t border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
-                          <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => startEditarItem(selectedItem)}
-                              className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
-                            >
-                              <span aria-hidden>✎</span>
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleEliminarItem(selectedItem)}
-                              className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
-                            >
-                              <span aria-hidden>🗑</span>
-                              Eliminar
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </section>
-
-      <section className={`${activeTab === "proveedores" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-medium">Proveedores</div>
-          <div className="flex gap-2">
-            {showImportSections && (
-              <button
-                type="button"
-                onClick={() => toggleSection('importProveedores')}
-                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-              >
-                {sectionsOpen.importProveedores ? 'Ocultar importacion' : 'Mostrar importacion'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => toggleSection('proveedores')}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {sectionsOpen.proveedores ? 'Ocultar listado' : 'Mostrar listado'}
-            </button>
-          </div>
-        </div>
-
-        {showImportSections && sectionsOpen.importProveedores && (
-          <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-            <div className="text-sm font-medium">Importar proveedores (Excel/CSV)</div>
-            <div className="text-[11px] opacity-70 mt-1">Lee la primera hoja. Requiere columnas para Razon social y NIT (nombres flexibles).</div>
-            <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-              <div>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={(e) => onProvImportFile(e.target.files?.[0])}
-                  className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
-                />
-                {provImportFileName && (
-                  <div className="text-[11px] opacity-70 mt-1">Archivo: {provImportFileName}</div>
-                )}
-                {provImportSummary && (
-                  <div className="text-[11px] opacity-70 mt-1">
-                    Filas: {provImportSummary.total ?? 0} - Validas: {provImportSummary.valid ?? 0} - Omitidas: {provImportSummary.skipped ?? 0}
-                    {typeof provImportSummary.imported !== 'undefined' ? ` - Importadas: ${provImportSummary.imported}` : ''}
-                    {typeof provImportSummary.duplicates !== 'undefined' ? ` - Duplicados(NIT): ${provImportSummary.duplicates}` : ''}
-                  </div>
-                )}
-                {provImportSummary?.errors?.length ? (
-                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-200">
-                    Primeros errores: {provImportSummary.errors.map((e) => `fila ${e.row}: ${e.reason}`).join(' - ')}
-                  </div>
-                ) : null}
-              </div>
-
-              <button
-                type="button"
-                onClick={runProvImport}
-                disabled={provImportBusy || provImportRows.length === 0}
-                className={`text-xs px-3 py-2 rounded ${provImportBusy || provImportRows.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-200 dark:bg-gris-700' : 'bg-trafico text-black hover:opacity-90'}`}
-              >
-                {provImportBusy ? 'Importando...' : 'Importar a Firebase'}
-              </button>
-            </div>
-
-            {provImportPreview.length > 0 && (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left opacity-70">
-                      <th className="py-1 pr-3">Razon social</th>
-                      <th className="py-1 pr-3">NIT</th>
-                      <th className="py-1 pr-3">Lead time</th>
-                      <th className="py-1 pr-3">Ciudad</th>
-                      <th className="py-1">Contacto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {provImportPreview.map((p, idx) => (
-                      <tr key={idx} className="border-t border-gray-200/60 dark:border-gris-600/60">
-                        <td className="py-1 pr-3">{p.razonSocial}</td>
-                        <td className="py-1 pr-3">{p.nit}</td>
-                        <td className="py-1 pr-3">{p.leadTimeDias ?? 0}</td>
-                        <td className="py-1 pr-3">{Array.isArray(p.sedes) ? (p.sedes[0]?.ciudad || '') : ''}</td>
-                        <td className="py-1">{Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : ''}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {sectionsOpen.proveedores && (
-          <>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-              <div className="rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 px-3 py-2">
-                <div className="text-[11px] opacity-70">Buscar (razón social, NIT, contacto, ciudad, modalidad, pago).</div>
-                <input
-                  value={proveedoresSearch}
-                  onChange={(e) => setProveedoresSearch(e.target.value)}
-                  placeholder="Ej: nit 900 bogotá credito"
-                  className="mt-1 w-full bg-transparent outline-none text-sm"
-                />
-              </div>
-              <div className="text-xs opacity-70 pt-2">Mostrando: {filteredProveedores.length} / {proveedores.length}</div>
-            </div>
-
-            {sortedProveedores.length === 0 ? (
-              <div className="text-sm opacity-70 mt-4">Sin resultados.</div>
-            ) : (
-              <div className="mt-4 rounded-lg border border-gray-200 dark:border-gris-700 overflow-auto max-h-[420px]">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left opacity-70">
-                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'razonSocial')}>Razón social{sortArrow(provSort, 'razonSocial')}</th>
-                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'nit')}>NIT{sortArrow(provSort, 'nit')}</th>
-                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'leadTimeDias')}>Lead time{sortArrow(provSort, 'leadTimeDias')}</th>
-                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'modalidadEntrega')}>Entrega{sortArrow(provSort, 'modalidadEntrega')}</th>
-                      <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'tipoPago')}>Pago{sortArrow(provSort, 'tipoPago')}</th>
-                      <th className="py-2 cursor-pointer select-none" onClick={() => toggleSort(setProvSort, provSort, 'contacto')}>Contacto{sortArrow(provSort, 'contacto')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedProveedores.map((p) => {
-                      const isSelected = selectedProveedorId === p.id;
-                      const contacto = p.contacto || (Array.isArray(p.contactos) ? (p.contactos[0]?.nombre || '') : '');
-                      return (
-                        <tr
-                          key={p.id}
-                          onClick={() => {
-                            setSelectedItemId('');
-                            setSelectedProveedorId(p.id);
-                            setShowProveedorOverlay(true);
-                          }}
-                          className={`border-t border-gray-200/60 dark:border-gris-600/60 align-top ${isSelected ? 'bg-gray-50 dark:bg-gris-700/40' : 'hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer'}`}
-                        >
-                          <td className="py-2 pr-3">
-                            <div className="font-medium truncate max-w-[320px]" title={p.razonSocial || p.nombre || ''}>{p.razonSocial || p.nombre || '—'}</div>
-                          </td>
-                          <td className="py-2 pr-3 whitespace-nowrap">{p.nit || '—'}</td>
-                          <td className="py-2 pr-3 whitespace-nowrap">{Number(p.leadTimeDias ?? 0)} días</td>
-                          <td className="py-2 pr-3 whitespace-nowrap">{p.modalidadEntrega || '—'}</td>
-                          <td className="py-2 pr-3 whitespace-nowrap">{p.tipoPago || '—'}</td>
-                          <td className="py-2">
-                            <div className="truncate max-w-[340px]" title={contacto}>{contacto || '—'}</div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      <section className={`${activeTab === "movimientos" ? "" : "hidden"} mt-5 bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4`}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="font-medium">Movimientos (general)</div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => toggleSection('movimientos')}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {sectionsOpen.movimientos ? 'Ocultar listado' : 'Mostrar listado'}
-            </button>
-            <button
-              type="button"
-              onClick={loadMovGeneral}
-              className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-            >
-              {movGeneralLoaded ? 'Refrescar' : 'Cargar últimos 200'}
-            </button>
-          </div>
-        </div>
-
-        {sectionsOpen.movimientos && (
-          <>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
-              <div className="rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 px-3 py-2">
-                <div className="text-[11px] opacity-70">Buscar (item, SKU, tipo, cantidad, nota).</div>
-                <input
-                  value={movGeneralSearch}
-                  onChange={(e) => setMovGeneralSearch(e.target.value)}
-                  placeholder="Ej: salida espuma factura"
-                  className="mt-1 w-full bg-transparent outline-none text-sm"
-                  disabled={!movGeneralLoaded}
-                />
-              </div>
-              <div className="text-xs opacity-70 pt-2">Mostrando: {filteredMovGeneral.length} / {movGeneral.length}</div>
-            </div>
-
-            <div className="mt-4">
-              {!movGeneralLoaded ? (
-                <div className="text-sm opacity-70">Haz clic en “Cargar últimos 200” para ver el historial general.</div>
-              ) : movGeneralLoading ? (
-                <div className="text-sm opacity-70">Cargando…</div>
-              ) : filteredMovGeneral.length === 0 ? (
-                <div className="text-sm opacity-70">Sin movimientos.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left opacity-70">
-                        <th className="py-2 pr-3">Fecha</th>
-                        <th className="py-2 pr-3">Item</th>
-                        <th className="py-2 pr-3">Tipo</th>
-                        <th className="py-2 pr-3">Cant.</th>
-                        <th className="py-2 pr-3">Stock</th>
-                        <th className="py-2 pr-3">Proveedor</th>
-                        <th className="py-2 pr-3">Costo</th>
-                        <th className="py-2 pr-3">Nota</th>
-                        <th className="py-2">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                  {filteredMovGeneral.map((m) => {
-                    const it = itemById[m.itemId];
-                    const isLatest = it?.lastMovimientoId && it.lastMovimientoId === m.id;
-                    const isEditing = editingMovId === m.id;
-                    return (
-                      <tr key={m.id} className="border-t border-gray-200/60 dark:border-gris-600/60 align-top">
-                        <td className="py-2 pr-3 whitespace-nowrap">{formatMovimientoFecha(m.createdAt)}</td>
-                        <td className="py-2 pr-3">
-                          <div className="font-medium">{it?.nombre || m.itemId}</div>
-                          <div className="opacity-70">SKU: {it?.sku || '—'}</div>
-                        </td>
-                        <td className="py-2 pr-3">
-                          {isEditing ? (
-                            <select
-                              value={editingMovForm.tipo}
-                              onChange={(e) => setEditingMovForm((p) => ({ ...p, tipo: e.target.value }))}
-                              disabled={!isLatest}
-                              className="px-2 py-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                            >
-                              <option value="ingreso">Ingreso</option>
-                              <option value="salida">Salida</option>
-                            </select>
-                          ) : (m.tipo === 'salida' ? 'Salida' : 'Ingreso')}
-                          {!isLatest && isEditing && (
-                            <div className="text-[11px] opacity-60 mt-1">Solo nota (no es el último del item)</div>
-                          )}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              min={1}
-                              value={editingMovForm.cantidad}
-                              onChange={(e) => setEditingMovForm((p) => ({ ...p, cantidad: Number(e.target.value) }))}
-                              disabled={!isLatest}
-                              className="w-24 px-2 py-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                            />
-                          ) : (m.cantidad ?? '')}
-                        </td>
-                        <td className="py-2 pr-3 whitespace-nowrap">{typeof m.stockAntes !== 'undefined' ? `${m.stockAntes} → ${m.stockDespues}` : ''}</td>
-                        <td className="py-2 pr-3">{proveedorNameById[m.proveedorId] || '—'}</td>
-                        <td className="py-2 pr-3">{m.costoUnitario ? formatCOP(m.costoUnitario) : '—'}</td>
-                        <td className="py-2 pr-3">
-                          {isEditing ? (
-                            <form onSubmit={(e) => submitEditarMovimiento(e, m)}>
-                              <input
-                                value={editingMovForm.nota}
-                                onChange={(e) => setEditingMovForm((p) => ({ ...p, nota: e.target.value }))}
-                                className="w-full min-w-[220px] px-2 py-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                                placeholder="Nota"
-                              />
-                              <div className="flex gap-2 mt-2">
-                                <button type="button" onClick={cancelEditarMovimiento} className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600">Cancelar</button>
-                                <button type="submit" className="text-xs px-3 py-2 rounded bg-trafico text-black">Guardar</button>
-                              </div>
-                            </form>
-                          ) : (m.nota || '')}
-                        </td>
-                        <td className="py-2">
-                          {isEditing ? null : (
-                            <div className="flex flex-col gap-2">
-                              <button
-                                type="button"
-                                onClick={() => startEditarMovimiento(m)}
-                                className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleEliminarMovimiento(m)}
-                                className={`text-xs px-3 py-2 rounded ${isLatest ? 'bg-red-600 hover:bg-red-500 text-white' : 'border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 opacity-60 cursor-not-allowed'}`}
-                                disabled={!isLatest}
-                              >
-                                Borrar
-                              </button>
-                              {!isLatest && (
-                                <div className="text-[11px] opacity-60">Solo se borra el último del item</div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </section>
+      <MovimientosTab
+        isActive={activeTab === "movimientos"}
+        sectionOpen={sectionsOpen.movimientos}
+        onToggleSection={() => toggleSection('movimientos')}
+        movGeneralLoaded={movGeneralLoaded}
+        loadMovGeneral={loadMovGeneral}
+        movGeneralSearch={movGeneralSearch}
+        setMovGeneralSearch={setMovGeneralSearch}
+        filteredCount={filteredMovGeneral.length}
+        totalCount={movGeneral.length}
+        movGeneralLoading={movGeneralLoading}
+        filteredMovGeneral={filteredMovGeneral}
+        itemById={itemById}
+        editingMovId={editingMovId}
+        editingMovForm={editingMovForm}
+        setEditingMovForm={setEditingMovForm}
+        submitEditarMovimiento={submitEditarMovimiento}
+        cancelEditarMovimiento={cancelEditarMovimiento}
+        startEditarMovimiento={startEditarMovimiento}
+        handleEliminarMovimiento={handleEliminarMovimiento}
+        proveedorNameById={proveedorNameById}
+      />
 
       {showMovimientoModal && mov.itemId && (
         <div className="fixed inset-0 z-50">
@@ -1997,6 +1030,8 @@ export default function InventarioPage() {
                 <button
                   type="button"
                   onClick={cancelMovimiento}
+                  aria-label="Cerrar"
+                  title="Cerrar"
                   className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
                 >
                   <span className="text-base leading-none">✕</span>
@@ -2059,137 +1094,6 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {showProveedorOverlay && selectedProveedorId && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowProveedorOverlay(false)} />
-          <div className="absolute inset-0 p-4 flex items-start justify-center">
-            <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-lg max-h-[calc(100vh-2rem)] overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium">Proveedor</div>
-                  <div className="text-lg font-semibold mt-1 break-words">
-                    {selectedProveedor
-                      ? (selectedProveedor.razonSocial || selectedProveedor.nombre || '—')
-                      : 'Cargando...'}
-                  </div>
-                  {selectedProveedor && (
-                    <>
-                      <div className="text-xs opacity-70 mt-1">NIT: {selectedProveedor.nit || '—'} - Lead time: {Number(selectedProveedor.leadTimeDias ?? 0)} dias</div>
-                      <div className="text-xs opacity-70">Entrega: {selectedProveedor.modalidadEntrega || '—'} - Pago: {selectedProveedor.tipoPago || '—'}</div>
-                    </>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowProveedorOverlay(false)}
-                  className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
-                >
-                  <span className="text-base leading-none">✕</span>
-                </button>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
-                {selectedProveedor ? (
-                  <>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                        <div className="text-xs opacity-70">Contactos</div>
-                        <div className="text-sm mt-1">
-                          {Array.isArray(selectedProveedor.contactos) && selectedProveedor.contactos.length ? (
-                            selectedProveedor.contactos.slice(0, 3).map((c, idx) => (
-                              <div key={idx} className="text-xs">
-                                {c.nombre || '—'}{c.telefono ? ` - ${c.telefono}` : ''}{c.correo ? ` - ${c.correo}` : ''}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-xs">{selectedProveedor.contacto || '—'}{selectedProveedor.telefono ? ` - ${selectedProveedor.telefono}` : ''}{selectedProveedor.email ? ` - ${selectedProveedor.email}` : ''}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded border border-gray-200 dark:border-gris-700 bg-gray-50 dark:bg-gris-700/30 p-3">
-                        <div className="text-xs opacity-70">Sedes</div>
-                        <div className="text-sm mt-1">
-                          {Array.isArray(selectedProveedor.sedes) && selectedProveedor.sedes.length ? (
-                            selectedProveedor.sedes.slice(0, 3).map((s, idx) => (
-                              <div key={idx} className="text-xs">{s.direccion || '—'}{s.ciudad ? ` - ${s.ciudad}` : ''}</div>
-                            ))
-                          ) : (
-                            <div className="text-xs">—</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <div className="text-xs opacity-70">Items asociados: {selectedProveedorItemList.length}</div>
-                      <button
-                        type="button"
-                        onClick={() => setShowSelectedProveedorItems((v) => !v)}
-                        className="text-xs px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600"
-                      >{showSelectedProveedorItems ? 'Ocultar items' : 'Mostrar items'}</button>
-                    </div>
-
-                    {showSelectedProveedorItems && (
-                      <div className="mt-2 overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="text-left opacity-70">
-                              <th className="py-1 pr-3">Item</th>
-                              <th className="py-1 pr-3">SKU</th>
-                              <th className="py-1 pr-3">Stock</th>
-                              <th className="py-1">Ubicacion</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedProveedorItemList.slice(0, 50).map((it) => (
-                              <tr
-                                key={it.id}
-                                onClick={() => {
-                                  setShowProveedorOverlay(false);
-                                  setSelectedItemId(it.id);
-                                  ensureMovimientosForItem(it.id);
-                                }}
-                                className="border-t border-gray-200/60 dark:border-gris-600/60 hover:bg-gray-50/60 dark:hover:bg-gris-700/20 cursor-pointer"
-                              >
-                                <td className="py-1 pr-3 font-medium">{it.nombre || '—'}</td>
-                                <td className="py-1 pr-3">{it.sku || '—'}</td>
-                                <td className="py-1 pr-3">{it.stockActual ?? 0}</td>
-                                <td className="py-1">{it.ubicacion || '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setShowProveedorOverlay(false); startEditarProveedor(selectedProveedor); }}
-                        className="text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white inline-flex items-center justify-center gap-2"
-                      >
-                        <span aria-hidden>✎</span>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleEliminarProveedor(selectedProveedor)}
-                        className="text-xs px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white inline-flex items-center justify-center gap-2"
-                      >
-                        <span aria-hidden>🗑</span>
-                        Eliminar
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm opacity-70">Cargando proveedor...</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showProveedorModal && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={resetProveedorForm} />
@@ -2203,6 +1107,8 @@ export default function InventarioPage() {
                 <button
                   type="button"
                   onClick={resetProveedorForm}
+                  aria-label="Cerrar"
+                  title="Cerrar"
                   className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
                 >
                   <span className="text-base leading-none">✕</span>
@@ -2468,6 +1374,8 @@ export default function InventarioPage() {
                 <button
                   type="button"
                   onClick={resetItemForm}
+                  aria-label="Cerrar"
+                  title="Cerrar"
                   className="h-8 w-8 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-700 hover:bg-gray-100 dark:hover:bg-gris-600 flex items-center justify-center"
                 >
                   <span className="text-base leading-none">✕</span>

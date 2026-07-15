@@ -55,7 +55,7 @@ export default function CotizadorApp(){
   const { quoteData, setQuoteData,
     empresas, setEmpresas, empresaSeleccionada, setEmpresaSeleccionada, contactoSeleccionado, setContactoSeleccionado,
     matricesOverride, extrasOverride, productosOverride,
-    productosDB, resetToken, setResetToken } = useQuote();
+    productosDB, resetToken, setResetToken, confirm } = useQuote();
   const navigate = useNavigate();
 
   const [productos, setProductos] = useState([crearProductoInicial()]);
@@ -138,7 +138,9 @@ export default function CotizadorApp(){
       document.getElementById(`producto-card-${newIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 80);
   };
-  const handleEliminarProducto = (i)=>{
+  const handleEliminarProducto = async (i)=>{
+    const ok = await confirm('¿Eliminar este producto de la cotización?');
+    if(!ok) return;
     setProductos(p=> p.filter((_,idx)=> idx!==i));
     setAlertas(a=> a.filter((_,idx)=> idx!==i));
     setExtrasInputs(prev=>{ const next={}; Object.entries(prev).forEach(([k,v])=>{ const ki=parseInt(k); if(ki<i) next[ki]=v; else if(ki>i) next[ki-1]=v; }); return next; });
@@ -351,9 +353,23 @@ export default function CotizadorApp(){
         </div>
       )}
       <h1 className="text-2xl font-bold mb-4">Generar Cotización</h1>
+      <nav className="sticky top-16 z-10 -mx-4 lg:mx-0 mb-4 flex gap-2 overflow-x-auto bg-gray-50/95 dark:bg-gris-900/95 backdrop-blur px-4 lg:px-0 py-2 text-xs font-medium">
+        {[
+          { href: '#seccion-empresa', label: '1. Empresa' },
+          { href: '#seccion-productos', label: '2. Productos' },
+          { href: '#seccion-total', label: '3. Total' },
+        ].map(s => (
+          <a
+            key={s.href}
+            href={s.href}
+            onClick={(e)=>{ e.preventDefault(); document.querySelector(s.href)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            className="px-3 py-1.5 rounded-full border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 whitespace-nowrap transition-colors"
+          >{s.label}</a>
+        ))}
+      </nav>
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 space-y-6">
-          <div className="p-4 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm">
+          <div id="seccion-empresa" className="p-4 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm scroll-mt-32">
             {/* Empresa */}
             <div className="mb-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Empresa</p>
@@ -397,6 +413,7 @@ export default function CotizadorApp(){
                 </div>
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <button type="button" onClick={async ()=>{ setCreandoEntidad(true); try { await ensureEmpresaContacto(); } catch(e){ /* handled */ } finally { setCreandoEntidad(false);} }} className="mt-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded disabled:opacity-60 w-full" disabled={creandoEntidad}>{creandoEntidad? 'Validando...':'Validar / Crear'}</button>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">Opcional: revisa aquí si la empresa/contacto ya existen antes de seguir. Si no lo usas, "Generar Cotización" los valida y crea igual al final.</p>
                 </div>
               </div>
             </div>
@@ -407,7 +424,7 @@ export default function CotizadorApp(){
               {contactoSeleccionado?.email && <span>{contactoSeleccionado.email}</span>}
             </div>
           </div>
-          <div className="space-y-4">
+          <div id="seccion-productos" className="space-y-4 scroll-mt-32">
             <div className="flex items-center justify-between">
               <p className="text-xs text-gray-500 dark:text-gray-400">{productos.length} {productos.length === 1 ? 'producto' : 'productos'}</p>
               <div className="flex gap-3 text-xs">
@@ -504,8 +521,16 @@ export default function CotizadorApp(){
                       })()}
                       <div className="space-y-2 md:col-span-2"><label className="block text-xs font-semibold tracking-wide uppercase">Información Adicional</label><input type="text" value={producto.infoAdicional||''} onChange={e=> handleChangeProducto(i,'infoAdicional', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="(Ej: Muelle 3, Placa 5, Zona Fría)" /></div>
                       <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Cantidad</label><input type="number" value={producto.cantidad} onChange={e=> handleChangeProducto(i,'cantidad', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" /></div>
-                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label><input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" /></div>
-                      <div className="space-y-2"><label className="block text-xs font-semibold tracking-wide uppercase" title="Ajuste sobre el precio de este producto. El ajuste global (sidebar) se aplica encima del total.">Ajuste (%)</label><div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div></div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-semibold tracking-wide uppercase">Precio Manual</label>
+                        <input type="number" value={producto.precioManual} onChange={e=> handleChangeProducto(i,'precioManual', e.target.value)} className="w-full border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="Opcional" />
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500">Si lo llenas, reemplaza cualquier otro precio (calculado o el del aviso de rango) para este producto.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-semibold tracking-wide uppercase">Ajuste (%) de este producto</label>
+                        <div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500">Solo afecta este producto. El "Ajuste general" del panel derecho se suma aparte, sobre el total de la cotización.</p>
+                      </div>
                       {producto.tipo==='Sello de Andén' && (
                         <div className="space-y-2 md:col-span-2">
                           <label className="block text-xs font-semibold tracking-wide uppercase">Componentes Sello</label>
@@ -589,7 +614,13 @@ export default function CotizadorApp(){
                         </div>
                       )}
                     </div>
-                    {alertas[i] && (<div className="p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded text-xs">Medidas fuera de rango. Ingrese un precio manual:<input type="number" className="w-full border p-2 rounded mt-2 bg-white dark:bg-gris-800 dark:border-gris-600" value={producto.precioEditado} placeholder="Precio manual" onChange={e=> handleChangeProducto(i,'precioEditado', e.target.value)} /></div>)}
+                    {alertas[i] && (
+                      <div className="p-3 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded text-xs">
+                        Medidas fuera de rango: el sistema no puede calcular un precio automático para este producto. Ingresa un precio aquí, o usa el campo "Precio Manual" de arriba (ese siempre tiene prioridad).
+                        <input type="number" className="w-full border p-2 rounded mt-2 bg-white dark:bg-gris-800 dark:border-gris-600" value={producto.precioEditado} placeholder="Precio para medidas fuera de rango" onChange={e=> handleChangeProducto(i,'precioEditado', e.target.value)} disabled={!!producto.precioManual} />
+                        {producto.precioManual && <p className="mt-1 text-[10px] text-yellow-700">Deshabilitado: ya hay un "Precio Manual" definido arriba y ese es el que se usará.</p>}
+                      </div>
+                    )}
                     <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-semibold tracking-wide uppercase mb-1">Extras</label>
@@ -639,7 +670,7 @@ export default function CotizadorApp(){
         </div>
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
           <div className="lg:sticky lg:top-4 space-y-6">
-            <div className="p-5 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm">
+            <div id="seccion-total" className="p-5 rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 shadow-sm scroll-mt-32">
               {productos.length > 0 && (
                 <div className="mb-4">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Detalle</p>
@@ -647,7 +678,7 @@ export default function CotizadorApp(){
                     {productos.map((p,i)=>{
                       const precio = calcularPrecio(p,i);
                       const extras = calcularSubtotalExtras(p);
-                      const lineTotal = (precio + extras) * (parseInt(p.cantidad)||1);
+                      const lineTotal = precio * (parseInt(p.cantidad)||1) + extras;
                       return (
                         <div key={i} className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
                           <span className="truncate max-w-[60%]">{p.nombrePersonalizado || p.tipo || `Producto ${i+1}`}{parseInt(p.cantidad)>1 && <span className="text-gray-400 dark:text-gray-500"> ×{p.cantidad}</span>}</span>
@@ -659,11 +690,13 @@ export default function CotizadorApp(){
                   <div className="border-t border-gray-200 dark:border-gris-700 mt-2 pt-1" />
                 </div>
               )}
-              <h2 className="text-sm font-semibold tracking-wide uppercase mb-1 text-gray-600 dark:text-gray-300">Ajuste general</h2>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-3">Se aplica sobre el subtotal, después del ajuste por producto.</p>
-              <div className="flex items-center gap-3 mb-4">
-                <select value={ajusteTotalTipo} onChange={e=> setAjusteTotalTipo(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"><option value='Descuento'>Descuento</option><option value='Incremento'>Incremento</option></select>
-                <input type="number" value={ajusteTotalValor} onChange={e=> setAjusteTotalValor(e.target.value)} placeholder="%" className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" /><span className="text-xs">%</span>
+              <div className="rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-3 mb-4">
+                <h2 className="text-sm font-semibold tracking-wide uppercase mb-1 text-indigo-700 dark:text-indigo-300">Ajuste general</h2>
+                <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mb-3">Se suma sobre el subtotal de toda la cotización, después de los ajustes por producto (no los reemplaza).</p>
+                <div className="flex items-center gap-3">
+                  <select value={ajusteTotalTipo} onChange={e=> setAjusteTotalTipo(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"><option value='Descuento'>Descuento</option><option value='Incremento'>Incremento</option></select>
+                  <input type="number" value={ajusteTotalValor} onChange={e=> setAjusteTotalValor(e.target.value)} placeholder="%" className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" /><span className="text-xs">%</span>
+                </div>
               </div>
               <div className="text-xs space-y-1 font-mono">
                 <div className="flex justify-between"><span>Bruto</span><span>{previewBruto.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span></div>

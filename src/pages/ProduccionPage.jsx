@@ -9,13 +9,14 @@ import {
 import DivisionTermicaFicha from "../components/DivisionTermicaFicha";
 import SelloAndenFicha from "../components/SelloAndenFicha";
 import AbrigoAndenFicha from "../components/AbrigoAndenFicha";
+import Tabs from "../components/ui/Tabs";
 
 const TABS = [
-  { id: "division", label: "División Térmica" },
-  { id: "sello",    label: "Sello de Andén" },
-  { id: "abrigo",   label: "Abrigo de Andén" },
-  { id: "ordenes",  label: "Órdenes" },
-  { id: "fichas",   label: "Fichas básicas" },
+  { key: "division", label: "División Térmica" },
+  { key: "sello",    label: "Sello de Andén" },
+  { key: "abrigo",   label: "Abrigo de Andén" },
+  { key: "ordenes",  label: "Órdenes", legacy: true },
+  { key: "fichas",   label: "Fichas básicas", legacy: true },
 ];
 
 export default function ProduccionPage() {
@@ -84,21 +85,7 @@ export default function ProduccionPage() {
       <h1 className="text-xl font-semibold">Producción</h1>
 
       {/* Tabs */}
-      <div className="flex gap-0.5 mt-4 border-b border-gray-200 dark:border-gris-700">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors border border-b-0 ${
-              tab === t.id
-                ? "bg-white dark:bg-gris-800 border-gray-200 dark:border-gris-700 text-blue-600 dark:text-blue-400 -mb-px"
-                : "bg-transparent border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs items={TABS} active={tab} onChange={setTab} variant="boxed" />
 
       <div className="mt-5">
         {/* ── División Térmica ── */}
@@ -111,6 +98,11 @@ export default function ProduccionPage() {
         {tab === "abrigo" && <AbrigoAndenFicha />}
 
         {/* ── Órdenes (legado) ── */}
+        {tab === "ordenes" && (
+          <div className="mb-4 text-xs text-amber-800 dark:text-trafico bg-amber-50 dark:bg-gris-800 border border-amber-200 dark:border-gris-700 rounded px-3 py-2">
+            Herramienta antigua, mantenida solo por referencia. Los registros creados aquí no se pueden editar ni eliminar desde la interfaz.
+          </div>
+        )}
         {tab === "ordenes" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
@@ -185,6 +177,11 @@ export default function ProduccionPage() {
         )}
 
         {/* ── Fichas básicas (legado) ── */}
+        {tab === "fichas" && (
+          <div className="mb-4 text-xs text-amber-800 dark:text-trafico bg-amber-50 dark:bg-gris-800 border border-amber-200 dark:border-gris-700 rounded px-3 py-2">
+            Herramienta antigua, mantenida solo por referencia. Los registros creados aquí no se pueden editar ni eliminar desde la interfaz.
+          </div>
+        )}
         {tab === "fichas" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">

@@ -13,6 +13,7 @@ import UsuariosPage from "./pages/UsuariosPage";
 import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ConfirmDialog from "./components/ui/ConfirmDialog";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
 import menuIcon from "./assets/imagenes/menu-icon.png";
@@ -235,17 +236,13 @@ function NuevaCotizacionModal({ onClose, onConfirm }){
   const location = useLocation();
   const navigate = useNavigate();
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-gris-800 rounded-lg shadow-lg border border-gray-200 dark:border-gris-600 p-6 animate-fade-in">
-        <h2 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Iniciar nueva cotización</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Se perderán los datos no guardados de la cotización actual. ¿Deseas continuar?</p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded border border-gray-300 dark:border-gris-600 bg-gray-100 dark:bg-gris-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gris-600 text-sm">Cancelar</button>
-          <button onClick={()=>onConfirm(navigate, location.pathname)} className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white text-sm shadow focus:outline-none focus:ring-2 focus:ring-trafico/60">Sí, limpiar</button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      title="Iniciar nueva cotización"
+      message="Se perderán los datos no guardados de la cotización actual. ¿Deseas continuar?"
+      confirmLabel="Sí, limpiar"
+      onCancel={onClose}
+      onConfirm={() => onConfirm(navigate, location.pathname)}
+    />
   );
 }
 

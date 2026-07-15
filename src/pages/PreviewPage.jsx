@@ -1,8 +1,8 @@
 // src/pages/PreviewPage.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useQuote } from "../context/QuoteContext";
 import { useNavigate } from "react-router-dom";
-import { generarPDFReact } from "../utils/pdfReact";
+import { generarPDFReact, entregarPDFBlob } from "../utils/pdfReact";
 import { generarSeccionesHTML, generarSeccionesPorProducto } from "../utils/htmlSections";
 import { sanitizeHtml } from "../utils/sanitizeHtml";
 import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
@@ -11,6 +11,64 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import { numeroALetras } from "../utils/numeroALetras";
+import { EXTRAS_POR_DEFECTO } from "../data/precios";
+import { getExtrasPorTipo } from "../data/catalogoProductos";
+
+// Desglose de extras (de catálogo y personalizados) de un producto, con el
+// mismo cálculo de precio unitario que CotizadorApp.calcularSubtotalExtras,
+// para que la suma de estas líneas coincida siempre con p.subtotalExtras.
+function getExtrasDetalle(p, extrasOverride) {
+  const detalle = [];
+  const lista = getExtrasPorTipo(p.tipo, extrasOverride) || EXTRAS_POR_DEFECTO[p.tipo] || [];
+  (p.extras || []).forEach((nombre) => {
+    const ex = lista.find((e) => e.nombre === nombre);
+    if (!ex) return;
+    const cantidad = parseInt(p.extrasCantidades?.[nombre]) || 1;
+    const precioUnit = (ex.precioDistribuidor != null || ex.precioCliente != null)
+      ? (p.cliente === 'Distribuidor' ? (ex.precioDistribuidor || 0) : (ex.precioCliente || 0))
+      : (ex.precio || 0);
+    detalle.push({ nombre, cantidad, precioUnit, total: precioUnit * cantidad });
+  });
+  (p.extrasPersonalizados || []).forEach((ex, idx) => {
+    if (!ex?.nombre) return;
+    const cantidad = parseInt(p.extrasPersonalizadosCant?.[idx]) || 1;
+    const precioUnit = ex.precio || 0;
+    detalle.push({ nombre: ex.nombre, cantidad, precioUnit, total: precioUnit * cantidad });
+  });
+  return detalle;
+}
+
+// Grilla de miniaturas para elegir una imagen del catálogo (reemplaza el
+// selector de texto plano, que obligaba a reconocer la imagen por su
+// nombre de archivo interno en vez de verla).
+function ImagePickerGrid({ keys, selectedKey, onSelect, allowEmpty = true }) {
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-56 overflow-y-auto p-2 border rounded-lg bg-gray-50">
+      {allowEmpty && (
+        <button
+          type="button"
+          onClick={() => onSelect("")}
+          title="Sin imagen"
+          className={`aspect-square rounded-lg border-2 flex items-center justify-center text-[9px] text-gray-400 text-center leading-tight p-1 transition-colors ${!selectedKey ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'}`}
+        >
+          — Ninguna —
+        </button>
+      )}
+      {keys.map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onSelect(k)}
+          title={k}
+          aria-label={k}
+          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${selectedKey === k ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'}`}
+        >
+          <img src={imagenesPorProducto[k]} alt={k} className="w-full h-full object-cover" />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function generarTituloCompacto(productos) {
   if (!productos?.length) return "COTIZACIÓN";
@@ -24,7 +82,7 @@ function generarTituloCompacto(productos) {
 export default function PreviewPage() {
   const { quoteData, setQuoteData,
     empresas, setEmpresas, empresaSeleccionada, setEmpresaSeleccionada, contactoSeleccionado, setContactoSeleccionado, confirm,
-    setImagenSeleccionada, setImagenesSeleccionadas, productosOverride } = useQuote();
+    setImagenSeleccionada, setImagenesSeleccionadas, productosOverride, extrasOverride } = useQuote();
   const navigate = useNavigate();
 
   // --- Estado de edición por producto ---
@@ -34,6 +92,9 @@ export default function PreviewPage() {
   const [edicionesCompartidas, setEdicionesCompartidas] = useState({ condicionesHTML: "", terminosHTML: "" });
   // {scope: 'producto'|'compartido', index: number|null, campo: string} | null
   const [editando, setEditando] = useState(null);
+  // true si el usuario cambió texto/imágenes/título en esta vista que aún no
+  // se han incluido en ningún PDF generado (ver handleEditarCotizacion más abajo).
+  const [hayEdicionesSinGuardar, setHayEdicionesSinGuardar] = useState(false);
 
   // --- Índice del producto cuyas condiciones se usan ---
   const [condicionesProductoIndex, setCondicionesProductoIndex] = useState(0);
@@ -44,6 +105,12 @@ export default function PreviewPage() {
   // [string|null] — base64 para preview de imagen principal de cada producto
   const [imagenesBase64Principal, setImagenesBase64Principal] = useState([]);
   const [imagenAmpliada, setImagenAmpliada] = useState(null);
+  useEffect(() => {
+    if (!imagenAmpliada) return;
+    const onKeyDown = (e) => { if (e.key === "Escape") setImagenAmpliada(null); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imagenAmpliada]);
 
   const [generandoPDF, setGenerandoPDF] = useState(false);
   const [tituloCotizacion, setTituloCotizacion] = useState("");
@@ -278,11 +345,11 @@ export default function PreviewPage() {
             <ReactQuill
               theme="snow"
               value={value}
-              onChange={(v) => setEdicionesPorProducto(prev => {
+              onChange={(v) => { setHayEdicionesSinGuardar(true); setEdicionesPorProducto(prev => {
                 const next = [...prev];
                 next[productoIdx] = { ...next[productoIdx], [campo]: sanitizeHtml(v) };
                 return next;
-              })}
+              }); }}
               modules={quillModules}
               formats={quillFormats}
             />
@@ -303,7 +370,7 @@ export default function PreviewPage() {
               className="mt-1 text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
               onClick={() => setEditando({ scope: 'producto', index: productoIdx, campo })}
             >
-              ✏️ Editar sección
+              📝 Editar texto
             </button>
           </div>
         )}
@@ -327,7 +394,7 @@ export default function PreviewPage() {
             <ReactQuill
               theme="snow"
               value={value}
-              onChange={(v) => setEdicionesCompartidas(prev => ({ ...prev, [campo]: sanitizeHtml(v) }))}
+              onChange={(v) => { setHayEdicionesSinGuardar(true); setEdicionesCompartidas(prev => ({ ...prev, [campo]: sanitizeHtml(v) })); }}
               modules={quillModules}
               formats={quillFormats}
             />
@@ -348,7 +415,7 @@ export default function PreviewPage() {
               className="mt-1 text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
               onClick={() => setEditando({ scope: 'compartido', index: null, campo })}
             >
-              ✏️ Editar sección
+              📝 Editar texto
             </button>
           </div>
         )}
@@ -363,6 +430,7 @@ export default function PreviewPage() {
     if (todosKeys.length === 0) return null;
 
     const setPrincipal = (val) => {
+      setHayEdicionesSinGuardar(true);
       setImagenesPerProducto(prev => {
         const next = [...prev];
         next[idx] = { ...next[idx], principal: val || null };
@@ -384,16 +452,7 @@ export default function PreviewPage() {
         {/* Imagen principal */}
         <div>
           <label className="block mb-2 text-sm font-medium text-gray-700">Imagen principal</label>
-          <select
-            value={imgState.principal || ""}
-            onChange={(e) => setPrincipal(e.target.value)}
-            className="px-4 py-2 border rounded-lg w-full sm:w-auto text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="">— Sin imagen principal —</option>
-            {todosKeys.map(k => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
+          <ImagePickerGrid keys={todosKeys} selectedKey={imgState.principal || ""} onSelect={setPrincipal} />
           {imagenesBase64Principal[idx] && (
             <div className="relative mt-3 inline-block group/img">
               <img
@@ -415,11 +474,11 @@ export default function PreviewPage() {
             <button
               type="button"
               disabled={imgState.adicionales.length >= 2}
-              onClick={() => setImagenesPerProducto(prev => {
+              onClick={() => { setHayEdicionesSinGuardar(true); setImagenesPerProducto(prev => {
                 const next = [...prev];
                 next[idx] = { ...next[idx], adicionales: [...next[idx].adicionales, ""] };
                 return next;
-              })}
+              }); }}
               className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${imgState.adicionales.length >= 2 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'}`}
             >+ Añadir</button>
           </div>
@@ -428,34 +487,33 @@ export default function PreviewPage() {
           )}
           <div className="space-y-3">
             {imgState.adicionales.map((clave, aidx) => (
-              <div key={aidx} className="flex items-center gap-2">
-                <select
-                  value={clave}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setImagenesPerProducto(prev => {
-                      const next = [...prev];
-                      const adicionales = [...next[idx].adicionales];
-                      adicionales[aidx] = val;
-                      next[idx] = { ...next[idx], adicionales };
-                      return next;
-                    });
-                  }}
-                  className="px-3 py-2 border rounded-lg flex-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                >
-                  <option value="">— Seleccionar —</option>
-                  {todosKeys.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
+              <div key={aidx} className="flex items-start gap-2">
+                <div className="flex-1">
+                  <ImagePickerGrid
+                    keys={todosKeys}
+                    selectedKey={clave}
+                    onSelect={(val) => {
+                      setHayEdicionesSinGuardar(true);
+                      setImagenesPerProducto(prev => {
+                        const next = [...prev];
+                        const adicionales = [...next[idx].adicionales];
+                        adicionales[aidx] = val;
+                        next[idx] = { ...next[idx], adicionales };
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
-                  onClick={() => setImagenesPerProducto(prev => {
+                  onClick={() => { setHayEdicionesSinGuardar(true); setImagenesPerProducto(prev => {
                     const next = [...prev];
                     next[idx] = { ...next[idx], adicionales: next[idx].adicionales.filter((_, i) => i !== aidx) };
                     return next;
-                  })}
-                  className="text-red-500 text-sm px-2 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                  }); }}
+                  aria-label="Quitar imagen adicional"
+                  title="Quitar imagen adicional"
+                  className="text-red-500 text-sm px-2 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors shrink-0"
                 >✕</button>
               </div>
             ))}
@@ -485,10 +543,25 @@ export default function PreviewPage() {
   };
 
   // --- Generar PDF ---
-  const handleGenerarPDF = async () => {
+  // Cachea el blob ya guardado en esta sesión para que "Imprimir" y "Descargar"
+  // puedan reutilizarlo sin volver a guardar la cotización dos veces en Firestore.
+  const pdfCacheRef = useRef(null);
+  // Si el usuario edita contenido después de generar el PDF, invalidar el caché
+  // para que la próxima descarga/impresión refleje los cambios.
+  useEffect(() => {
+    pdfCacheRef.current = null;
+  }, [edicionesPorProducto, edicionesCompartidas, imagenesPerProducto, tituloCotizacion]);
+
+  const handleGenerarPDF = async (mode = 'download') => {
     if (generandoPDF) return;
     try {
       setGenerandoPDF(true);
+
+      if (pdfCacheRef.current) {
+        await entregarPDFBlob(pdfCacheRef.current.blob, pdfCacheRef.current.nombreArchivo, mode);
+        return;
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Construir seccionesPorProducto con las ediciones del usuario
@@ -515,7 +588,8 @@ export default function PreviewPage() {
           imagenesSeleccionadasPorProducto: imagenesPerProducto,
           tituloCotizacion: tituloCotizacion.trim() || generarTituloCompacto(quoteData.productos),
         },
-        estaEditando
+        estaEditando,
+        { mode, onBlobReady: (r) => { pdfCacheRef.current = r; } }
       );
     } catch (error) {
       console.error("Error generando PDF:", error);
@@ -525,22 +599,37 @@ export default function PreviewPage() {
     }
   };
 
+  const handleEditarCotizacion = async () => {
+    if (pdfCacheRef.current === null && hayEdicionesSinGuardar) {
+      const ok = await confirm('Tienes cambios de texto o imágenes en esta vista previa que aún no se han incluido en ningún PDF generado. Si editas la cotización ahora, se perderán.\n¿Deseas continuar?');
+      if (!ok) return;
+    }
+    navigate("/cotizar");
+  };
+
   const botonesAccion = (
     <>
       <button
         className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm"
-        onClick={() => navigate("/cotizar")}
+        onClick={handleEditarCotizacion}
       >
-        ✏️ Editar cotización
+        🧮 Editar precios y productos
       </button>
       <button
         className={`w-full px-4 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 text-sm ${
           generandoPDF ? "bg-green-500 cursor-not-allowed text-white" : "bg-green-700 text-white hover:bg-green-800"
         }`}
-        onClick={handleGenerarPDF}
+        onClick={() => handleGenerarPDF('download')}
         disabled={generandoPDF}
       >
         {generandoPDF ? "⏳ Generando PDF..." : "⬇️ Descargar PDF"}
+      </button>
+      <button
+        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        onClick={() => handleGenerarPDF('print')}
+        disabled={generandoPDF}
+      >
+        🖨️ Imprimir
       </button>
       <button
         onClick={() => navigate("/historial")}
@@ -589,7 +678,7 @@ export default function PreviewPage() {
                 <input
                   type="text"
                   value={tituloCotizacion}
-                  onChange={(e) => setTituloCotizacion(e.target.value)}
+                  onChange={(e) => { setHayEdicionesSinGuardar(true); setTituloCotizacion(e.target.value); }}
                   className="w-full border rounded-lg px-3 py-2.5 text-sm font-semibold uppercase bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 tracking-wide"
                   placeholder="Título de la cotización..."
                   maxLength={200}
@@ -615,7 +704,7 @@ export default function PreviewPage() {
                   className="mt-3 text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
                   onClick={() => setEditandoTitulo(true)}
                 >
-                  ✏️ Editar título
+                  🏷️ Editar título
                 </button>
               </div>
             )}
@@ -636,7 +725,7 @@ export default function PreviewPage() {
                   onClick={() => setEditandoCliente(true)}
                   className="mt-3 text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
                 >
-                  ✏️ Editar datos cliente
+                  👤 Editar datos del cliente
                 </button>
               </div>
             ) : (
@@ -708,22 +797,31 @@ export default function PreviewPage() {
                 <tr className="bg-gray-50 text-gray-500 dark:bg-gray-900 dark:text-gray-300 uppercase text-xs">
                   <th className="text-left px-4 py-2.5 rounded-l-lg font-medium">Producto</th>
                   <th className="text-right px-4 py-2.5 font-medium">Cant.</th>
-                  <th className="text-right px-4 py-2.5 rounded-r-lg font-medium">Precio</th>
+                  <th className="text-right px-4 py-2.5 rounded-r-lg font-medium">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
-                {productos.map((p, i) => (
-                  <tr key={i} className={`border-t border-gray-100 dark:border-gray-700 hover:bg-blue-50/30 dark:hover:bg-gray-800/60 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/50 dark:bg-gray-800/40' : ''}`}>
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
-                      {p.tipo}{p.ancho && p.alto ? ` · ${p.ancho}×${p.alto} mm` : ''}
-                      {p.extras?.length > 0 && (
-                        <span className="ml-2 text-xs text-gray-400 font-normal">+{p.extras.length} extras</span>
-                      )}
-                    </td>
-                    <td className="text-right px-4 py-3 text-gray-600 dark:text-gray-300">{p.cantidad}</td>
-                    <td className="text-right px-4 py-3 font-semibold text-gray-800 dark:text-gray-100">{formatCOP(p.precioCalculado)}</td>
-                  </tr>
-                ))}
+                {productos.map((p, i) => {
+                  const extrasDetalle = getExtrasDetalle(p, extrasOverride);
+                  return (
+                    <React.Fragment key={i}>
+                      <tr className={`border-t border-gray-100 dark:border-gray-700 hover:bg-blue-50/30 dark:hover:bg-gray-800/60 transition-colors ${i % 2 !== 0 ? 'bg-gray-50/50 dark:bg-gray-800/40' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
+                          {p.tipo}{p.ancho && p.alto ? ` · ${p.ancho}×${p.alto} mm` : ''}
+                        </td>
+                        <td className="text-right px-4 py-3 text-gray-600 dark:text-gray-300">{p.cantidad}</td>
+                        <td className="text-right px-4 py-3 font-semibold text-gray-800 dark:text-gray-100">{formatCOP(p.precioCalculado * (parseInt(p.cantidad) || 1))}</td>
+                      </tr>
+                      {extrasDetalle.map((ex, exIdx) => (
+                        <tr key={`${i}-extra-${exIdx}`} className="bg-gray-50/70 dark:bg-gray-800/30 text-xs">
+                          <td className="pl-8 pr-4 py-1.5 text-gray-500 dark:text-gray-400">↳ {ex.nombre}</td>
+                          <td className="text-right px-4 py-1.5 text-gray-500 dark:text-gray-400">{ex.cantidad}</td>
+                          <td className="text-right px-4 py-1.5 text-gray-500 dark:text-gray-400">{formatCOP(ex.total)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 dark:border-gray-600">
@@ -839,21 +937,32 @@ export default function PreviewPage() {
       <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2 shadow-2xl z-40">
         <button
           className="flex-1 bg-blue-600 text-white px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-          onClick={() => navigate("/cotizar")}
+          onClick={handleEditarCotizacion}
         >
-          ✏️ Editar
+          🧮 Precios
         </button>
         <button
           className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
             generandoPDF ? "bg-green-500 cursor-not-allowed text-white" : "bg-green-700 text-white hover:bg-green-800"
           }`}
-          onClick={handleGenerarPDF}
+          onClick={() => handleGenerarPDF('download')}
           disabled={generandoPDF}
         >
           {generandoPDF ? "⏳ PDF..." : "⬇️ PDF"}
         </button>
         <button
+          onClick={() => handleGenerarPDF('print')}
+          disabled={generandoPDF}
+          aria-label="Imprimir"
+          title="Imprimir"
+          className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
+        >
+          🖨️
+        </button>
+        <button
           onClick={() => navigate("/historial")}
+          aria-label="Ver historial"
+          title="Ver historial"
           className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
         >
           📋
@@ -875,6 +984,8 @@ export default function PreviewPage() {
           <button
             className="absolute top-4 right-4 text-white text-xl bg-black/40 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/60 transition-colors"
             onClick={() => setImagenAmpliada(null)}
+            aria-label="Cerrar imagen ampliada"
+            title="Cerrar (Esc)"
           >✕</button>
         </div>
       )}
