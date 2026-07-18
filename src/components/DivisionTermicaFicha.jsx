@@ -1,5 +1,9 @@
 import React from "react";
 import toast from "react-hot-toast";
+import {
+  FaTruck, FaSlidersH, FaIdCard, FaSearch, FaSyncAlt, FaEye,
+  FaChevronRight, FaLayerGroup, FaPauseCircle, FaIndustry, FaCheckCircle, FaInbox,
+} from "react-icons/fa";
 import { calcularDesdeInput } from "../utils/divisionTermica";
 import {
   crearFichaDivision,
@@ -14,7 +18,6 @@ import EstadoActions from "./fichas/EstadoActions";
 
 const OPCIONES = {
   placa:     ["SI", "NO"],
-  ft:        ["SI", "NO"],
   logo:      ["COLD CHAIN", "CLIENTE", "NO"],
   agujero:   ["SIN AGUJERO", "1 AGUJERO", "2 AGUJEROS", "4 AGUJEROS", "AGUJERO DIF MEDIDA"],
   platinas:  ["SI", "NO"],
@@ -23,24 +26,35 @@ const OPCIONES = {
 };
 
 const INITIAL_FORM = {
-  fechaOrden:    new Date().toISOString().slice(0, 10),
-  fechaEntrega:  "",
-  cliente:       "",
-  cantidad:      1,
-  anchoVehiculo: "",
-  altoVehiculo:  "",
-  placa:         "NO",
-  ft:            "NO",
-  logo:          "NO",
-  agujero:       "SIN AGUJERO",
-  platinas:      "NO",
-  factura:       "SI",
-  colorLona:     "NEGRO",
-  adicional:     "",
+  fechaOrden:        new Date().toISOString().slice(0, 10),
+  fechaEntrega:      "",
+  numeroOrdenCompra: "",
+  numeroFicha:       "",
+  cliente:           "",
+  cantidad:          1,
+  anchoVehiculo:     "",
+  altoVehiculo:      "",
+  placa:             "SI",
+  numeroPlaca:       "",
+  logo:              "COLD CHAIN",
+  agujero:           "1 AGUJERO",
+  platinas:          "NO",
+  alturaPlatinas:    "",
+  factura:           "SI",
+  colorLona:         "NEGRO",
+  adicional:         "",
 };
 
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
 const labelCls = "text-xs text-gray-600 dark:text-gray-300";
+
+function SectionLabel({ icon: Icon, children }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+      <Icon className="text-[11px] opacity-70" /> {children}
+    </div>
+  );
+}
 
 export default function DivisionTermicaFicha() {
   const [form, setForm]             = React.useState(INITIAL_FORM);
@@ -49,6 +63,8 @@ export default function DivisionTermicaFicha() {
   const [saving, setSaving]         = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(null);
   const [printFicha, setPrintFicha] = React.useState(null); // { ficha, numero }
+  const [search, setSearch] = React.useState("");
+  const [estadoFiltro, setEstadoFiltro] = React.useState("todos");
 
   const calculo = React.useMemo(
     () => calcularDesdeInput(form),
@@ -60,6 +76,21 @@ export default function DivisionTermicaFicha() {
     () => fichas.find((f) => f.id === selectedId) || null,
     [fichas, selectedId]
   );
+
+  const stats = React.useMemo(() => ({
+    total: fichas.length,
+    borrador: fichas.filter((f) => (f.estado || "borrador") === "borrador").length,
+    en_produccion: fichas.filter((f) => f.estado === "en_produccion").length,
+    terminado: fichas.filter((f) => f.estado === "terminado").length,
+  }), [fichas]);
+
+  const fichasFiltradas = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return fichas
+      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx) }))
+      .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
+      .filter(({ f }) => !term || (f.cliente || "").toLowerCase().includes(term));
+  }, [fichas, search, estadoFiltro]);
 
   const loadFichas = React.useCallback(async () => {
     setLoading(true);
@@ -117,11 +148,28 @@ export default function DivisionTermicaFicha() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
         {/* FORMULARIO */}
-        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
-          <div className="font-medium text-sm mb-4">Nueva ficha — División Térmica</div>
+        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 border-t-4 border-t-blue-600 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center gap-2 font-medium text-sm mb-4">
+            <span className="flex items-center justify-center h-6 w-6 rounded-md bg-blue-600/10 text-blue-700 dark:text-blue-400">
+              <FaIdCard className="text-[11px]" />
+            </span>
+            Nueva ficha — División Térmica
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Identificación */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>N.° orden de compra</label>
+                <input value={form.numeroOrdenCompra} onChange={set("numeroOrdenCompra")}
+                  className={inputCls} placeholder="Ref. del cliente" />
+              </div>
+              <div>
+                <label className={labelCls}>N.° de ficha</label>
+                <input value={form.numeroFicha} onChange={set("numeroFicha")}
+                  className={inputCls} placeholder="Ficha física (opcional)" />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <label className={labelCls}>Cliente</label>
@@ -148,9 +196,7 @@ export default function DivisionTermicaFicha() {
 
             {/* Medidas del vehículo */}
             <div className="border-t border-gray-200 dark:border-gris-700 pt-4">
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                Medidas del vehículo (mm)
-              </div>
+              <SectionLabel icon={FaTruck}>Medidas del vehículo (mm)</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Ancho interior</label>
@@ -169,31 +215,68 @@ export default function DivisionTermicaFicha() {
 
             {/* Opciones */}
             <div className="border-t border-gray-200 dark:border-gris-700 pt-4">
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                Opciones
-              </div>
+              <SectionLabel icon={FaSlidersH}>Opciones</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["placa",     "Placa"],
-                  ["ft",        "FT"],
-                  ["platinas",  "Platinas"],
-                  ["factura",   "Factura"],
-                  ["colorLona", "Color lona"],
-                  ["logo",      "Logo"],
-                ].map(([field, label]) => (
-                  <div key={field}>
-                    <label className={labelCls}>{label}</label>
-                    <select value={form[field]} onChange={set(field)} className={inputCls}>
-                      {OPCIONES[field].map((o) => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
-                ))}
+
+                {/* Placa + número de placa */}
+                <div>
+                  <label className={labelCls}>Placa</label>
+                  <select value={form.placa} onChange={set("placa")} className={inputCls}>
+                    {OPCIONES.placa.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Número de placa</label>
+                  <input value={form.numeroPlaca} onChange={set("numeroPlaca")}
+                    disabled={form.placa !== "SI"}
+                    className={`${inputCls} disabled:opacity-40`} placeholder="ej: ABC123" />
+                </div>
+
+                {/* Logo + color de lona */}
+                <div>
+                  <label className={labelCls}>Logo</label>
+                  <select value={form.logo} onChange={set("logo")} className={inputCls}>
+                    {OPCIONES.logo.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Color lona</label>
+                  <select value={form.colorLona} onChange={set("colorLona")} className={inputCls}>
+                    {OPCIONES.colorLona.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+
+                {/* Agujero */}
                 <div className="col-span-2">
                   <label className={labelCls}>Agujero</label>
                   <select value={form.agujero} onChange={set("agujero")} className={inputCls}>
                     {OPCIONES.agujero.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
+
+                {/* Platinas + altura */}
+                <div>
+                  <label className={labelCls}>Platinas</label>
+                  <select value={form.platinas} onChange={set("platinas")} className={inputCls}>
+                    {OPCIONES.platinas.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Altura platinas (mm)</label>
+                  <input type="number" min={0} value={form.alturaPlatinas}
+                    onChange={set("alturaPlatinas")}
+                    disabled={form.platinas !== "SI"}
+                    className={`${inputCls} font-mono disabled:opacity-40`} placeholder="ej: 450" />
+                </div>
+
+                {/* Factura (al final) */}
+                <div className="col-span-2">
+                  <label className={labelCls}>Factura</label>
+                  <select value={form.factura} onChange={set("factura")} className={inputCls}>
+                    {OPCIONES.factura.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+
                 <div className="col-span-2">
                   <label className={labelCls}>Adicional / Notas</label>
                   <input value={form.adicional} onChange={set("adicional")} className={inputCls} />
@@ -203,7 +286,8 @@ export default function DivisionTermicaFicha() {
 
             <div className="flex justify-end pt-1">
               <button type="submit" disabled={saving || !calculo}
-                className="px-5 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium transition-colors">
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 active:scale-95 text-white text-sm font-medium shadow-sm transition">
+                {saving && <FaSyncAlt className="animate-spin text-xs" />}
                 {saving ? "Guardando…" : "Guardar ficha"}
               </button>
             </div>
@@ -211,8 +295,11 @@ export default function DivisionTermicaFicha() {
         </section>
 
         {/* VISTA PREVIA */}
-        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
+        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 border-t-4 border-t-cyan-600 rounded-lg p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
+            <span className="flex items-center justify-center h-6 w-6 rounded-md bg-cyan-600/10 text-cyan-700 dark:text-cyan-400">
+              <FaLayerGroup className="text-[11px]" />
+            </span>
             <span className="font-medium text-sm">Vista previa</span>
             {calculo && (
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${
@@ -342,18 +429,61 @@ export default function DivisionTermicaFicha() {
 
       {/* ── Fichas guardadas ── */}
       <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="font-medium text-sm">Fichas guardadas</div>
-          <button onClick={loadFichas}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-            Actualizar
+          <button onClick={loadFichas} disabled={loading}
+            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50">
+            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
         </div>
 
+        {/* Resumen de estados */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          {[
+            { key: "todos",         label: "Total",         value: stats.total,         icon: FaLayerGroup,  tone: "text-gray-600 dark:text-gray-300",  ring: "border-gray-200 dark:border-gris-600" },
+            { key: "borrador",      label: "Borrador",      value: stats.borrador,      icon: FaPauseCircle, tone: "text-gray-500 dark:text-gray-300",  ring: "border-gray-200 dark:border-gris-600" },
+            { key: "en_produccion", label: "En producción", value: stats.en_produccion, icon: FaIndustry,    tone: "text-blue-700 dark:text-blue-300",  ring: "border-blue-200 dark:border-blue-800" },
+            { key: "terminado",     label: "Terminadas",    value: stats.terminado,     icon: FaCheckCircle, tone: "text-green-700 dark:text-green-300", ring: "border-green-200 dark:border-green-800" },
+          ].map(({ key, label, value, icon: Icon, tone, ring }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setEstadoFiltro((prev) => (prev === key ? "todos" : key))}
+              className={`text-left rounded-lg border px-3 py-2 transition-colors ${ring} ${
+                estadoFiltro === key ? "bg-gray-50 dark:bg-gris-700 ring-2 ring-offset-1 ring-blue-500 dark:ring-offset-gris-800" : "bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700/60"
+              }`}
+            >
+              <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${tone}`}>
+                <Icon className="text-[10px]" /> {label}
+              </div>
+              <div className={`text-xl font-bold font-mono mt-0.5 ${tone}`}>{value}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Búsqueda */}
+        <div className="relative mb-3 max-w-xs">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente…"
+            className={`${inputCls} pl-8`}
+          />
+        </div>
+
         {loading ? (
-          <div className="text-sm opacity-60">Cargando…</div>
+          <div className="flex items-center gap-2 text-sm opacity-60 py-6 justify-center">
+            <FaSyncAlt className="animate-spin" /> Cargando…
+          </div>
         ) : fichas.length === 0 ? (
-          <div className="text-sm opacity-60">Sin fichas guardadas</div>
+          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
+            <FaInbox className="text-2xl" /> Sin fichas guardadas
+          </div>
+        ) : fichasFiltradas.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
+            <FaSearch className="text-2xl" /> Ninguna ficha coincide con el filtro
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -370,16 +500,23 @@ export default function DivisionTermicaFicha() {
                 </tr>
               </thead>
               <tbody>
-                {fichas.map((f, idx) => {
-                  const numero = fichas.length - idx;
+                {fichasFiltradas.map(({ f, numero }) => {
+                  const isSelected = selectedId === f.id;
                   return (
                     <React.Fragment key={f.id}>
                       <tr
-                        onClick={() => setSelectedId(selectedId === f.id ? null : f.id)}
-                        className="border-b border-gray-100 dark:border-gris-700/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gris-700/40 transition-colors"
+                        onClick={() => setSelectedId(isSelected ? null : f.id)}
+                        className={`border-b border-gray-100 dark:border-gris-700/50 cursor-pointer transition-colors ${
+                          isSelected ? "bg-blue-50/60 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gris-700/40"
+                        }`}
                       >
                         <td className="py-2 text-right font-mono text-gray-400">{numero}</td>
-                        <td className="py-2 font-medium pl-2">{f.cliente || "—"}</td>
+                        <td className="py-2 font-medium pl-2">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FaChevronRight className={`text-[9px] text-gray-400 transition-transform ${isSelected ? "rotate-90" : ""}`} />
+                            {f.cliente || "—"}
+                          </span>
+                        </td>
                         <td className="py-2 font-mono">{f.anchoVehiculo}×{f.altoVehiculo}</td>
                         <td className="py-2 text-center">{f.cantidad}</td>
                         <td className="py-2 text-center">
@@ -405,16 +542,16 @@ export default function DivisionTermicaFicha() {
                               e.stopPropagation();
                               setPrintFicha({ ficha: f, numero });
                             }}
-                            className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
                             title="Ver ficha imprimible"
                           >
-                            Ver ficha
+                            <FaEye className="text-[11px]" /> Ver ficha
                           </button>
                         </td>
                       </tr>
 
                       {/* Detalle expandido */}
-                      {selectedId === f.id && (
+                      {isSelected && (
                         <tr className="border-b border-gray-200 dark:border-gris-700">
                           <td colSpan={8} className="py-3 px-2">
                             <FichaDetalle ficha={f} numero={numero} onCambiarEstado={cambiarEstado} onVerFicha={() => setPrintFicha({ ficha: f, numero })} />
@@ -454,10 +591,9 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
   ];
 
   const opciones = [
-    ["Placa",      f.placa     || "—", f.placa      === "SI"],
-    ["FT",         f.ft        || "—", f.ft         === "SI"],
+    ["Placa",      f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : (f.placa || "—"), f.placa === "SI"],
     ["Logo",       f.logo      || "—", f.logo !== "NO" && !!f.logo],
-    ["Platinas",   f.platinas  || "—", f.platinas   === "SI"],
+    ["Platinas",   f.platinas === "SI" ? `SI · ${f.alturaPlatinas ? fmtMm(f.alturaPlatinas) + " mm" : "—"}` : (f.platinas || "—"), f.platinas === "SI"],
     ["Factura",    f.factura   || "—", f.factura    === "SI"],
     ["Color lona", f.colorLona || "—", false],
     ["Agujero",    f.agujero   || "—", false],
@@ -473,6 +609,11 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
         <div>
           <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">{f.cliente || "Sin cliente"}</span>
           <span className="ml-2 text-gray-400 font-mono">{f.anchoVehiculo}×{f.altoVehiculo} mm · ×{f.cantidad}</span>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            Orden producción #{f.ordenProduccion ?? numero}
+            {f.numeroOrdenCompra && <> · OC {f.numeroOrdenCompra}</>}
+            {f.numeroFicha && <> · Ficha {f.numeroFicha}</>}
+          </div>
         </div>
         <button onClick={onVerFicha}
           className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5">

@@ -8,6 +8,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
@@ -15,6 +16,8 @@ import {
 const FICHAS_COL     = "division_fichas";
 const INSUMOS_COL    = "division_insumos";
 const PARAMETROS_COL = "division_parametros";
+const CONSECUTIVOS_COL = "consecutivos";
+const ORDEN_PRODUCCION_DOC = "orden_produccion_division";
 
 const toIso = (v) => {
   if (!v) return null;
@@ -22,9 +25,25 @@ const toIso = (v) => {
   return String(v);
 };
 
+// Consecutivo único de orden de producción, asignado por transacción para
+// evitar colisiones si dos fichas se crean casi al mismo tiempo.
+async function getNextOrdenProduccion() {
+  const ref = doc(db, CONSECUTIVOS_COL, ORDEN_PRODUCCION_DOC);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const next = (snap.exists() ? snap.data().numero : 0) + 1;
+    tx.set(ref, { numero: next }, { merge: true });
+    return next;
+  });
+}
+
 export async function crearFichaDivision(input, calculo) {
   await waitForAuth();
+  const ordenProduccion = await getNextOrdenProduccion();
   const ref = await addDoc(collection(db, FICHAS_COL), {
+    ordenProduccion,
+    numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
+    numeroFicha:   (input.numeroFicha || "").trim(),
     cliente:       (input.cliente || "").trim(),
     cantidad:      Number(input.cantidad || 1),
     fechaOrden:    toIso(input.fechaOrden),
@@ -32,9 +51,11 @@ export async function crearFichaDivision(input, calculo) {
     anchoVehiculo: Number(input.anchoVehiculo),
     altoVehiculo:  Number(input.altoVehiculo),
     placa:         input.placa    || "NO",
+    numeroPlaca:   input.placa === "SI" ? (input.numeroPlaca || "").trim() : "",
     logo:          input.logo     || "NO",
     agujero:       input.agujero  || "SIN AGUJERO",
     platinas:      input.platinas || "NO",
+    alturaPlatinas: input.platinas === "SI" ? Number(input.alturaPlatinas || 0) : null,
     factura:       input.factura  || "SI",
     colorLona:     input.colorLona || "NEGRO",
     medidas:       calculo.medidas,
@@ -44,7 +65,7 @@ export async function crearFichaDivision(input, calculo) {
     createdAt:     serverTimestamp(),
     updatedAt:     serverTimestamp(),
   });
-  return ref.id;
+  return { id: ref.id, ordenProduccion };
 }
 
 export async function listarFichasDivision({ max = 200 } = {}) {
