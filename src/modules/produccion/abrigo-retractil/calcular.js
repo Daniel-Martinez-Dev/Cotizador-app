@@ -1,8 +1,9 @@
-// Motor de cálculo para Abrigos de Andén — Cold Chain Services.
+// Motor de cálculo para Abrigos Retráctiles — Cold Chain Services.
 // Función pura: (input, params?) => resultado | null
 // Todas las medidas en mm. Lona y banda PVC en m².
+// Verificado contra ficha real OP001222 (ver CASOS_PRUEBA_ABRIGO_RETRACTIL).
 
-import { PARAMETROS_ABRIGO } from "./parametros.js";
+import { PARAMETROS_ABRIGO_RETRACTIL } from "./parametros.js";
 
 /**
  * Agrega N días hábiles (lun–vie) a una fecha ISO "YYYY-MM-DD".
@@ -24,24 +25,24 @@ function addWorkDays(fechaIso, dias) {
 /**
  * @param {object}  input
  * @param {string}  [input.cliente]
- * @param {number}  input.ancho            Ancho del abrigo (mm)
- * @param {number}  input.alto             Alto del abrigo (mm)
- * @param {number}  [input.casas=910]      Largo de las casitas (mm)
- * @param {number}  [input.cantidad=1]     Cantidad de abrigos del pedido
+ * @param {number}  input.ancho              Ancho luz del abrigo (mm)
+ * @param {number}  input.alto               Alto del abrigo (mm)
+ * @param {number}  [input.travesanos=910]   Largo de los travesaños (mm)
+ * @param {number}  [input.cantidad=1]       Cantidad de abrigos del pedido
  * @param {string}  [input.numeroOP]
- * @param {string}  [input.fechaOrden]     "YYYY-MM-DD"
+ * @param {string}  [input.fechaOrden]       "YYYY-MM-DD"
  * @param {string}  [input.auxiliarEncargado]
  * @param {string}  [input.color]
  * @param {'PINTADO'|'GALVANIZADO'} [input.acabado]
  * @param {boolean} [input.llevaBanda=true]
- * @param {object}  [params]               Sobrescribe PARAMETROS_ABRIGO
+ * @param {object}  [params]                 Sobrescribe PARAMETROS_ABRIGO_RETRACTIL
  * @returns {{ medidas, materiaPrimaPorAbrigo, materiaPrimaTotal, alistamiento, despacho, fechaEntrega } | null}
  */
-export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
-  const ancho    = Number(input.ancho);
-  const alto     = Number(input.alto);
-  const casas    = Number(input.casas   ?? 910);
-  const cantidad = Math.max(1, Math.floor(Number(input.cantidad ?? 1)));
+export function calcularAbrigoRetractil(input, params = PARAMETROS_ABRIGO_RETRACTIL) {
+  const ancho      = Number(input.ancho);
+  const alto       = Number(input.alto);
+  const travesanos = Number(input.travesanos ?? 910);
+  const cantidad   = Math.max(1, Math.floor(Number(input.cantidad ?? 1)));
   const llevaBanda = input.llevaBanda !== false;
 
   if (!ancho || ancho <= 0 || !alto || alto <= 0) return null;
@@ -49,14 +50,14 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
   const {
     traslapeLonaPerimetral,
     descuentoBandaLateral,
-    descuentoTravesano,
+    descuentoLarguero,
     anchoRolloLona,
     anchoBandaPVCLateral,
     anchoBandaPVCSuperior,
     largoRolloManguera,
+    largueroPorAbrigo,
     travesanosPorAbrigo,
     casitasPorAbrigo,
-    largueroPorAbrigo,
     uDoble5x5PorAbrigo,
     refuerzosPlatinaPorAbrigo,
     tubosMediaPorAbrigo,
@@ -73,20 +74,25 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
     pesoPaqLonaMangueraTornilleria,
   } = params;
 
-  if (descuentoTravesano >= alto) return null; // travesaño quedaría negativo
+  if (descuentoLarguero >= alto) return null; // larguero quedaría negativo
 
   // ── Medidas (mm) ───────────────────────────────────────────────────────────
 
+  // "ancho" (input) es el ANCHO TOTAL del abrigo — el vano libre (ancho luz)
+  // es un valor derivado: se le resta el ancho de cada banda lateral.
   const loneaPerimetro     = 2 * alto + ancho + traslapeLonaPerimetral;
   const bandaLateralLargo  = alto - descuentoBandaLateral;
   const bandaLateralAncho  = anchoBandaPVCLateral;
   const bandaSuperiorLargo = ancho;
   const bandaSuperiorAncho = anchoBandaPVCSuperior;
-  const travesanoLargo     = alto - descuentoTravesano;
+  const largueroLargo      = alto - descuentoLarguero;   // postes principales del marco
+  const largueroCantidad   = largueroPorAbrigo;
+  const travesanoLargo     = travesanos;                  // tubos cuadrados pequeños
   const travesanoCantidad  = travesanosPorAbrigo;
-  const casitasLargo       = casas;
+  const casitasLargo       = ancho;                       // refuerzos de esquina
   const casitasCantidad    = casitasPorAbrigo;
   const manguerasCantidad  = Math.ceil((alto * 4 + ancho * 2) / largoRolloManguera);
+  const anchoLuz           = ancho - 2 * anchoBandaPVCLateral; // vano libre (ancho total - 2×banda lateral)
 
   const medidas = {
     loneaPerimetro,
@@ -94,11 +100,14 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
     bandaLateralAncho,
     bandaSuperiorLargo,
     bandaSuperiorAncho,
+    largueroLargo,
+    largueroCantidad,
     travesanoLargo,
     travesanoCantidad,
     casitasLargo,
     casitasCantidad,
     manguerasCantidad,
+    anchoLuz,
   };
 
   // ── Materia prima por abrigo ───────────────────────────────────────────────
@@ -108,7 +117,7 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
     ? (bandaLateralAncho * 2 * bandaLateralLargo + bandaSuperiorAncho * bandaSuperiorLargo) / 1_000_000
     : 0;
   const tuberiaMarco_und    = largueroPorAbrigo;
-  const tuberiaTravesanos_m = (casas * travesanosPorAbrigo) / 1000;
+  const tuberiaTravesanos_m = (travesanos * travesanosPorAbrigo) / 1000;
   const mangueras_und       = manguerasCantidad;
   const uDoble5x5_und       = uDoble5x5PorAbrigo;
   const refuerzosPlatina_und = refuerzosPlatinaPorAbrigo;
@@ -173,7 +182,7 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
     },
     {
       descripcion: "Paquete Largueros",
-      medidas:     `${travesanoLargo} × 15 × 10`,
+      medidas:     `${largueroLargo} × 15 × 10`,
       pesoUnitKg:  pesoPaqueteLargueros,
       cantidad,
       pesoTotalKg: pesoPaqueteLargueros * cantidad,
@@ -214,60 +223,56 @@ export function calcularAbrigo(input, params = PARAMETROS_ABRIGO) {
   };
 }
 
-// ─── Casos de prueba — verificados contra el caso BIMBO ──────────────────────
-// Input: ancho=3500, alto=3600, casas=910, cantidad=1, llevaBanda=true
+// ─── Casos de prueba — verificados contra ficha real OP001222 ────────────────
+// Input: cliente=ACL OC 770, ancho=3400, alto=3400, travesanos=910, cantidad=10
 //
 // Medidas esperadas (mm):
-//   loneaPerimetro=10740, bandaLateralLargo=3520, bandaLateralAncho=800
-//   bandaSuperiorLargo=3500, bandaSuperiorAncho=1600
-//   travesanoLargo=3400, travesanoCantidad=4
-//   casitasLargo=910, casitasCantidad=2, manguerasCantidad=4
+//   loneaPerimetro=10240, bandaLateralLargo=3320, bandaLateralAncho=600
+//   bandaSuperiorLargo=3400, bandaSuperiorAncho=1000
+//   largueroLargo=3200, largueroCantidad=4
+//   travesanoLargo=910, travesanoCantidad=4
+//   casitasLargo=3400 (= ancho), casitasCantidad=2
 //
-// Materia prima por abrigo:
-//   lonaPerimetral_m2=7.518, bandaPVC_m2=11.232
-//   tuberiaMarco_und=4, tuberiaTravesanos_m=3.64, mangueras_und=4
-//   uDoble5x5_und=8, refuerzosPlatina_und=8, tubosMedia_und=8
-//   tuercasArandelas_und=22 (20 + 2/1)
+// Materia prima total pedido (×10):
+//   tuberiaMarco_und=40, tuercasArandelas_und=202 (20×10+2)
+//   mangueras largo=ancho: 20 (dim 3400), largo=alto: 40 (dim 3400)
+//   tornillos 3/8: 80, autorroscantes: 220
 //
-// Despacho total pedido: 12.6+15+36+24+2.5 = 90.1 kg
+// M² BANDA (por abrigo) = (600×2×3320 + 1000×3400) / 1e6 = 7.384 ≈ 7,38 (ficha real)
+// Peso total pedido = (12.6+15+36+24+2.5) × 10 = 901 kg (ficha real)
 
-export const CASOS_PRUEBA_ABRIGO = [
+export const CASOS_PRUEBA_ABRIGO_RETRACTIL = [
   {
-    descripcion: "BIMBO — ancho=3500, alto=3600, casas=910, cantidad=1",
+    descripcion: "OP001222 — ACL OC 770 — ancho=3400, alto=3400, travesanos=910, cantidad=10",
     input: {
-      cliente: "BIMBO",
-      cantidad: 1,
-      ancho: 3500,
-      alto: 3600,
-      casas: 910,
+      cliente: "ACL OC 770",
+      cantidad: 10,
+      ancho: 3400,
+      alto: 3400,
+      travesanos: 910,
       color: "NEGRO",
       acabado: "PINTADO",
       llevaBanda: true,
-      fechaOrden: "2026-01-06",
+      fechaOrden: "2026-07-19",
     },
     medidas: {
-      loneaPerimetro:     10740,
-      bandaLateralLargo:  3520,
-      bandaLateralAncho:  800,
-      bandaSuperiorLargo: 3500,
-      bandaSuperiorAncho: 1600,
-      travesanoLargo:     3400,
+      loneaPerimetro:     10240,
+      bandaLateralLargo:  3320,
+      bandaLateralAncho:  600,
+      bandaSuperiorLargo: 3400,
+      bandaSuperiorAncho: 1000,
+      largueroLargo:      3200,
+      largueroCantidad:   4,
+      travesanoLargo:     910,
       travesanoCantidad:  4,
-      casitasLargo:       910,
+      casitasLargo:       3400,
       casitasCantidad:    2,
-      manguerasCantidad:  4,
     },
-    materiaPrimaPorAbrigo: {
-      lonaPerimetral_m2:    7.518,
-      bandaPVC_m2:          11.232,
-      tuberiaMarco_und:     4,
-      tuberiaTravesanos_m:  3.64,
-      mangueras_und:        4,
-      uDoble5x5_und:        8,
-      refuerzosPlatina_und: 8,
-      tubosMedia_und:       8,
-      tuercasArandelas_und: 22,
+    materiaPrimaTotal: {
+      tuberiaMarco_und:     40,
+      tuercasArandelas_und: 202,
     },
-    pesoTotalKg: 90.1,
+    bandaPVC_m2PorAbrigo: 7.384,
+    pesoTotalKg: 901,
   },
 ];

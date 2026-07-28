@@ -3,18 +3,21 @@ import toast from "react-hot-toast";
 import {
   FaTruck, FaSlidersH, FaIdCard, FaSearch, FaSyncAlt, FaEye,
   FaChevronRight, FaLayerGroup, FaPauseCircle, FaIndustry, FaCheckCircle, FaInbox,
+  FaEdit, FaTrash, FaTimes,
 } from "react-icons/fa";
 import { calcularDesdeInput } from "../utils/divisionTermica";
 import {
   crearFichaDivision,
   listarFichasDivision,
   actualizarFichaDivision,
+  eliminarFichaDivision,
 } from "../utils/firebaseDivision";
 import FichaImpresionDivision from "./FichaImpresionDivision";
 import { fmtMm, fmtM2, fmtN, fmtCm } from "../utils/fichaFormat";
 import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoActions from "./fichas/EstadoActions";
+import { useQuote } from "../context/QuoteContext";
 
 const OPCIONES = {
   placa:     ["SI", "NO"],
@@ -57,6 +60,7 @@ function SectionLabel({ icon: Icon, children }) {
 }
 
 export default function DivisionTermicaFicha() {
+  const { confirm } = useQuote();
   const [form, setForm]             = React.useState(INITIAL_FORM);
   const [fichas, setFichas]         = React.useState([]);
   const [loading, setLoading]       = React.useState(false);
@@ -65,6 +69,8 @@ export default function DivisionTermicaFicha() {
   const [printFicha, setPrintFicha] = React.useState(null); // { ficha, numero }
   const [search, setSearch] = React.useState("");
   const [estadoFiltro, setEstadoFiltro] = React.useState("todos");
+  const [editingId, setEditingId]   = React.useState(null);
+  const formRef = React.useRef(null);
 
   const calculo = React.useMemo(
     () => calcularDesdeInput(form),
@@ -115,16 +121,25 @@ export default function DivisionTermicaFicha() {
     if (!calculo) return toast.error("Revisa las medidas (deben ser > 0)");
     setSaving(true);
     try {
-      await crearFichaDivision(
-        { ...form, anchoVehiculo: Number(form.anchoVehiculo), altoVehiculo: Number(form.altoVehiculo) },
-        calculo
-      );
-      toast.success("Ficha guardada");
+      const datos = { ...form, anchoVehiculo: Number(form.anchoVehiculo), altoVehiculo: Number(form.altoVehiculo) };
+      if (editingId) {
+        await actualizarFichaDivision(editingId, {
+          ...datos,
+          medidas:    calculo.medidas,
+          tipoIcopor: calculo.tipoIcopor,
+          consumo:    calculo.consumo,
+        });
+        toast.success("Ficha actualizada");
+        setEditingId(null);
+      } else {
+        await crearFichaDivision(datos, calculo);
+        toast.success("Ficha guardada");
+      }
       setForm(INITIAL_FORM);
       await loadFichas();
     } catch (err) {
       console.error(err);
-      toast.error("Error guardando ficha");
+      toast.error(editingId ? "Error actualizando ficha" : "Error guardando ficha");
     } finally {
       setSaving(false);
     }
@@ -141,6 +156,51 @@ export default function DivisionTermicaFicha() {
     }
   };
 
+  const handleEditar = (f) => {
+    setForm({
+      fechaOrden:        f.fechaOrden || new Date().toISOString().slice(0, 10),
+      fechaEntrega:      f.fechaEntrega || "",
+      numeroOrdenCompra: f.numeroOrdenCompra || "",
+      numeroFicha:       f.numeroFicha || "",
+      cliente:           f.cliente || "",
+      cantidad:          f.cantidad ?? 1,
+      anchoVehiculo:     f.anchoVehiculo ?? "",
+      altoVehiculo:      f.altoVehiculo ?? "",
+      placa:             f.placa || "SI",
+      numeroPlaca:       f.numeroPlaca || "",
+      logo:              f.logo || "COLD CHAIN",
+      agujero:           f.agujero || "1 AGUJERO",
+      platinas:          f.platinas || "NO",
+      alturaPlatinas:    f.alturaPlatinas ?? "",
+      factura:           f.factura || "SI",
+      colorLona:         f.colorLona || "NEGRO",
+      adicional:         f.adicional || "",
+    });
+    setEditingId(f.id);
+    setSelectedId(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelarEdicion = () => {
+    setEditingId(null);
+    setForm(INITIAL_FORM);
+  };
+
+  const handleEliminar = async (f) => {
+    const ok = await confirm(`¿Eliminar la ficha de ${f.cliente || "este cliente"}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    try {
+      await eliminarFichaDivision(f.id);
+      setFichas((prev) => prev.filter((x) => x.id !== f.id));
+      if (selectedId === f.id) setSelectedId(null);
+      if (editingId === f.id) cancelarEdicion();
+      toast.success("Ficha eliminada");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error eliminando ficha");
+    }
+  };
+
   return (
     <div className="space-y-5">
 
@@ -148,12 +208,12 @@ export default function DivisionTermicaFicha() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
         {/* FORMULARIO */}
-        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 border-t-4 border-t-blue-600 rounded-lg p-4 shadow-sm">
+        <section ref={formRef} className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 border-t-4 border-t-blue-600 rounded-lg p-4 shadow-sm">
           <div className="flex items-center gap-2 font-medium text-sm mb-4">
             <span className="flex items-center justify-center h-6 w-6 rounded-md bg-blue-600/10 text-blue-700 dark:text-blue-400">
               <FaIdCard className="text-[11px]" />
             </span>
-            Nueva ficha — División Térmica
+            {editingId ? "Editar ficha — División Térmica" : "Nueva ficha — División Térmica"}
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -284,11 +344,17 @@ export default function DivisionTermicaFicha() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-end gap-2 pt-1">
+              {editingId && (
+                <button type="button" onClick={cancelarEdicion}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 text-sm font-medium transition">
+                  <FaTimes className="text-xs" /> Cancelar edición
+                </button>
+              )}
               <button type="submit" disabled={saving || !calculo}
                 className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 active:scale-95 text-white text-sm font-medium shadow-sm transition">
                 {saving && <FaSyncAlt className="animate-spin text-xs" />}
-                {saving ? "Guardando…" : "Guardar ficha"}
+                {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar ficha"}
               </button>
             </div>
           </form>
@@ -537,16 +603,32 @@ export default function DivisionTermicaFicha() {
                             : "—"}
                         </td>
                         <td className="py-2 pl-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPrintFicha({ ficha: f, numero });
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
-                            title="Ver ficha imprimible"
-                          >
-                            <FaEye className="text-[11px]" /> Ver ficha
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPrintFicha({ ficha: f, numero });
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
+                              title="Ver ficha imprimible"
+                            >
+                              <FaEye className="text-[11px]" /> Ver ficha
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEditar(f); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
+                              title="Editar ficha"
+                            >
+                              <FaEdit className="text-[11px]" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEliminar(f); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 transition-colors"
+                              title="Eliminar ficha"
+                            >
+                              <FaTrash className="text-[11px]" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
 
@@ -554,7 +636,14 @@ export default function DivisionTermicaFicha() {
                       {isSelected && (
                         <tr className="border-b border-gray-200 dark:border-gris-700">
                           <td colSpan={8} className="py-3 px-2">
-                            <FichaDetalle ficha={f} numero={numero} onCambiarEstado={cambiarEstado} onVerFicha={() => setPrintFicha({ ficha: f, numero })} />
+                            <FichaDetalle
+                              ficha={f}
+                              numero={numero}
+                              onCambiarEstado={cambiarEstado}
+                              onVerFicha={() => setPrintFicha({ ficha: f, numero })}
+                              onEditar={() => handleEditar(f)}
+                              onEliminar={() => handleEliminar(f)}
+                            />
                           </td>
                         </tr>
                       )}
@@ -580,7 +669,7 @@ export default function DivisionTermicaFicha() {
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
+function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar, onEliminar }) {
   const med = f.medidas || {};
 
   const medidas = [
@@ -615,10 +704,20 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
             {f.numeroFicha && <> · Ficha {f.numeroFicha}</>}
           </div>
         </div>
-        <button onClick={onVerFicha}
-          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5">
-          Ver ficha
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={onVerFicha}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5">
+            Ver ficha
+          </button>
+          <button onClick={onEditar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 text-xs font-medium">
+            <FaEdit className="text-[11px]" /> Editar
+          </button>
+          <button onClick={onEliminar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-medium">
+            <FaTrash className="text-[11px]" /> Eliminar
+          </button>
+        </div>
       </div>
 
       {/* Medidas de corte */}

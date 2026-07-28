@@ -31,14 +31,36 @@ export default function FichaImpresionShell({
       <title>Ficha ${productLabel} #${numero} — ${cliente || ""}</title>
       <style>
         * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
         body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #111; }
         table { border-collapse: collapse; width: 100%; }
         td, th { border: 1px solid #999; padding: 4px 7px; font-size: 11px; vertical-align: middle; }
-        @media print { body { margin: 5mm; } @page { size: A4 landscape; } }
+        @media print { body { margin: 5mm; } @page { size: A4 landscape; margin: 0; } }
       </style>
-    </head><body>${printRef.current.innerHTML}</body></html>`);
+    </head><body><div id="print-content">${printRef.current.innerHTML}</div></body></html>`);
     win.document.close();
-    setTimeout(() => { win.focus(); win.print(); setPrinting(false); }, 300);
+
+    // Encoge el contenido (si hace falta) para que cualquier ficha, sin importar
+    // cuántas filas/insumos tenga, entre siempre en una sola página A4 horizontal.
+    const fitToOnePage = () => {
+      const el = win.document.getElementById("print-content");
+      if (el) {
+        const mmToPx = 96 / 25.4;
+        const pageW = (297 - 10) * mmToPx; // A4 horizontal menos márgenes de 5mm
+        const pageH = (210 - 10) * mmToPx;
+        const scale = Math.min(1, pageW / el.scrollWidth, pageH / el.scrollHeight);
+        if (scale < 1) el.style.zoom = scale;
+      }
+      win.focus();
+      win.print();
+      setPrinting(false);
+    };
+
+    if (win.document.readyState === "complete") {
+      setTimeout(fitToOnePage, 250);
+    } else {
+      win.addEventListener("load", () => setTimeout(fitToOnePage, 250));
+    }
   };
 
   const onBackdropClick = (e) => { if (e.target === e.currentTarget) onClose?.(); };

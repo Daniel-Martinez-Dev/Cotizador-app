@@ -8,15 +8,15 @@ import {
 } from "../utils/firebaseProduction";
 import DivisionTermicaFicha from "../components/DivisionTermicaFicha";
 import SelloAndenFicha from "../components/SelloAndenFicha";
-import AbrigoAndenFicha from "../components/AbrigoAndenFicha";
+import AbrigoRetractilFicha from "../components/AbrigoRetractilFicha";
 import Tabs from "../components/ui/Tabs";
 
 const TABS = [
-  { key: "division", label: "División Térmica" },
-  { key: "sello",    label: "Sello de Andén" },
-  { key: "abrigo",   label: "Abrigo de Andén" },
-  { key: "ordenes",  label: "Órdenes", legacy: true },
-  { key: "fichas",   label: "Fichas básicas", legacy: true },
+  { key: "division",        label: "División Térmica" },
+  { key: "sello",            label: "Sello de Andén" },
+  { key: "abrigoretractil", label: "Abrigo Retráctil" },
+  { key: "ordenes",          label: "Órdenes", legacy: true },
+  { key: "fichas",           label: "Fichas básicas", legacy: true },
 ];
 
 export default function ProduccionPage() {
@@ -94,8 +94,8 @@ export default function ProduccionPage() {
         {/* ── Sello de Andén ── */}
         {tab === "sello" && <SelloAndenFicha />}
 
-        {/* ── Abrigo de Andén ── */}
-        {tab === "abrigo" && <AbrigoAndenFicha />}
+        {/* ── Abrigo Retráctil ── */}
+        {tab === "abrigoretractil" && <AbrigoRetractilFicha />}
 
         {/* ── Órdenes (legado) ── */}
         {tab === "ordenes" && (

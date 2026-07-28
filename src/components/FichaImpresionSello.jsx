@@ -1,171 +1,91 @@
 import React from "react";
 import FichaImpresionShell from "./fichas/FichaImpresionShell";
 import { fmtMm, fmtM2, fmtN, fmtDate } from "../utils/fichaFormat";
+import logoPng from "../assets/imagenes/logo.png";
+import { MedidaCard, InfoChip, AcabadoCard, SectionTitle, MedidaHero, Membrete, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
 
-// ── Estilos de celda de tabla ──────────────────────────────────────────────────
-const TD = ({ children, header, center, bold, italic, gray, colSpan, rowSpan, style = {} }) => (
-  <td
-    colSpan={colSpan}
-    rowSpan={rowSpan}
-    style={{
-      border: "1px solid #999",
-      padding: "4px 7px",
-      fontSize: "11px",
-      textAlign: center ? "center" : "left",
-      fontWeight: bold || header ? "bold" : "normal",
-      fontStyle: italic ? "italic" : "normal",
-      background: gray ? "#f0f0f0" : header ? "#dde3ef" : "white",
-      verticalAlign: "middle",
-      whiteSpace: "nowrap",
-      ...style,
-    }}
-  >
-    {children}
-  </td>
-);
+// ── Diagrama SVG del SELLO (vista frontal isométrica: dintel + 2 postes) ──────
+// Dibujo técnico en blanco y negro (solo trazo, sin relleno de color), siguiendo
+// la proporción del plano de referencia: postes esbeltos y vano amplio, marco en
+// forma de "U" invertida con una franja de acabado marcada en cada poste.
+function DiagramaSelloFrente({ anchoVano, altoVano, selloAncho, selloAlto, espesorSello, despliegueCortina }) {
+  const W = 420, H = 350;
+  const postD   = 20;   // profundidad (perspectiva)
+  const postW   = 34;   // ancho cara frontal de cada poste
+  const lintelH = 42;   // alto cara frontal del dintel
+  const vanoW   = 210;  // ancho de la luz (vano) en el dibujo
+  const postH   = 190;  // alto cara frontal de cada poste
+  const ox = 70, oy = 40;
 
-// ── Diagrama SVG del PARAL (poste lateral) ────────────────────────────────────
-function DiagramaParal({ espesorSello, espesorPoste, selloAlto, despliegueCortina }) {
-  const W = 280, H = 320;
-  // Proporciones de la vista isométrica simplificada
-  const fw = 90;   // ancho cara frontal
-  const fd = 35;   // profundidad (perspectiva)
-  const fh = 190;  // alto cara frontal
-  const ox = 60;   // origen x cara frontal
-  const oy = 80;   // origen y cara frontal
+  const frontLeftX  = ox;
+  const frontRightX = ox + postW * 2 + vanoW;
+  const totalW = postW * 2 + vanoW;
+  const lintelTopY    = oy;
+  const lintelBottomY = oy + lintelH;
+  const postBottomY   = lintelBottomY + postH;
+  const cx = (frontLeftX + frontRightX) / 2;
 
-  // Núcleo estructural (madera/lámina) — centrado en la cara frontal
-  const cw = fw * 0.35, ch = fh * 0.55;
-  const cx = ox + (fw - cw) / 2;
-  const cy = oy + (fh - ch) / 2;
+  const linea = "#111827";       // trazo de objeto (negro)
+  const dim   = "#374151";       // trazo/texto de cota (gris oscuro)
+  const caraFrontal = "#ffffff";
+  const caraSuperior = "#f8fafc";
+  const caraLateral  = "#e5e7eb";
+  const stripeW = 7, stripeInset = 7;
 
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      {/* Cara superior */}
-      <polygon
-        points={`${ox},${oy} ${ox+fw},${oy} ${ox+fw+fd},${oy-fd} ${ox+fd},${oy-fd}`}
-        fill="#c8c8c8" stroke="#555" strokeWidth="1.2"
-      />
-      {/* Cara lateral derecha */}
-      <polygon
-        points={`${ox+fw},${oy} ${ox+fw+fd},${oy-fd} ${ox+fw+fd},${oy-fd+fh} ${ox+fw},${oy+fh}`}
-        fill="#b0b0b0" stroke="#555" strokeWidth="1.2"
-      />
-      {/* Cara frontal */}
-      <rect x={ox} y={oy} width={fw} height={fh} fill="#d8d8d8" stroke="#555" strokeWidth="1.2" />
-      {/* Núcleo estructural */}
-      <rect x={cx} y={cy} width={cw} height={ch} fill="#FFD700" stroke="#888" strokeWidth="1" />
-
-      {/* ── Cotas ── */}
-      {/* Cota altura (derecha) */}
-      <line x1={ox+fw+fd+10} y1={oy-fd} x2={ox+fw+fd+10} y2={oy-fd+fh} stroke="#1a3f8f" strokeWidth="1" markerStart="url(#arr)" markerEnd="url(#arr)" />
-      <text x={ox+fw+fd+22} y={oy-fd+fh/2+4} fontSize="9" fill="#1a3f8f" textAnchor="middle"
-        transform={`rotate(90,${ox+fw+fd+22},${oy-fd+fh/2+4})`}>
-        {fmtMm(selloAlto)} mm
-      </text>
-
-      {/* Cota ancho sello (inferior frontal) */}
-      <line x1={ox} y1={oy+fh+12} x2={ox+fw} y2={oy+fh+12} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={ox} y1={oy+fh+8} x2={ox} y2={oy+fh+16} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={ox+fw} y1={oy+fh+8} x2={ox+fw} y2={oy+fh+16} stroke="#1a3f8f" strokeWidth="1" />
-      <text x={ox+fw/2} y={oy+fh+24} fontSize="9" fill="#1a3f8f" textAnchor="middle">
-        Esp. sello: {fmtMm(espesorSello)} mm
-      </text>
-
-      {/* Cota profundidad poste (inferior derecha, perspectiva) */}
-      <line x1={ox+fw} y1={oy+fh+38} x2={ox+fw+fd} y2={oy+fh+38-fd} stroke="#555" strokeWidth="1" />
-      <text x={ox+fw+fd+8} y={oy+fh+38-fd+4} fontSize="9" fill="#555" textAnchor="start">
-        Esp. poste: {fmtMm(espesorPoste)} mm
-      </text>
-
-      {/* Etiqueta distancia solapas (izquierda) */}
-      <line x1={ox-18} y1={oy} x2={ox-18} y2={oy+fh*0.6} stroke="#c00" strokeWidth="1" strokeDasharray="3,2" />
-      <text x={ox-22} y={oy+fh*0.3} fontSize="8" fill="#c00" textAnchor="middle"
-        transform={`rotate(-90,${ox-22},${oy+fh*0.3})`}>
-        DIST. SOLAPAS: {fmtMm(despliegueCortina)} mm
-      </text>
-
-      {/* Flecha marcadores reutilizables */}
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto", maxWidth: W }}>
       <defs>
-        <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill="#1a3f8f" />
+        <marker id="arrSF" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill={dim} />
         </marker>
       </defs>
 
-      {/* Título */}
-      <text x={W/2} y={H-8} fontSize="11" fontWeight="bold" textAnchor="middle" fill="#333">PARAL</text>
-    </svg>
-  );
-}
+      {/* Dintel (viga superior) */}
+      <polygon points={`${frontLeftX},${lintelTopY} ${frontRightX},${lintelTopY} ${frontRightX+postD},${lintelTopY-postD} ${frontLeftX+postD},${lintelTopY-postD}`} fill={caraSuperior} stroke={linea} strokeWidth="1.3" />
+      <polygon points={`${frontRightX},${lintelTopY} ${frontRightX+postD},${lintelTopY-postD} ${frontRightX+postD},${lintelTopY-postD+lintelH} ${frontRightX},${lintelTopY+lintelH}`} fill={caraLateral} stroke={linea} strokeWidth="1.3" />
+      <rect x={frontLeftX} y={lintelTopY} width={totalW} height={lintelH} fill={caraFrontal} stroke={linea} strokeWidth="1.3" />
+      {/* Franjas de acabado del dintel, alineadas con cada poste */}
+      <rect x={frontLeftX+postW-stripeW-stripeInset} y={lintelTopY+lintelH*0.5} width={stripeW} height={lintelH*0.42} fill="none" stroke={linea} strokeWidth="0.9" />
+      <rect x={frontRightX-postW+stripeInset} y={lintelTopY+lintelH*0.5} width={stripeW} height={lintelH*0.42} fill="none" stroke={linea} strokeWidth="0.9" />
 
-// ── Diagrama SVG de la CORTINA ────────────────────────────────────────────────
-function DiagramaCortina({ cortinaAncho, cortinaLargoLona, espesorSello, selloAlto, despliegueCortina }) {
-  const W = 480, H = 320;
-  const margin = 50;
-  const rectW = W - margin * 2;
-  const rectH = H - 80;
-  const rx = margin, ry = 30;
+      {/* Poste izquierdo */}
+      <rect x={frontLeftX} y={lintelBottomY} width={postW} height={postH} fill={caraFrontal} stroke={linea} strokeWidth="1.3" />
+      <rect x={frontLeftX+postW-stripeW-stripeInset} y={lintelBottomY+5} width={stripeW} height={postH-10} fill="none" stroke={linea} strokeWidth="0.9" />
 
-  // Doblez superior (4 cm = representado como ~8% del alto del rectángulo)
-  const dobSupH = rectH * 0.07;
-  // Doblez inferior (5 cm)
-  const dobInfH = rectH * 0.09;
-  // Bloque paral (poste) en esquina sup-izq
-  const paralW = rectW * 0.10;
-  const paralH = rectH * 0.50;
-
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      {/* Cuerpo principal de la cortina */}
-      <rect x={rx} y={ry} width={rectW} height={rectH} fill="#e0e0e0" stroke="#555" strokeWidth="1.5" />
-
-      {/* Doblez superior (azul claro) */}
-      <rect x={rx} y={ry} width={rectW} height={dobSupH} fill="#9ecae1" stroke="#555" strokeWidth="1" />
-
-      {/* Doblez inferior */}
-      <rect x={rx} y={ry+rectH-dobInfH} width={rectW} height={dobInfH} fill="#9ecae1" stroke="#555" strokeWidth="1" />
-
-      {/* Bloque paral (amarillo) en esquina sup-izq */}
-      <rect x={rx} y={ry+dobSupH} width={paralW} height={paralH} fill="#FFD700" stroke="#777" strokeWidth="1" />
+      {/* Poste derecho + cara lateral (borde exterior del conjunto) */}
+      <polygon points={`${frontRightX},${lintelBottomY} ${frontRightX+postD},${lintelBottomY-postD} ${frontRightX+postD},${lintelBottomY-postD+postH} ${frontRightX},${lintelBottomY+postH}`} fill={caraLateral} stroke={linea} strokeWidth="1.3" />
+      <rect x={frontRightX-postW} y={lintelBottomY} width={postW} height={postH} fill={caraFrontal} stroke={linea} strokeWidth="1.3" />
+      <rect x={frontRightX-postW+stripeInset} y={lintelBottomY+5} width={stripeW} height={postH-10} fill="none" stroke={linea} strokeWidth="0.9" />
 
       {/* ── Cotas ── */}
-      {/* Cota ancho (inferior, horizontal) */}
-      <line x1={rx} y1={ry+rectH+16} x2={rx+rectW} y2={ry+rectH+16} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={rx} y1={ry+rectH+12} x2={rx} y2={ry+rectH+20} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={rx+rectW} y1={ry+rectH+12} x2={rx+rectW} y2={ry+rectH+20} stroke="#1a3f8f" strokeWidth="1" />
-      <text x={rx+rectW/2} y={ry+rectH+30} fontSize="9" fill="#1a3f8f" textAnchor="middle">
-        LARGO: {fmtMm(cortinaAncho)} mm
+      {/* Ancho vano (interno) */}
+      <line x1={frontLeftX+postW} y1={postBottomY+14} x2={frontRightX-postW} y2={postBottomY+14} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
+      <text x={cx} y={postBottomY+25} fontSize="9" fill={dim} textAnchor="middle">ANCHO VANO: {fmtMm(anchoVano)} mm</text>
+
+      {/* Ancho total sello (externo) */}
+      <line x1={frontLeftX} y1={postBottomY+34} x2={frontRightX} y2={postBottomY+34} stroke={linea} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
+      <text x={cx} y={postBottomY+45} fontSize="9" fill={linea} textAnchor="middle" fontWeight="bold">ANCHO TOTAL SELLO: {fmtMm(selloAncho)} mm</text>
+
+      {/* Alto luz (dentro del vano) */}
+      <line x1={frontLeftX+postW+vanoW*0.28} y1={lintelBottomY} x2={frontLeftX+postW+vanoW*0.28} y2={postBottomY} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
+      <text x={frontLeftX+postW+vanoW*0.28-9} y={(lintelBottomY+postBottomY)/2}
+        fontSize="9" fill={dim} textAnchor="middle"
+        transform={`rotate(-90,${frontLeftX+postW+vanoW*0.28-9},${(lintelBottomY+postBottomY)/2})`}>
+        ALTO LUZ: {fmtMm(altoVano)} mm
       </text>
 
-      {/* Cota alto (derecha, vertical) */}
-      <line x1={rx+rectW+16} y1={ry} x2={rx+rectW+16} y2={ry+rectH} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={rx+rectW+12} y1={ry} x2={rx+rectW+20} y2={ry} stroke="#1a3f8f" strokeWidth="1" />
-      <line x1={rx+rectW+12} y1={ry+rectH} x2={rx+rectW+20} y2={ry+rectH} stroke="#1a3f8f" strokeWidth="1" />
-      <text x={rx+rectW+28} y={ry+rectH/2+4} fontSize="9" fill="#1a3f8f" textAnchor="middle"
-        transform={`rotate(90,${rx+rectW+28},${ry+rectH/2+4})`}>
-        ANCHO (rollo): {fmtMm(cortinaLargoLona)} mm
+      {/* Alto total sello (externo, derecha) */}
+      <line x1={frontRightX+postD+14} y1={lintelTopY-postD} x2={frontRightX+postD+14} y2={postBottomY} stroke={linea} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
+      <text x={frontRightX+postD+26} y={(lintelTopY-postD+postBottomY)/2}
+        fontSize="9" fill={linea} textAnchor="middle" fontWeight="bold"
+        transform={`rotate(90,${frontRightX+postD+26},${(lintelTopY-postD+postBottomY)/2})`}>
+        ALTO TOTAL SELLO: {fmtMm(selloAlto)} mm
       </text>
 
-      {/* Etiqueta doblez superior */}
-      <text x={rx + rectW/2} y={ry + dobSupH/2 + 3} fontSize="8" fill="#08519c" textAnchor="middle" fontWeight="bold">
-        DOBLEZ SUPERIOR 4 cm
+      {/* Nota inferior: espesor / despliegue / material */}
+      <text x={cx} y={H-10} fontSize="8" fill={dim} textAnchor="middle">
+        Espesor postes: {fmtMm(espesorSello)} mm · Despliegue cortina: {fmtMm(despliegueCortina)} mm · Lona 750gr
       </text>
-
-      {/* Etiqueta doblez inferior */}
-      <text x={rx + rectW/2} y={ry+rectH-dobInfH/2+3} fontSize="8" fill="#08519c" textAnchor="middle" fontWeight="bold">
-        DOBLEZ INFERIOR 5 cm
-      </text>
-
-      {/* Etiqueta despliegue */}
-      <line x1={rx+paralW+4} y1={ry+dobSupH} x2={rx+paralW+4} y2={ry+dobSupH+rectH*0.55}
-        stroke="#c00" strokeWidth="1" strokeDasharray="3,2" />
-      <text x={rx+paralW+10} y={ry+dobSupH+rectH*0.28} fontSize="8" fill="#c00"
-        transform={`rotate(90,${rx+paralW+10},${ry+dobSupH+rectH*0.28})`}>
-        DESPLIEGUE: {fmtMm(despliegueCortina)} mm
-      </text>
-
-      {/* Título */}
-      <text x={W/2} y={H-4} fontSize="11" fontWeight="bold" textAnchor="middle" fill="#333">CORTINA</text>
     </svg>
   );
 }
@@ -194,8 +114,10 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
     { label: 'Platina 2"×1/8"',        unit: "mm",  cu: fmtN(mp.platinaMm),   tot: fmtN((mp.platinaMm || 0) * cantidad),   formula: "6 platinas × 120 mm (fijo)" },
   ];
 
-  const tdStyle = { border: "1px solid #999", padding: "4px 7px", fontSize: "11px", verticalAlign: "middle", whiteSpace: "nowrap" };
-  const thStyle = { ...tdStyle, background: "#dde3ef", fontWeight: "bold", textAlign: "center" };
+  const bandas = [f.bandaLateral, f.bandaSuperior].filter(Boolean).join(" / ");
+
+  const tdStyle = { border: "1px solid #e2e8f0", padding: "5px 7px", fontSize: "10px", verticalAlign: "middle" };
+  const thStyle = { ...tdStyle, background: "#1a3f8f", color: "white", fontWeight: "bold", textAlign: "center" };
 
   return (
     <FichaImpresionShell
@@ -206,249 +128,124 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
       maxWidthClass="max-w-5xl"
       windowSize={{ width: 1120, height: 980 }}
     >
-          {/* ── Encabezado ── */}
-          <div style={{
-            background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)",
-            padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <div>
-              <div style={{ color: "white", fontSize: "18px", fontWeight: "bold", letterSpacing: "1px" }}>
-                COLD CHAIN SERVICES S.A.S.
+        <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
+          <Membrete
+            logoSrc={logoPng}
+            tituloFicha="Ficha de Fabricación — Sello de Andén"
+            numero={numero}
+            numeroLabel="N.° de ficha"
+            subtitulo="Todas las dimensiones en milímetros y lona 750K"
+          />
+
+          {/* ── Información general ── */}
+          <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+
+            {/* Medida del vano — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
+            <MedidaHero label="Medida del Vano" ancho={f.anchoVano} alto={f.altoVano} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
+              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
+                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
               </div>
-              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: "9px", marginTop: "2px", textTransform: "uppercase", letterSpacing: "1px" }}>
-                Departamento de Ingeniería — Fichas de Fabricación
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.9)", fontSize: "9px", marginTop: "3px" }}>
-                TODAS LAS DIMENSIONES EN MILÍMETROS Y LONA 750 K
+              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>sellos</div>
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "1.5px" }}>
-                Sello de Andén
-              </div>
-              <div style={{ color: "white", fontSize: "30px", fontWeight: "bold", lineHeight: 1, letterSpacing: "-1px" }}>
-                #{numero || "—"}
-              </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+              <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
+              <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
             </div>
           </div>
 
-          <div style={{ padding: "12px 18px 0" }}>
-
-          {/* ── Tabla principal de datos (estructura del Excel) ── */}
-          <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: "12px" }}>
-            <tbody>
-
-              {/* Fila 1: Fecha Orden / Cliente */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", width: "18%" }}>FECHA ORDEN:</td>
-                <td style={{ ...tdStyle, width: "13%" }}>{fmtDate(f.fechaOrden)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", width: "10%" }}>CLIENTE</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center", width: "19%" }}>{f.cliente || "—"}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", width: "20%", borderLeft: "2px solid #888" }} colSpan={2}></td>
-              </tr>
-
-              {/* Fila 2: Fecha Entrega / Cantidad / Material */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>FECHA ENTREGA:</td>
-                <td style={{ ...tdStyle }}>{fmtDate(f.fechaEntrega)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>CANTIDAD</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{f.cantidad}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>MATERIAL BASE</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{f.materialBase}</td>
-              </tr>
-
-              {/* Fila 3: Medidas Vano */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>MEDIDAS VANO</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(f.anchoVano)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ALTO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(f.altoVano)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>FACT</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{f.fact || "SI"}</td>
-              </tr>
-
-              {/* Fila 4: Medidas Sello */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>MEDIDAS SELLO</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.selloAncho)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ALTO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.selloAlto)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>ESPESOR</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{fmtMm(f.espesorSello)}</td>
-              </tr>
-
-              {/* Fila 5: Medidas Espuma de Postes */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>MEDIDAS ESPUMA DE POSTES</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.espumaPostesAncho)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ALTO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.espumaPostesAlto)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>ESPESOR</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{fmtMm(f.espesorPoste)}</td>
-              </tr>
-
-              {/* Fila 6: Tapa Superior */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>MEDIDAS TAPA DE POSTES SUPERIOR</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.tapaSuperiorAncho)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.tapaSuperiorLargo)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>CANTIDAD</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>2</td>
-              </tr>
-
-              {/* Fila 7: Tapa Inferior */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>MEDIDAS TAPA DE POSTES INFERIOR (AGUJERO)</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.tapaInferiorAncho)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.tapaInferiorLargo)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>CANTIDAD</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>2</td>
-              </tr>
-
-              {/* Fila 8: Forros y Chalecos */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>CORTE DE LONA POSTES (FORROS Y CHALECOS)</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.forroAncho)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>{fmtMm(med.forroLargo)}</td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>FORMA DE CUÑA</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>{f.formaCuna || "NO"}</td>
-              </tr>
-
-              {/* Fila 9: Cortina */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>CORTINA</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center", background: f.llevaCortina ? "#fffde7" : "white" }}>
-                  {f.llevaCortina ? "SÍ" : "NO"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>
-                  {f.llevaCortina ? fmtMm(med.cortinaAncho) : "—"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>ANCHO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>
-                  {f.llevaCortina ? fmtMm(med.cortinaLargoLona) : "—"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>DESPLIEGUE CORTINA</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>
-                  {f.llevaCortina ? fmtMm(f.despliegueCortina) : "—"}
-                </td>
-              </tr>
-
-              {/* Fila 10: Travesaño */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>TRAVESAÑO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center", background: f.llevaTravesano ? "#fffde7" : "white" }}>
-                  {f.llevaTravesano ? "SÍ" : "NO"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>
-                  {f.llevaTravesano ? fmtMm(med.travesanoAncho) : "—"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>LARGO LONA</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}>
-                  {f.llevaTravesano ? fmtMm(med.travesanoLargoLona) : "—"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>BANDA LATERAL</td>
-                <td style={{ ...tdStyle, fontStyle: "italic", textAlign: "center" }}>{f.bandaLateral || ""}</td>
-              </tr>
-
-              {/* Fila 11: Sello Abrigo */}
-              <tr>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold" }}>SELLO ABRIGO</td>
-                <td style={{ ...tdStyle, fontWeight: "bold", fontStyle: "italic", textAlign: "center" }}>
-                  {f.selloAbrigo || "NO"}
-                </td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center" }}>DIMENSIONES CUÑA</td>
-                <td style={{ ...tdStyle }} colSpan={2}></td>
-                <td style={{ ...tdStyle, background: "#f0f0f0", fontWeight: "bold", textAlign: "center", borderLeft: "2px solid #888" }}>BANDA SUPERIOR</td>
-                <td style={{ ...tdStyle, fontStyle: "italic", textAlign: "center" }} colSpan={2}>{f.bandaSuperior || ""}</td>
-              </tr>
-
-            </tbody>
-          </table>
-
-          {/* Nota dobleces */}
-          <div style={{ textAlign: "right", fontSize: "10px", fontWeight: "bold", marginBottom: "10px", color: "#555" }}>
-            DOBLEZ SUPERIOR DE 4 CM
+          {/* ── Medidas de fabricación ── */}
+          <div style={{ padding: "10px 20px" }}>
+            <SectionTitle>Medidas de Fabricación</SectionTitle>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+              <MedidaCard label="Sello principal"  ancho={med.selloAncho}        alto={med.selloAlto}         color="#1a3f8f" />
+              <MedidaCard label="Espuma postes"    ancho={med.espumaPostesAncho} alto={med.espumaPostesAlto}  color="#0f6cbf" />
+              <MedidaCard label="Tapa superior"    ancho={med.tapaSuperiorAncho} alto={med.tapaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
+              <MedidaCard label="Tapa inferior"    ancho={med.tapaInferiorAncho} alto={med.tapaInferiorLargo} color="#0d9488" dimLabels={["Ancho", "Largo"]} />
+              <MedidaCard label="Forros / chaleco" ancho={med.forroAncho}        alto={med.forroLargo}        color="#7c3aed" dimLabels={["Ancho", "Largo"]} />
+              {f.llevaCortina && (
+                <MedidaCard label="Cortina" ancho={med.cortinaAncho} alto={med.cortinaLargoLona} color="#059669" dimLabels={["Largo", "Ancho rollo"]} />
+              )}
+              {f.llevaTravesano && (
+                <MedidaCard label="Travesaño" ancho={med.travesanoAncho} alto={med.travesanoLargoLona} color="#d97706" dimLabels={["Largo", "Largo lona"]} />
+              )}
+            </div>
           </div>
 
-          {/* ── Sección diagramas ── */}
-          <div style={{ display: "flex", gap: "12px", justifyContent: "space-around", alignItems: "flex-start", marginBottom: "10px" }}>
-            <div style={{ textAlign: "center" }}>
-              <DiagramaParal
-                espesorSello={f.espesorSello}
-                espesorPoste={f.espesorPoste}
+          {/* ── Diagramas + Opciones y Acabados, lado a lado para aprovechar el
+                espacio que los planos dejan libre a los costados. ── */}
+          <div style={{ padding: "0 20px 10px", display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
+
+            <div style={{ flex: "2 1 320px", border: "1px solid #ccc", borderRadius: "8px", padding: "4px", background: "#fafafa", display: "flex", justifyContent: "center" }}>
+              <DiagramaSelloFrente
+                anchoVano={f.anchoVano}
+                altoVano={f.altoVano}
+                selloAncho={med.selloAncho}
                 selloAlto={med.selloAlto}
+                espesorSello={f.espesorSello}
                 despliegueCortina={f.despliegueCortina || 800}
               />
             </div>
-            {f.llevaCortina && (
-              <div style={{ textAlign: "center", flex: 1 }}>
-                <DiagramaCortina
-                  cortinaAncho={med.cortinaAncho}
-                  cortinaLargoLona={med.cortinaLargoLona}
-                  espesorSello={f.espesorSello}
-                  selloAlto={med.selloAlto}
-                  despliegueCortina={f.despliegueCortina || 800}
-                />
+
+            <div style={{ flex: "1 1 220px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
+              <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+                <AcabadoCard label="Material base"   value={f.materialBase || "MADERA"} color="#1a3f8f" active />
+                <AcabadoCard label="Cortina"          value={f.llevaCortina ? `SÍ · ${fmtMm(f.despliegueCortina)} mm` : "NO"} color="#059669" active={!!f.llevaCortina} />
+                <AcabadoCard label="Travesaño"        value={f.llevaTravesano ? "SÍ" : "NO"} color="#d97706" active={!!f.llevaTravesano} />
+                <AcabadoCard label="Factura"          value={f.fact || "SI"} color="#16a34a" active={f.fact === "SI"} />
+                <AcabadoCard label="Sello abrigo"     value={f.selloAbrigo || "NO"} color="#7c3aed" active={f.selloAbrigo === "SI"} />
+                <AcabadoCard label="Forma de cuña"    value={f.formaCuna || "NO"}   color="#be123c" active={f.formaCuna === "SI"} />
+                <AcabadoCard label="Espesores S/P/T"  value={`${fmtMm(f.espesorSello)}/${fmtMm(f.espesorPoste)}/${fmtMm(f.espesorTravesano)}`} color="#0891b2" active />
+                <AcabadoCard label="Bandas"           value={bandas || "—"} color="#334155" active={!!bandas} />
               </div>
-            )}
-          </div>
-
-          {/* Nota inferior dobleces */}
-          <div style={{ textAlign: "right", fontSize: "10px", fontWeight: "bold", marginBottom: "12px", color: "#555" }}>
-            DOBLEZ INFERIOR DE 5 CM
-          </div>
-
-          {/* ── Tabla de consumo de materia prima ── */}
-          <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: "10px" }}>
-            <thead>
-              <tr>
-                {["INSUMO", "UNIDAD", "FÓRMULA (REFERENCIA)", `POR SELLO`, `TOTAL × ${cantidad}`].map((h) => (
-                  <th key={h} style={{
-                    ...thStyle,
-                    textAlign: h === "INSUMO" || h.startsWith("FÓRMULA") ? "left" : "center",
-                    background: "#1a3f8f", color: "white",
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {insumos.map(({ label, unit, cu, tot, formula }, i) => (
-                <tr key={label} style={{ background: i % 2 === 0 ? "white" : "#f8f8f8" }}>
-                  <td style={{ ...tdStyle, fontWeight: "600" }}>{label}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", color: "#555" }}>{unit}</td>
-                  <td style={{ ...tdStyle, color: "#555", fontSize: "10px" }}>{formula}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold" }}>{cu}</td>
-                  <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1d4ed8" }}>{tot}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          </div>{/* end content wrapper */}
-
-          {/* ── Footer ── */}
-          <div style={{
-            background: "#f1f5f9", borderTop: "2px solid #e2e8f0",
-            padding: "6px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <div style={{ fontSize: "9px", color: "#94a3b8" }}>
-              COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN SELLOS DE ANDÉN
-            </div>
-            <div style={{ fontSize: "9px", color: "#94a3b8" }}>
-              Ficha #{numero || "—"} · {fmtDate(new Date().toISOString())}
             </div>
           </div>
+
+          {/* ── Consumo de materia prima ── */}
+          <div style={{ padding: "10px 20px 8px" }}>
+            <SectionTitle>Consumo de Materia Prima (por sello)</SectionTitle>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <thead>
+                  <tr>
+                    {["INSUMO", "UNIDAD", "FÓRMULA (REFERENCIA)", "POR SELLO", `TOTAL × ${cantidad}`].map((h) => (
+                      <th key={h} style={{
+                        ...thStyle,
+                        textAlign: h === "INSUMO" || h.startsWith("FÓRMULA") ? "left" : "center",
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {insumos.map(({ label, unit, cu, tot, formula }, i) => (
+                    <tr key={label} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
+                      <td style={{ ...tdStyle, fontWeight: "600" }}>{label}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", color: "#64748b" }}>{unit}</td>
+                      <td style={{ ...tdStyle, color: "#64748b", fontSize: "9px" }}>{formula}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold" }}>{cu}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1d4ed8" }}>{tot}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <Firmas />
+          <FichaFooter
+            texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN SELLOS DE ANDÉN"
+            numero={numero}
+            fecha={fmtDate(new Date().toISOString())}
+          />
+        </div>
     </FichaImpresionShell>
   );
 }

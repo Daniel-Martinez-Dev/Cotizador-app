@@ -1,16 +1,19 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { calcularAbrigo } from "../modules/produccion/abrigos/calcular.js";
+import { FaEdit, FaTrash, FaTimes } from "react-icons/fa";
+import { calcularAbrigoRetractil } from "../modules/produccion/abrigo-retractil/calcular.js";
 import {
-  crearFichaAbrigo,
-  listarFichasAbrigos,
-  actualizarFichaAbrigo,
-} from "../utils/firebaseAbrigos";
-import FichaImpresionAbrigo from "./FichaImpresionAbrigo";
+  crearFichaAbrigoRetractil,
+  listarFichasAbrigoRetractil,
+  actualizarFichaAbrigoRetractil,
+  eliminarFichaAbrigoRetractil,
+} from "../utils/firebaseAbrigoRetractil";
+import FichaImpresionAbrigoRetractil from "./FichaImpresionAbrigoRetractil";
 import { fmtMm, fmtM2, fmtDec, fmtN } from "../utils/fichaFormat";
 import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoActions from "./fichas/EstadoActions";
+import { useQuote } from "../context/QuoteContext";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -23,7 +26,7 @@ const genOP = () => {
   const dd = String(now.getDate()).padStart(2, "0");
   const hh = String(now.getHours()).padStart(2, "0");
   const mi = String(now.getMinutes()).padStart(2, "0");
-  return `AP-${yy}${mm}${dd}-${hh}${mi}`;
+  return `AR-${yy}${mm}${dd}-${hh}${mi}`;
 };
 
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
@@ -39,7 +42,7 @@ const INITIAL_FORM = {
   auxiliarEncargado: "TODOS",
   ancho:             "",
   alto:              "",
-  casas:             910,
+  travesanos:        910,
   color:             "NEGRO",
   acabado:           "PINTADO",
   llevaBanda:        true,
@@ -47,20 +50,23 @@ const INITIAL_FORM = {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function AbrigoAndenFicha() {
+export default function AbrigoRetractilFicha() {
+  const { confirm } = useQuote();
   const [form, setForm]             = React.useState(INITIAL_FORM);
   const [fichas, setFichas]         = React.useState([]);
   const [loading, setLoading]       = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(null);
   const [printFicha, setPrintFicha] = React.useState(null);
+  const [editingId, setEditingId]   = React.useState(null);
+  const formRef = React.useRef(null);
 
   // ── Cálculo reactivo ─────────────────────────────────────────────────────
 
   const calculo = React.useMemo(
-    () => calcularAbrigo(form),
+    () => calcularAbrigoRetractil(form),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [form.ancho, form.alto, form.casas, form.cantidad, form.llevaBanda, form.fechaOrden]
+    [form.ancho, form.alto, form.travesanos, form.cantidad, form.llevaBanda, form.fechaOrden]
   );
 
   // Sincroniza fechaEntrega calculada cuando cambian ancho/alto/cantidad/fechaOrden
@@ -77,7 +83,7 @@ export default function AbrigoAndenFicha() {
   const loadFichas = React.useCallback(async () => {
     setLoading(true);
     try {
-      setFichas(await listarFichasAbrigos());
+      setFichas(await listarFichasAbrigoRetractil());
     } catch (e) {
       console.error(e);
       toast.error("Error cargando fichas");
@@ -105,17 +111,28 @@ export default function AbrigoAndenFicha() {
 
     setSaving(true);
     try {
-      await crearFichaAbrigo(
-        { ...form, ancho: Number(form.ancho), alto: Number(form.alto) },
-        calculo
-      );
-      toast.success("Ficha guardada");
+      const datos = { ...form, ancho: Number(form.ancho), alto: Number(form.alto) };
+      if (editingId) {
+        await actualizarFichaAbrigoRetractil(editingId, {
+          ...datos,
+          medidas:               calculo.medidas,
+          materiaPrimaPorAbrigo: calculo.materiaPrimaPorAbrigo,
+          materiaPrimaTotal:     calculo.materiaPrimaTotal,
+          alistamiento:          calculo.alistamiento,
+          despacho:              calculo.despacho,
+        });
+        toast.success("Ficha actualizada");
+        setEditingId(null);
+      } else {
+        await crearFichaAbrigoRetractil(datos, calculo);
+        toast.success("Ficha guardada");
+      }
       setForm({ ...INITIAL_FORM, numeroOP: genOP() });
       setFechaManual(false);
       await loadFichas();
     } catch (err) {
       console.error(err);
-      toast.error("Error guardando ficha");
+      toast.error(editingId ? "Error actualizando ficha" : "Error guardando ficha");
     } finally {
       setSaving(false);
     }
@@ -123,12 +140,54 @@ export default function AbrigoAndenFicha() {
 
   const cambiarEstado = async (id, estado) => {
     try {
-      await actualizarFichaAbrigo(id, { estado });
+      await actualizarFichaAbrigoRetractil(id, { estado });
       toast.success(`Estado → ${ESTADO_LABEL[estado] || estado}`);
       setFichas((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
     } catch (err) {
       console.error(err);
       toast.error("Error actualizando estado");
+    }
+  };
+
+  const handleEditar = (f) => {
+    setForm({
+      numeroOP:          f.numeroOP || genOP(),
+      cliente:           f.cliente || "",
+      cantidad:          f.cantidad ?? 1,
+      fechaOrden:        f.fechaOrden || hoy(),
+      fechaEntrega:      f.fechaEntrega || "",
+      auxiliarEncargado: f.auxiliarEncargado || "TODOS",
+      ancho:             f.ancho ?? "",
+      alto:              f.alto ?? "",
+      travesanos:        f.travesanos ?? 910,
+      color:             f.color || "NEGRO",
+      acabado:           f.acabado || "PINTADO",
+      llevaBanda:        f.llevaBanda !== false,
+    });
+    setFechaManual(true);
+    setEditingId(f.id);
+    setSelectedId(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelarEdicion = () => {
+    setEditingId(null);
+    setForm({ ...INITIAL_FORM, numeroOP: genOP() });
+    setFechaManual(false);
+  };
+
+  const handleEliminar = async (f) => {
+    const ok = await confirm(`¿Eliminar la ficha de ${f.cliente || "este cliente"}? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    try {
+      await eliminarFichaAbrigoRetractil(f.id);
+      setFichas((prev) => prev.filter((x) => x.id !== f.id));
+      if (selectedId === f.id) setSelectedId(null);
+      if (editingId === f.id) cancelarEdicion();
+      toast.success("Ficha eliminada");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error eliminando ficha");
     }
   };
 
@@ -146,8 +205,8 @@ export default function AbrigoAndenFicha() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
         {/* FORMULARIO */}
-        <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
-          <div className="font-medium text-sm mb-4">Nueva ficha — Abrigo de Andén</div>
+        <section ref={formRef} className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
+          <div className="font-medium text-sm mb-4">{editingId ? "Editar ficha — Abrigo Retráctil" : "Nueva ficha — Abrigo Retráctil"}</div>
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Identificación */}
@@ -155,7 +214,7 @@ export default function AbrigoAndenFicha() {
               <div>
                 <label className={labelCls}>N° OP</label>
                 <input value={form.numeroOP} onChange={set("numeroOP")}
-                  className={`${inputCls} font-mono`} placeholder="AP-YYMMDD-HHMM" />
+                  className={`${inputCls} font-mono`} placeholder="AR-YYMMDD-HHMM" />
               </div>
               <div>
                 <label className={labelCls}>Cantidad</label>
@@ -191,7 +250,7 @@ export default function AbrigoAndenFicha() {
               <div className={sectionTitleCls}>Medidas del abrigo (mm)</div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className={labelCls}>Ancho</label>
+                  <label className={labelCls}>Ancho total</label>
                   <input type="number" min={1} value={form.ancho}
                     onChange={set("ancho")}
                     className={`${inputCls} font-mono`} placeholder="ej: 3500" />
@@ -203,9 +262,9 @@ export default function AbrigoAndenFicha() {
                     className={`${inputCls} font-mono`} placeholder="ej: 3600" />
                 </div>
                 <div>
-                  <label className={labelCls}>Casas (mm)</label>
-                  <input type="number" min={1} value={form.casas}
-                    onChange={setNum("casas")}
+                  <label className={labelCls}>Travesaños (mm)</label>
+                  <input type="number" min={1} value={form.travesanos}
+                    onChange={setNum("travesanos")}
                     className={`${inputCls} font-mono`} />
                 </div>
               </div>
@@ -239,10 +298,16 @@ export default function AbrigoAndenFicha() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-end gap-2 pt-1">
+              {editingId && (
+                <button type="button" onClick={cancelarEdicion}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 text-sm font-medium transition-colors">
+                  <FaTimes className="text-xs" /> Cancelar edición
+                </button>
+              )}
               <button type="submit" disabled={saving || !calculo}
                 className="px-5 py-2 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium transition-colors">
-                {saving ? "Guardando…" : "Guardar ficha"}
+                {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Guardar ficha"}
               </button>
             </div>
           </form>
@@ -273,9 +338,11 @@ export default function AbrigoAndenFicha() {
                   </thead>
                   <tbody>
                     {[
+                      ["Ancho luz (vano libre)", fmtMm(med.anchoLuz),       "—",                   "1"],
                       ["Lona perimetral",     fmtMm(med.loneaPerimetro),    "700",                 "1"],
                       ["Banda PVC lateral",   fmtMm(med.bandaLateralLargo), fmtMm(med.bandaLateralAncho), "2"],
                       ["Banda PVC superior",  fmtMm(med.bandaSuperiorLargo),fmtMm(med.bandaSuperiorAncho),"1"],
+                      ["Largueros",           fmtMm(med.largueroLargo),     "—",                   fmtN(med.largueroCantidad)],
                       ["Travesaños",          fmtMm(med.travesanoLargo),    "—",                   fmtN(med.travesanoCantidad)],
                       ["Casitas",             fmtMm(med.casitasLargo),      "—",                   fmtN(med.casitasCantidad)],
                       ["Mangueras (rollos)",  "6000",                       "—",                   fmtN(med.manguerasCantidad)],
@@ -385,7 +452,7 @@ export default function AbrigoAndenFicha() {
                   <th className="text-left py-2 font-medium pl-2">OP</th>
                   <th className="text-left py-2 font-medium">Cliente</th>
                   <th className="text-center py-2 font-medium">Ancho×Alto (mm)</th>
-                  <th className="text-center py-2 font-medium">Casas</th>
+                  <th className="text-center py-2 font-medium">Travesaños</th>
                   <th className="text-center py-2 font-medium">Cant.</th>
                   <th className="text-center py-2 font-medium">Estado</th>
                   <th className="text-left py-2 font-medium">Creada</th>
@@ -405,7 +472,7 @@ export default function AbrigoAndenFicha() {
                         <td className="py-2 font-mono pl-2 text-gray-500">{f.numeroOP || "—"}</td>
                         <td className="py-2 font-medium">{f.cliente || "—"}</td>
                         <td className="py-2 text-center font-mono">{f.ancho}×{f.alto}</td>
-                        <td className="py-2 text-center font-mono">{f.casas}</td>
+                        <td className="py-2 text-center font-mono">{f.travesanos}</td>
                         <td className="py-2 text-center">{f.cantidad}</td>
                         <td className="py-2 text-center">
                           <EstadoBadge estado={f.estado} />
@@ -416,23 +483,41 @@ export default function AbrigoAndenFicha() {
                             : "—"}
                         </td>
                         <td className="py-2 pl-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setPrintFicha({ ficha: f, numero }); }}
-                            className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap"
-                          >
-                            Ver ficha
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPrintFicha({ ficha: f, numero }); }}
+                              className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap"
+                            >
+                              Ver ficha
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEditar(f); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                              title="Editar ficha"
+                            >
+                              <FaEdit className="text-[11px]" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEliminar(f); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                              title="Eliminar ficha"
+                            >
+                              <FaTrash className="text-[11px]" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
 
                       {selectedId === f.id && (
                         <tr className="border-b border-gray-200 dark:border-gris-700">
                           <td colSpan={9} className="py-3 px-2">
-                            <FichaDetalleAbrigo
+                            <FichaDetalleAbrigoRetractil
                               ficha={f}
                               numero={numero}
                               onCambiarEstado={cambiarEstado}
                               onVerFicha={() => setPrintFicha({ ficha: f, numero })}
+                              onEditar={() => handleEditar(f)}
+                              onEliminar={() => handleEliminar(f)}
                             />
                           </td>
                         </tr>
@@ -447,7 +532,7 @@ export default function AbrigoAndenFicha() {
       </section>
 
       {printFicha && (
-        <FichaImpresionAbrigo
+        <FichaImpresionAbrigoRetractil
           ficha={printFicha.ficha}
           numero={printFicha.numero}
           onClose={() => setPrintFicha(null)}
@@ -458,7 +543,7 @@ export default function AbrigoAndenFicha() {
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalleAbrigo({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
+function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar, onEliminar }) {
   const med  = f.medidas               || {};
   const mp   = f.materiaPrimaPorAbrigo || {};
   const mpt  = f.materiaPrimaTotal     || {};
@@ -466,12 +551,13 @@ function FichaDetalleAbrigo({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
   const cant = Number(f.cantidad)      || 1;
 
   const tarjetas = [
-    { label: "Lona perimetral",   val: `${fmtMm(med.loneaPerimetro)} × 700`,           color: "#1a3f8f" },
-    { label: "Banda lateral ×2",  val: `800 × ${fmtMm(med.bandaLateralLargo)}`,         color: "#0891b2" },
-    { label: "Banda superior ×1", val: `1600 × ${fmtMm(med.bandaSuperiorLargo)}`,       color: "#0d9488" },
-    { label: "Travesaños ×4",     val: `${fmtMm(med.travesanoLargo)} mm`,               color: "#7c3aed" },
-    { label: "Casitas ×2",        val: `${fmtMm(med.casitasLargo)} mm`,                 color: "#d97706" },
-    { label: "Mangueras",         val: `${fmtN(med.manguerasCantidad)} rollos 6000 mm`, color: "#059669" },
+    { label: "Lona perimetral",   val: `${fmtMm(med.loneaPerimetro)} × 700`,                          color: "#1a3f8f" },
+    { label: "Banda lateral ×2",  val: `${fmtMm(med.bandaLateralAncho)} × ${fmtMm(med.bandaLateralLargo)}`,  color: "#0891b2" },
+    { label: "Banda superior ×1", val: `${fmtMm(med.bandaSuperiorAncho)} × ${fmtMm(med.bandaSuperiorLargo)}`, color: "#0d9488" },
+    { label: `Largueros ×${fmtN(med.largueroCantidad)}`,  val: `${fmtMm(med.largueroLargo)} mm`,       color: "#be123c" },
+    { label: `Travesaños ×${fmtN(med.travesanoCantidad)}`, val: `${fmtMm(med.travesanoLargo)} mm`,     color: "#7c3aed" },
+    { label: `Casitas ×${fmtN(med.casitasCantidad)}`,      val: `${fmtMm(med.casitasLargo)} mm`,       color: "#d97706" },
+    { label: "Mangueras",         val: `${fmtN(med.manguerasCantidad)} rollos 6000 mm`,                color: "#059669" },
   ];
 
   return (
@@ -482,13 +568,23 @@ function FichaDetalleAbrigo({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
             {f.cliente || "Sin cliente"}
           </span>
           <span className="ml-2 text-gray-400 font-mono">
-            {f.ancho}×{f.alto} mm · ×{f.cantidad} und · casas {f.casas} mm
+            {f.ancho}×{f.alto} mm · ×{f.cantidad} und · travesaños {f.travesanos} mm
           </span>
         </div>
-        <button onClick={onVerFicha}
-          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
-          Ver ficha
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={onVerFicha}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
+            Ver ficha
+          </button>
+          <button onClick={onEditar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 text-xs font-medium">
+            <FaEdit className="text-[11px]" /> Editar
+          </button>
+          <button onClick={onEliminar}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-medium">
+            <FaTrash className="text-[11px]" /> Eliminar
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de medidas */}
@@ -531,4 +627,3 @@ function FichaDetalleAbrigo({ ficha: f, numero, onCambiarEstado, onVerFicha }) {
     </div>
   );
 }
-

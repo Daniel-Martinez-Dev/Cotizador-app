@@ -2,6 +2,7 @@ import { db, waitForAuth } from "../firebase";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -58,6 +59,7 @@ export async function crearFichaDivision(input, calculo) {
     alturaPlatinas: input.platinas === "SI" ? Number(input.alturaPlatinas || 0) : null,
     factura:       input.factura  || "SI",
     colorLona:     input.colorLona || "NEGRO",
+    adicional:     (input.adicional || "").trim(),
     medidas:       calculo.medidas,
     tipoIcopor:    calculo.tipoIcopor,
     consumo:       calculo.consumo,
@@ -85,6 +87,11 @@ export async function obtenerFichaDivision(id) {
 export async function actualizarFichaDivision(id, data) {
   await waitForAuth();
   await updateDoc(doc(db, FICHAS_COL, id), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function eliminarFichaDivision(id) {
+  await waitForAuth();
+  await deleteDoc(doc(db, FICHAS_COL, id));
 }
 
 // ─── Catálogo de insumos con precios de compra ────────────────────────────────

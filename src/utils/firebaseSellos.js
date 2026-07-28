@@ -2,6 +2,7 @@ import { db, waitForAuth } from "../firebase";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -67,4 +68,9 @@ export async function obtenerFichaSello(id) {
 export async function actualizarFichaSello(id, data) {
   await waitForAuth();
   await updateDoc(doc(db, FICHAS_COL, id), { ...data, updatedAt: serverTimestamp() });
+}
+
+export async function eliminarFichaSello(id) {
+  await waitForAuth();
+  await deleteDoc(doc(db, FICHAS_COL, id));
 }
