@@ -8,6 +8,21 @@ import { MedidaCard, InfoChip, AcabadoCard, SectionTitle, MedidaHero, Membrete, 
 // que formatea un área en m² ya calculada.
 const toM = (mm) => (mm == null ? "—" : (Math.round(Number(mm) / 10) / 100).toFixed(2));
 
+// Fichas antiguas guardaron una sola `alturaPlatinas` (número); las nuevas
+// guardan `alturasPlatinas` (arreglo), para permitir varias líneas de altura.
+function getAlturasPlatinas(f) {
+  if (Array.isArray(f.alturasPlatinas) && f.alturasPlatinas.length) return f.alturasPlatinas;
+  if (f.alturaPlatinas) return [f.alturaPlatinas];
+  return [];
+}
+
+function formatPlatinas(f) {
+  if (f.platinas !== "SI") return "NO";
+  const alturas = getAlturasPlatinas(f);
+  const alturasTxt = alturas.length ? alturas.map((h) => fmtMm(h)).join(" / ") + " mm" : "—";
+  return `SI · ${alturasTxt}${f.reatasRiel === "SI" ? " · Reatas riel" : ""}`;
+}
+
 // ── Plano técnico (SVG 2D vista frontal) ──────────────────────────────────────
 // La división se arma con dos paneles del mismo tamaño lado a lado (ver
 // calcularMedidas en utils/divisionTermica.js: anchoPanel = (anchoVehiculo+40)/2),
@@ -107,7 +122,7 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
   const pernosX = (panelX0) => Array.from({ length: pernosPorPanel }, (_, i) => panelX0 + pernoMargin + i * pernoStep);
 
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", maxWidth: "640px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <defs>
         <marker id="arrDivA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L6,3 L0,6 Z" fill="#555" />
@@ -229,72 +244,75 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
       numero={numero}
       cliente={f.cliente}
       onClose={onClose}
-      maxWidthClass="max-w-4xl"
-      windowSize={{ width: 1050, height: 900 }}
+      maxWidthClass="max-w-[1220px]"
+      windowSize={{ width: 1300, height: 840 }}
     >
         <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — División Térmica"
             numero={f.ordenProduccion ?? numero}
+            numeroLabel="N.° de ficha"
           />
 
-          {/* ── Información general ── */}
-          <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+          {/* ── Identificación + medidas (izquierda) / Plano + acabados (derecha) ── */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "0.86fr 1.14fr", gap: "16px",
+            padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0",
+          }}>
 
-            {/* Medida del vehículo — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
-            <MedidaHero
-              label="Medida del Vehículo"
-              ancho={f.anchoVehiculo}
-              alto={f.altoVehiculo}
-              extra={
-                <span style={{ color: "#7dd3fc", fontSize: "14px", fontWeight: "bold", fontFamily: "monospace" }}>
-                  {toM(f.anchoVehiculo)} × {toM(f.altoVehiculo)} m
-                </span>
-              }
-            />
+            {/* Columna izquierda — identificación + medidas de corte */}
+            <div>
+              {/* Medida del vehículo — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
+              <MedidaHero
+                label="Medida del Vehículo"
+                ancho={f.anchoVehiculo}
+                alto={f.altoVehiculo}
+                extra={
+                  <span style={{ color: "#7dd3fc", fontSize: "14px", fontWeight: "bold", fontFamily: "monospace" }}>
+                    {toM(f.anchoVehiculo)} × {toM(f.altoVehiculo)} m
+                  </span>
+                }
+              />
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                </div>
+
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                  <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>unidades</div>
+                </div>
               </div>
 
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>unidades</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
+                <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} />
+                <InfoChip label="N.° de ficha"    value={f.numeroFicha || "—"} />
+                <InfoChip label="Agujero"         value={f.agujero || "—"} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                <InfoChip label="Fecha orden"   value={f.fechaOrden   ? new Date(f.fechaOrden).toLocaleDateString("es-CO")   : "—"} />
+                <InfoChip label="Fecha entrega" value={f.fechaEntrega ? new Date(f.fechaEntrega).toLocaleDateString("es-CO") : "—"} highlight={!!f.fechaEntrega} />
+                <InfoChip label="Placa"         value={f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : "NO"} highlight={f.placa === "SI"} />
+              </div>
+
+              <SectionTitle size="10px">Medidas de Corte</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                <MedidaCard label="Panel"                  ancho={med.panel?.ancho}          alto={med.panel?.alto}          color="#1a3f8f" />
+                <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0f6cbf" />
+                <MedidaCard label="Funda"                  ancho={med.funda?.ancho}          alto={med.funda?.alto}          color="#0891b2" />
+                <MedidaCard label="Policarb. / Cartonplast" ancho={med.policarbonato?.ancho} alto={med.policarbonato?.alto}  color="#0d9488" />
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
-              <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} />
-              <InfoChip label="N.° de ficha"    value={f.numeroFicha || "—"} />
-              <InfoChip label="Agujero"         value={f.agujero || "—"} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-              <InfoChip label="Fecha orden"   value={f.fechaOrden   ? new Date(f.fechaOrden).toLocaleDateString("es-CO")   : "—"} />
-              <InfoChip label="Fecha entrega" value={f.fechaEntrega ? new Date(f.fechaEntrega).toLocaleDateString("es-CO") : "—"} highlight={!!f.fechaEntrega} />
-              <InfoChip label="Placa"         value={f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : "NO"} highlight={f.placa === "SI"} />
-            </div>
-          </div>
-
-          {/* ── Medidas de corte ── */}
-          <div style={{ padding: "10px 20px" }}>
-            <SectionTitle>Medidas de Corte</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "8px" }}>
-              <MedidaCard label="Panel"                  ancho={med.panel?.ancho}          alto={med.panel?.alto}          color="#1a3f8f" />
-              <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0f6cbf" />
-              <MedidaCard label="Funda"                  ancho={med.funda?.ancho}          alto={med.funda?.alto}          color="#0891b2" />
-              <MedidaCard label="Policarb. / Cartonplast" ancho={med.policarbonato?.ancho} alto={med.policarbonato?.alto}  color="#0d9488" />
-            </div>
-
-            {/* Plano técnico + Opciones y Acabados, lado a lado para aprovechar el
-                espacio que el plano deja libre a los costados. */}
-            <div style={{ display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
+            {/* Columna derecha — plano técnico + opciones/acabados + lona/piso/ventana */}
+            <div>
               {med.panel && med.icopor && (
                 <div style={{
-                  flex: "2 1 340px", border: "1px solid #ccc", borderRadius: "8px", padding: "4px",
+                  border: "1px solid #ccc", borderRadius: "8px", padding: "4px",
                   background: "#fafafa", display: "flex", justifyContent: "center", alignItems: "center",
                 }}>
                   <PlanoTecnicoDivision
@@ -308,70 +326,80 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                   />
                 </div>
               )}
-              <div style={{
-                flex: "1 1 200px", background: "#eff6ff", border: "1px solid #dbeafe",
-                borderRadius: "8px", padding: "9px 10px",
-              }}>
+
+              <div style={{ marginTop: "8px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
                 <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Logo"     value={f.logo || "NO"} color="#1a3f8f" active={f.logo !== "NO" && !!f.logo} />
-                  <AcabadoCard label="Platinas" value={f.platinas === "SI" ? `SI · ${f.alturaPlatinas ? fmtMm(f.alturaPlatinas) + " mm" : "—"}` : "NO"} color="#d97706" active={f.platinas === "SI"} />
+                  <AcabadoCard label="Platinas" value={formatPlatinas(f)} color="#d97706" active={f.platinas === "SI"} />
                   <AcabadoCard label="Espuma"   value="8 CAB / 4+4 LAT" color="#0d9488" active />
                   <AcabadoCard label="Factura"  value={f.factura || "NO"} color="#16a34a" active={f.factura === "SI"} />
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* ── Lona + Piso ── */}
-          <div style={{ padding: "0 20px 10px", display: "grid", gridTemplateColumns: "3fr 2fr", gap: "8px" }}>
+              {/* Lona + Piso + Ventana */}
+              <div style={{ marginTop: "8px", display: "grid", gridTemplateColumns: "3fr 2fr", gap: "8px" }}>
 
-            {/* Lona */}
-            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
-              <div style={{ fontSize: "9px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
-                Distribución de Lona
-                <span style={{ fontWeight: "normal", color: "#64748b", marginLeft: "6px" }}>
-                  Rollo {med.lona?.anchoRollo ?? "—"} mm — Color: {f.colorLona || "—"}
-                </span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-                {[
-                  ["Tiras",        med.lona?.tiras,          ""],
-                  ["Largo tira",   med.lona?.largoTira,      "mm"],
-                  ["Sobrante",     med.lona?.sobranteAncho,  "mm"],
-                ].map(([lbl, val, unit]) => (
-                  <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
-                    <div style={{ fontSize: lbl === "Tiras" ? "20px" : "15px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>
-                      {val ?? "—"}
-                    </div>
-                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
+                {/* Lona */}
+                <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
+                  <div style={{ fontSize: "9px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+                    Distribución de Lona
+                    <span style={{ fontWeight: "normal", color: "#64748b", marginLeft: "6px" }}>
+                      Rollo {med.lona?.anchoRollo ?? "—"} mm — Color: {f.colorLona || "—"}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Piso y ventana */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                <div style={{ fontSize: "8px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#15803d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>mm</div>
-              </div>
-              <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                <div style={{ fontSize: "8px", color: "#ca8a04", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#92400e", lineHeight: 1 }}>
-                  {med.distanciaVentana != null ? fmt1(med.distanciaVentana) : "—"}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+                    {[
+                      ["Tiras",        med.lona?.tiras,          ""],
+                      ["Largo tira",   med.lona?.largoTira,      "mm"],
+                      ["Sobrante",     med.lona?.sobranteAncho,  "mm"],
+                    ].map(([lbl, val, unit]) => (
+                      <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
+                        <div style={{ fontSize: lbl === "Tiras" ? "20px" : "15px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>
+                          {val ?? "—"}
+                        </div>
+                        <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>cm</div>
+
+                {/* Piso y ventana */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
+                    <div style={{ fontSize: "8px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
+                    <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#15803d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
+                    <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>mm</div>
+                  </div>
+                  <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
+                    <div style={{ fontSize: "8px", color: "#ca8a04", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
+                    <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#92400e", lineHeight: 1 }}>
+                      {med.distanciaVentana != null ? fmt1(med.distanciaVentana) : "—"}
+                    </div>
+                    <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>cm</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* ── Adicional / Notas ── */}
+          {f.adicional && (
+            <div style={{ padding: "0 20px 8px" }}>
+              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
+                <div style={{ fontSize: "8px", color: "#ea580c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
+                  Adicional / Notas
+                </div>
+                <div style={{ fontSize: "11px", color: "#1a1a2e" }}>{f.adicional}</div>
+              </div>
+            </div>
+          )}
 
           {/* ── Consumo de materiales ── */}
           {consumoVisible.length > 0 && (
             <div style={{ padding: "10px 20px 8px" }}>
               <SectionTitle>Consumo de Materiales (por unidad)</SectionTitle>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px" }}>
                 {consumoVisible.map((c) => (
                   <div key={c.insumo} style={{
                     background: "#f8fafc", border: "1px solid #e2e8f0",
@@ -386,18 +414,6 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Adicional / Notas ── */}
-          {f.adicional && (
-            <div style={{ padding: "0 20px 8px" }}>
-              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#ea580c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
-                  Adicional / Notas
-                </div>
-                <div style={{ fontSize: "11px", color: "#1a1a2e" }}>{f.adicional}</div>
               </div>
             </div>
           )}

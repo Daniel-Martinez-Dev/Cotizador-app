@@ -108,8 +108,8 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
       numero={numero}
       cliente={f.cliente}
       onClose={onClose}
-      maxWidthClass="max-w-5xl"
-      windowSize={{ width: 1120, height: 980 }}
+      maxWidthClass="max-w-[1220px]"
+      windowSize={{ width: 1300, height: 840 }}
     >
         <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
           <Membrete
@@ -120,86 +120,87 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
             subtitulo="Todas las dimensiones en milímetros"
           />
 
-          {/* ── Información general ── */}
-          <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+          {/* ── Identificación + medidas (izquierda) / Plano + acabados (derecha) ── */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "0.86fr 1.14fr", gap: "16px",
+            padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0",
+          }}>
 
-            {/* Medidas del abrigo — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
-            <MedidaHero
-              label="Medidas del Abrigo"
-              ancho={f.ancho}
-              alto={f.alto}
-              extra={
-                <span style={{ color: "#7dd3fc", fontSize: "12px", fontWeight: "bold", fontFamily: "monospace" }}>
-                  Travesaños: {fmtMm(f.travesanos)} mm
-                </span>
-              }
-            />
+            {/* Columna izquierda — identificación + medidas de fabricación */}
+            <div>
+              {/* Medidas del abrigo — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
+              <MedidaHero
+                label="Medidas del Abrigo"
+                ancho={f.ancho}
+                alto={f.alto}
+                extra={
+                  <span style={{ color: "#7dd3fc", fontSize: "12px", fontWeight: "bold", fontFamily: "monospace" }}>
+                    Travesaños: {fmtMm(f.travesanos)} mm
+                  </span>
+                }
+              />
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
-              </div>
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>abrigos</div>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
-              <InfoChip label="Orden de producción" value={f.numeroOP || "—"} />
-              <InfoChip label="Auxiliar encargado"   value={f.auxiliarEncargado || "TODOS"} />
-              <InfoChip label="Color / Acabado"      value={f.acabado === "GALVANIZADO" ? "GALVANIZADO" : `${f.color || "NEGRO"} / PINTADO`} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
-              <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
-              <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
-            </div>
-          </div>
-
-          {/* ── Medidas de fabricación ── */}
-          <div style={{ padding: "10px 20px" }}>
-            <SectionTitle>Medidas de Fabricación</SectionTitle>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "8px" }}>
-              <MedidaCard label="Lona perimetral" ancho={med.loneaPerimetro} alto={700} color="#1a3f8f" dimLabels={["Largo", "Ancho rollo"]} />
-              {llevaBanda && (
-                <>
-                  <MedidaCard label="Banda PVC lateral ×2" ancho={med.bandaLateralAncho}  alto={med.bandaLateralLargo}  color="#0f6cbf" dimLabels={["Ancho", "Largo"]} />
-                  <MedidaCard label="Banda PVC superior"   ancho={med.bandaSuperiorAncho} alto={med.bandaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
-                </>
-              )}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "10px" }}>
-              {[
-                { label: `Largueros ×${fmtN(med.largueroCantidad)}`,   val: fmtMm(med.largueroLargo),        unit: "mm",     color: "#be123c", bg: "#fff1f2", border: "#fecdd3" },
-                { label: `Travesaños ×${fmtN(med.travesanoCantidad)}`, val: fmtMm(med.travesanoLargo),       unit: "mm",     color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
-                { label: `Casitas ×${fmtN(med.casitasCantidad)}`,       val: fmtMm(med.casitasLargo),         unit: "mm",     color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
-                { label: "Mangueras (rollos de 6000 mm)",                val: fmtN(med.manguerasCantidad),     unit: "rollos", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
-              ].map(({ label, val, unit, color, bg, border }) => (
-                <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "8px", padding: "8px 9px", textAlign: "center" }}>
-                  <div style={{ fontSize: "8px", color, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>{label}</div>
-                  <div style={{ fontSize: "18px", fontWeight: "bold", fontFamily: "monospace", color, lineHeight: 1 }}>{val}</div>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "2px" }}>{unit}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
                 </div>
-              ))}
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                  <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>abrigos</div>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
+                <InfoChip label="Orden de producción" value={f.numeroOP || "—"} />
+                <InfoChip label="Auxiliar encargado"   value={f.auxiliarEncargado || "TODOS"} />
+                <InfoChip label="Color / Acabado"      value={f.acabado === "GALVANIZADO" ? "GALVANIZADO" : `${f.color || "NEGRO"} / PINTADO`} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
+                <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
+              </div>
+
+              <SectionTitle size="10px">Medidas de Fabricación</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "8px" }}>
+                <MedidaCard label="Lona perimetral" ancho={med.loneaPerimetro} alto={700} color="#1a3f8f" dimLabels={["Largo", "Ancho rollo"]} />
+                {llevaBanda && (
+                  <>
+                    <MedidaCard label="Banda PVC lateral ×2" ancho={med.bandaLateralAncho}  alto={med.bandaLateralLargo}  color="#0f6cbf" dimLabels={["Ancho", "Largo"]} />
+                    <MedidaCard label="Banda PVC superior"   ancho={med.bandaSuperiorAncho} alto={med.bandaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                {[
+                  { label: `Largueros ×${fmtN(med.largueroCantidad)}`,   val: fmtMm(med.largueroLargo),        unit: "mm",     color: "#be123c", bg: "#fff1f2", border: "#fecdd3" },
+                  { label: `Travesaños ×${fmtN(med.travesanoCantidad)}`, val: fmtMm(med.travesanoLargo),       unit: "mm",     color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+                  { label: `Casitas ×${fmtN(med.casitasCantidad)}`,       val: fmtMm(med.casitasLargo),         unit: "mm",     color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+                  { label: "Mangueras (rollos de 6000 mm)",                val: fmtN(med.manguerasCantidad),     unit: "rollos", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
+                ].map(({ label, val, unit, color, bg, border }) => (
+                  <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "8px", padding: "8px 9px", textAlign: "center" }}>
+                    <div style={{ fontSize: "8px", color, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>{label}</div>
+                    <div style={{ fontSize: "18px", fontWeight: "bold", fontFamily: "monospace", color, lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "2px" }}>{unit}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Plano técnico + Opciones y Acabados, lado a lado para aprovechar el
-                espacio que el plano deja libre a los costados. */}
-            <div style={{ display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
+            {/* Columna derecha — plano técnico + opciones/acabados */}
+            <div>
               <div style={{
-                flex: "3 1 360px", border: "1px solid #ccc", borderRadius: "8px", padding: "8px",
+                border: "1px solid #ccc", borderRadius: "8px", padding: "8px",
                 background: "#fafafa", display: "flex", justifyContent: "center", alignItems: "center",
               }}>
                 <PlanoTecnico ancho={f.ancho} alto={f.alto} anchoLuz={med.anchoLuz} bandaLateralAncho={med.bandaLateralAncho} />
               </div>
 
-              <div style={{ flex: "1 1 200px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px", display: "flex", flexDirection: "column" }}>
+              <div style={{ marginTop: "8px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
                 <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Color"     value={f.color || "NEGRO"} color="#1a3f8f" active />
                   <AcabadoCard label="Acabado"   value={f.acabado || "PINTADO"} color="#0f6cbf" active />
                   <AcabadoCard label="Banda PVC" value={llevaBanda ? "SÍ" : "NO"} color="#059669" active={llevaBanda} />

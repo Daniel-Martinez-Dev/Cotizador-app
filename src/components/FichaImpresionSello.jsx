@@ -33,7 +33,7 @@ function DiagramaSelloFrente({ anchoVano, altoVano, selloAncho, selloAlto, espes
   const stripeW = 7, stripeInset = 7;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto", maxWidth: W }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", width: "100%", height: "auto", maxWidth: 480, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <defs>
         <marker id="arrSF" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
           <path d="M0,0 L6,3 L0,6 Z" fill={dim} />
@@ -125,8 +125,8 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
       numero={numero}
       cliente={f.cliente}
       onClose={onClose}
-      maxWidthClass="max-w-5xl"
-      windowSize={{ width: 1120, height: 980 }}
+      maxWidthClass="max-w-[1220px]"
+      windowSize={{ width: 1300, height: 840 }}
     >
         <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
           <Membrete
@@ -137,74 +137,75 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             subtitulo="Todas las dimensiones en milímetros y lona 750K"
           />
 
-          {/* ── Información general ── */}
-          <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+          {/* ── Identificación + medidas (izquierda) / Diagrama + acabados (derecha) ── */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "0.86fr 1.14fr", gap: "16px",
+            padding: "10px 20px", background: "#f8fafc", borderBottom: "2px solid #e2e8f0",
+          }}>
 
-            {/* Medida del vano — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
-            <MedidaHero label="Medida del Vano" ancho={f.anchoVano} alto={f.altoVano} />
+            {/* Columna izquierda — identificación + medidas de fabricación */}
+            <div>
+              {/* Medida del vano — máxima prioridad visual, es la medida de entrada de todo el cálculo */}
+              <MedidaHero label="Medida del Vano" ancho={f.anchoVano} alto={f.altoVano} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                </div>
+                <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                  <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>sellos</div>
+                </div>
               </div>
-              <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>sellos</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
+                <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
+              </div>
+
+              <SectionTitle size="10px">Medidas de Fabricación</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                <MedidaCard label="Sello principal"  ancho={med.selloAncho}        alto={med.selloAlto}         color="#1a3f8f" />
+                <MedidaCard label="Espuma postes"    ancho={med.espumaPostesAncho} alto={med.espumaPostesAlto}  color="#0f6cbf" />
+                <MedidaCard label="Tapa superior"    ancho={med.tapaSuperiorAncho} alto={med.tapaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
+                <MedidaCard label="Tapa inferior"    ancho={med.tapaInferiorAncho} alto={med.tapaInferiorLargo} color="#0d9488" dimLabels={["Ancho", "Largo"]} />
+                <MedidaCard label="Forros / chaleco" ancho={med.forroAncho}        alto={med.forroLargo}        color="#7c3aed" dimLabels={["Ancho", "Largo"]} />
+                {f.llevaCortina && (
+                  <MedidaCard label="Cortina" ancho={med.cortinaAncho} alto={med.cortinaLargoLona} color="#059669" dimLabels={["Largo", "Ancho rollo"]} />
+                )}
+                {f.llevaTravesano && (
+                  <MedidaCard label="Travesaño" ancho={med.travesanoAncho} alto={med.travesanoLargoLona} color="#d97706" dimLabels={["Largo", "Largo lona"]} />
+                )}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
-              <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
-              <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
-            </div>
-          </div>
+            {/* Columna derecha — diagrama del sello + opciones/acabados */}
+            <div>
+              <div style={{ border: "1px solid #ccc", borderRadius: "8px", padding: "4px", background: "#fafafa", display: "flex", justifyContent: "center" }}>
+                <DiagramaSelloFrente
+                  anchoVano={f.anchoVano}
+                  altoVano={f.altoVano}
+                  selloAncho={med.selloAncho}
+                  selloAlto={med.selloAlto}
+                  espesorSello={f.espesorSello}
+                  despliegueCortina={f.despliegueCortina || 800}
+                />
+              </div>
 
-          {/* ── Medidas de fabricación ── */}
-          <div style={{ padding: "10px 20px" }}>
-            <SectionTitle>Medidas de Fabricación</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
-              <MedidaCard label="Sello principal"  ancho={med.selloAncho}        alto={med.selloAlto}         color="#1a3f8f" />
-              <MedidaCard label="Espuma postes"    ancho={med.espumaPostesAncho} alto={med.espumaPostesAlto}  color="#0f6cbf" />
-              <MedidaCard label="Tapa superior"    ancho={med.tapaSuperiorAncho} alto={med.tapaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
-              <MedidaCard label="Tapa inferior"    ancho={med.tapaInferiorAncho} alto={med.tapaInferiorLargo} color="#0d9488" dimLabels={["Ancho", "Largo"]} />
-              <MedidaCard label="Forros / chaleco" ancho={med.forroAncho}        alto={med.forroLargo}        color="#7c3aed" dimLabels={["Ancho", "Largo"]} />
-              {f.llevaCortina && (
-                <MedidaCard label="Cortina" ancho={med.cortinaAncho} alto={med.cortinaLargoLona} color="#059669" dimLabels={["Largo", "Ancho rollo"]} />
-              )}
-              {f.llevaTravesano && (
-                <MedidaCard label="Travesaño" ancho={med.travesanoAncho} alto={med.travesanoLargoLona} color="#d97706" dimLabels={["Largo", "Largo lona"]} />
-              )}
-            </div>
-          </div>
-
-          {/* ── Diagramas + Opciones y Acabados, lado a lado para aprovechar el
-                espacio que los planos dejan libre a los costados. ── */}
-          <div style={{ padding: "0 20px 10px", display: "flex", gap: "10px", alignItems: "stretch", flexWrap: "wrap" }}>
-
-            <div style={{ flex: "2 1 320px", border: "1px solid #ccc", borderRadius: "8px", padding: "4px", background: "#fafafa", display: "flex", justifyContent: "center" }}>
-              <DiagramaSelloFrente
-                anchoVano={f.anchoVano}
-                altoVano={f.altoVano}
-                selloAncho={med.selloAncho}
-                selloAlto={med.selloAlto}
-                espesorSello={f.espesorSello}
-                despliegueCortina={f.despliegueCortina || 800}
-              />
-            </div>
-
-            <div style={{ flex: "1 1 220px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
-              <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
-                <AcabadoCard label="Material base"   value={f.materialBase || "MADERA"} color="#1a3f8f" active />
-                <AcabadoCard label="Cortina"          value={f.llevaCortina ? `SÍ · ${fmtMm(f.despliegueCortina)} mm` : "NO"} color="#059669" active={!!f.llevaCortina} />
-                <AcabadoCard label="Travesaño"        value={f.llevaTravesano ? "SÍ" : "NO"} color="#d97706" active={!!f.llevaTravesano} />
-                <AcabadoCard label="Factura"          value={f.fact || "SI"} color="#16a34a" active={f.fact === "SI"} />
-                <AcabadoCard label="Sello abrigo"     value={f.selloAbrigo || "NO"} color="#7c3aed" active={f.selloAbrigo === "SI"} />
-                <AcabadoCard label="Forma de cuña"    value={f.formaCuna || "NO"}   color="#be123c" active={f.formaCuna === "SI"} />
-                <AcabadoCard label="Espesores S/P/T"  value={`${fmtMm(f.espesorSello)}/${fmtMm(f.espesorPoste)}/${fmtMm(f.espesorTravesano)}`} color="#0891b2" active />
-                <AcabadoCard label="Bandas"           value={bandas || "—"} color="#334155" active={!!bandas} />
+              <div style={{ marginTop: "8px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
+                <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+                  <AcabadoCard label="Material base"   value={f.materialBase || "MADERA"} color="#1a3f8f" active />
+                  <AcabadoCard label="Cortina"          value={f.llevaCortina ? `SÍ · ${fmtMm(f.despliegueCortina)} mm` : "NO"} color="#059669" active={!!f.llevaCortina} />
+                  <AcabadoCard label="Travesaño"        value={f.llevaTravesano ? "SÍ" : "NO"} color="#d97706" active={!!f.llevaTravesano} />
+                  <AcabadoCard label="Factura"          value={f.fact || "SI"} color="#16a34a" active={f.fact === "SI"} />
+                  <AcabadoCard label="Sello abrigo"     value={f.selloAbrigo || "NO"} color="#7c3aed" active={f.selloAbrigo === "SI"} />
+                  <AcabadoCard label="Forma de cuña"    value={f.formaCuna || "NO"}   color="#be123c" active={f.formaCuna === "SI"} />
+                  <AcabadoCard label="Espesores S/P/T"  value={`${fmtMm(f.espesorSello)}/${fmtMm(f.espesorPoste)}/${fmtMm(f.espesorTravesano)}`} color="#0891b2" active />
+                  <AcabadoCard label="Bandas"           value={bandas || "—"} color="#334155" active={!!bandas} />
+                </div>
               </div>
             </div>
           </div>

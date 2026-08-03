@@ -95,7 +95,7 @@ export default function SelloAndenFicha() {
   const fichasFiltradas = React.useMemo(() => {
     const term = search.trim().toLowerCase();
     return fichas
-      .map((f, idx) => ({ f, numero: fichas.length - idx }))
+      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx) }))
       .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
       .filter(({ f }) => !term || (f.cliente || "").toLowerCase().includes(term));
   }, [fichas, search, estadoFiltro]);

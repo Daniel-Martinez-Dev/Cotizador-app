@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import { getNextOrdenProduccionGlobal } from "./firebaseConsecutivos";
 
 const FICHAS_COL = "fichas_sellos";
 
@@ -23,7 +24,9 @@ const toIso = (v) => {
 
 export async function crearFichaSello(input, calculo) {
   await waitForAuth();
+  const ordenProduccion = await getNextOrdenProduccionGlobal();
   const ref = await addDoc(collection(db, FICHAS_COL), {
+    ordenProduccion,
     cliente:          (input.cliente || "").trim(),
     cantidad:         Number(input.cantidad || 1),
     fechaOrden:       toIso(input.fechaOrden),
@@ -48,7 +51,7 @@ export async function crearFichaSello(input, calculo) {
     createdAt:        serverTimestamp(),
     updatedAt:        serverTimestamp(),
   });
-  return ref.id;
+  return { id: ref.id, ordenProduccion };
 }
 
 export async function listarFichasSellos({ max = 200 } = {}) {

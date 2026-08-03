@@ -461,7 +461,7 @@ export default function AbrigoRetractilFicha() {
               </thead>
               <tbody>
                 {fichas.map((f, idx) => {
-                  const numero = fichas.length - idx;
+                  const numero = f.ordenProduccion ?? (fichas.length - idx);
                   return (
                     <React.Fragment key={f.id}>
                       <tr

@@ -19,7 +19,12 @@ export const fmtCm = (n) => (n == null ? "—" : Number(n).toFixed(1));
 export const fmtDate = (s) => {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleDateString("es-CO");
+    // Las fechas "YYYY-MM-DD" (sin hora) las interpreta el motor de JS como
+    // medianoche UTC; en husos horarios detrás de UTC (Colombia, UTC-5) eso
+    // muestra el día anterior. Se construyen en hora local para evitarlo.
+    const m = typeof s === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
+    return d.toLocaleDateString("es-CO");
   } catch {
     return s;
   }

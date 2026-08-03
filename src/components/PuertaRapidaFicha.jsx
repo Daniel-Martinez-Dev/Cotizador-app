@@ -1,56 +1,61 @@
 import React from "react";
 import toast from "react-hot-toast";
 import {
-  FaTruck, FaSlidersH, FaIdCard, FaSearch, FaSyncAlt, FaEye,
+  FaRulerCombined, FaSlidersH, FaIdCard, FaSearch, FaSyncAlt, FaEye,
   FaChevronRight, FaLayerGroup, FaPauseCircle, FaIndustry, FaCheckCircle, FaInbox,
-  FaEdit, FaTrash, FaTimes, FaPlus,
+  FaEdit, FaTrash, FaTimes, FaPlus, FaBoxOpen,
 } from "react-icons/fa";
-import { calcularDesdeInput } from "../utils/divisionTermica";
+import { calcularPuertaRapida, calcularFechaEntrega } from "../modules/produccion/puertas-rapidas/calcular.js";
+import { PARAMETROS_PUERTA_RAPIDA } from "../modules/produccion/puertas-rapidas/parametros.js";
 import {
-  crearFichaDivision,
-  listarFichasDivision,
-  actualizarFichaDivision,
-  eliminarFichaDivision,
-} from "../utils/firebaseDivision";
-import FichaImpresionDivision from "./FichaImpresionDivision";
-import { fmtMm, fmtM2, fmtN, fmtCm } from "../utils/fichaFormat";
+  crearFichaPuertaRapida,
+  listarFichasPuertaRapida,
+  actualizarFichaPuertaRapida,
+  eliminarFichaPuertaRapida,
+} from "../utils/firebasePuertaRapida";
+import FichaImpresionPuertaRapida from "./FichaImpresionPuertaRapida";
+import { fmtMm, fmtM2, fmtN, fmtDate } from "../utils/fichaFormat";
 import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoActions from "./fichas/EstadoActions";
 import { useQuote } from "../context/QuoteContext";
 
 const OPCIONES = {
-  placa:     ["SI", "NO"],
-  logo:      ["COLD CHAIN", "CLIENTE", "NO"],
-  agujero:   ["SIN AGUJERO", "1 AGUJERO", "2 AGUJEROS", "4 AGUJEROS", "AGUJERO DIF MEDIDA"],
-  platinas:  ["SI", "NO"],
-  reatasRiel: ["SI", "NO"],
-  factura:   ["SI", "NO"],
   colorLona: ["NEGRO", "AZUL", "VERDE", "NARANJA", "GRIS", "OTRO"],
+  ladoMotor: ["IZQUIERDO", "DERECHO"],
+  siNo:      ["SI", "NO"],
 };
+
+const hoy = () => new Date().toISOString().slice(0, 10);
 
 const INITIAL_FORM = {
-  fechaOrden:        new Date().toISOString().slice(0, 10),
-  fechaEntrega:      "",
-  numeroOrdenCompra: "",
-  numeroFicha:       "",
-  cliente:           "",
-  cantidad:          1,
-  anchoVehiculo:     "",
-  altoVehiculo:      "",
-  placa:             "SI",
-  numeroPlaca:       "",
-  logo:              "COLD CHAIN",
-  agujero:           "1 AGUJERO",
-  platinas:          "NO",
-  alturasPlatinas:   [""],
-  reatasRiel:        "NO",
-  factura:           "SI",
-  colorLona:         "NEGRO",
-  adicional:         "",
+  cliente:               "",
+  cantidad:              1,
+  fechaOrden:            hoy(),
+  anchoVano:             "",
+  altoVano:              "",
+  colorLona:             "AZUL",
+  ladoMotor:             "IZQUIERDO",
+  exclusa:               "SI",
+  fct:                   "SI",
+  vinilo:                "SI",
+  distanciaCortavientos: PARAMETROS_PUERTA_RAPIDA.DISTANCIA_CORTAVIENTOS_DEFAULT_MM,
+  adicional:             "",
 };
 
+// Accesorios cuya cantidad no es numérica sino una casilla de validación
+// (lista desplegable de valores fijos, ej. capacidad del transformador/UPS).
+const ACCESORIOS_CON_OPCIONES = {
+  "TRANSFORMADOR / UPS": PARAMETROS_PUERTA_RAPIDA.TRANSFORMADOR_UPS_OPCIONES,
+};
+const conOpciones = (lista) =>
+  (lista || []).map((it) =>
+    ACCESORIOS_CON_OPCIONES[it.insumo] ? { ...it, opciones: ACCESORIOS_CON_OPCIONES[it.insumo] } : it
+  );
+
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
+// Variante sin margen superior, para filas repetidas sin label propio (p. ej. lista de empaque).
+const rowInputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
 const labelCls = "text-xs text-gray-600 dark:text-gray-300";
 
 function SectionLabel({ icon: Icon, children }) {
@@ -61,44 +66,52 @@ function SectionLabel({ icon: Icon, children }) {
   );
 }
 
-// Fichas antiguas guardaron una sola `alturaPlatinas` (número); las nuevas
-// guardan `alturasPlatinas` (arreglo), para permitir varias líneas de altura.
-function getAlturasPlatinas(f) {
-  if (Array.isArray(f.alturasPlatinas) && f.alturasPlatinas.length) return f.alturasPlatinas;
-  if (f.alturaPlatinas) return [f.alturaPlatinas];
-  return [];
-}
-
-function formatPlatinas(f) {
-  if (f.platinas !== "SI") return f.platinas || "—";
-  const alturas = getAlturasPlatinas(f);
-  const alturasTxt = alturas.length ? alturas.map((h) => fmtMm(h)).join(" / ") + " mm" : "—";
-  return `SI · ${alturasTxt}${f.reatasRiel === "SI" ? " · Reatas riel" : ""}`;
-}
-
-export default function DivisionTermicaFicha() {
+export default function PuertaRapidaFicha() {
   const { confirm } = useQuote();
   const [form, setForm]             = React.useState(INITIAL_FORM);
   const [fichas, setFichas]         = React.useState([]);
   const [loading, setLoading]       = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(null);
-  const [printFicha, setPrintFicha] = React.useState(null); // { ficha, numero }
-  const [search, setSearch] = React.useState("");
+  const [printFicha, setPrintFicha] = React.useState(null);
+  const [search, setSearch]         = React.useState("");
   const [estadoFiltro, setEstadoFiltro] = React.useState("todos");
   const [editingId, setEditingId]   = React.useState(null);
+  const [empaque, setEmpaque]       = React.useState([]);
   const formRef = React.useRef(null);
 
   const calculo = React.useMemo(
-    () => calcularDesdeInput(form),
+    () => calcularPuertaRapida(form),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [form.anchoVehiculo, form.altoVehiculo, form.platinas]
+    [form.anchoVano, form.altoVano, form.cantidad, form.distanciaCortavientos]
   );
 
-  const selectedFicha = React.useMemo(
-    () => fichas.find((f) => f.id === selectedId) || null,
-    [fichas, selectedId]
+  const fechaEntrega = React.useMemo(
+    () => calcularFechaEntrega(form.fechaOrden, form.cantidad),
+    [form.fechaOrden, form.cantidad]
   );
+
+  // Precarga la lista de empaque calculada a partir de las medidas, solo
+  // mientras el usuario no la haya llenado (manualmente o al editar una ficha
+  // existente) — así no se pisan ediciones manuales cuando cambian medidas.
+  React.useEffect(() => {
+    if (!calculo) return;
+    setEmpaque((prev) => (prev.length === 0 ? conOpciones(calculo.empaque) : prev));
+  }, [calculo]);
+
+  const handleRecalcularEmpaque = () => {
+    if (!calculo) return;
+    setEmpaque(conOpciones(calculo.empaque));
+  };
+
+  const updateEmpaqueField = (idx, field, value) =>
+    setEmpaque((prev) => prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+
+  const addEmpaqueRow = () =>
+    setEmpaque((prev) => [...prev, { insumo: "", unidad: "und", cantidad: 1 }]);
+
+  const removeEmpaqueRow = (idx) =>
+    setEmpaque((prev) => prev.filter((_, i) => i !== idx));
 
   const stats = React.useMemo(() => ({
     total: fichas.length,
@@ -118,7 +131,7 @@ export default function DivisionTermicaFicha() {
   const loadFichas = React.useCallback(async () => {
     setLoading(true);
     try {
-      setFichas(await listarFichasDivision());
+      setFichas(await listarFichasPuertaRapida());
     } catch (e) {
       console.error(e);
       toast.error("Error cargando fichas");
@@ -131,49 +144,45 @@ export default function DivisionTermicaFicha() {
 
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
-  const addAlturaPlatina = () =>
-    setForm((p) => ({ ...p, alturasPlatinas: [...p.alturasPlatinas, ""] }));
-
-  const removeAlturaPlatina = (idx) =>
-    setForm((p) => ({ ...p, alturasPlatinas: p.alturasPlatinas.filter((_, i) => i !== idx) }));
-
-  const setAlturaPlatina = (idx, value) =>
-    setForm((p) => ({
-      ...p,
-      alturasPlatinas: p.alturasPlatinas.map((v, i) => (i === idx ? value : v)),
-    }));
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.anchoVehiculo || !form.altoVehiculo)
-      return toast.error("Ancho y alto son requeridos");
-    if (!calculo) return toast.error("Revisa las medidas (deben ser > 0)");
+    if (!form.anchoVano || !form.altoVano)
+      return toast.error("Ancho y alto del vano son requeridos");
+    if (Number(form.anchoVano) <= 0 || Number(form.altoVano) <= 0)
+      return toast.error("Las medidas deben ser mayores a 0");
+    if (!calculo) return toast.error("Revisa las medidas");
     setSaving(true);
     try {
-      const alturasPlatinas = form.platinas === "SI"
-        ? form.alturasPlatinas.map(Number).filter((n) => n > 0)
-        : [];
+      const empaqueLimpio = empaque
+        .filter((it) => (it.insumo || "").trim())
+        .map((it) => ({
+          insumo: it.insumo.trim(),
+          unidad: (it.unidad || "").trim(),
+          ...(it.texto !== undefined
+            ? { texto: it.texto, cantidad: null }
+            : { cantidad: Number(it.cantidad) || 0 }),
+        }));
       const datos = {
         ...form,
-        anchoVehiculo: Number(form.anchoVehiculo),
-        altoVehiculo: Number(form.altoVehiculo),
-        alturasPlatinas,
-        reatasRiel: form.platinas === "SI" ? form.reatasRiel : "NO",
+        anchoVano: Number(form.anchoVano),
+        altoVano:  Number(form.altoVano),
+        distanciaCortavientos: Number(form.distanciaCortavientos),
+        fechaEntrega,
       };
       if (editingId) {
-        await actualizarFichaDivision(editingId, {
+        await actualizarFichaPuertaRapida(editingId, {
           ...datos,
-          medidas:    calculo.medidas,
-          tipoIcopor: calculo.tipoIcopor,
-          consumo:    calculo.consumo,
+          medidas: calculo.medidas,
+          empaque: empaqueLimpio,
         });
         toast.success("Ficha actualizada");
         setEditingId(null);
       } else {
-        await crearFichaDivision(datos, calculo);
+        await crearFichaPuertaRapida(datos, { ...calculo, empaque: empaqueLimpio });
         toast.success("Ficha guardada");
       }
       setForm(INITIAL_FORM);
+      setEmpaque([]);
       await loadFichas();
     } catch (err) {
       console.error(err);
@@ -185,7 +194,7 @@ export default function DivisionTermicaFicha() {
 
   const cambiarEstado = async (id, estado) => {
     try {
-      await actualizarFichaDivision(id, { estado });
+      await actualizarFichaPuertaRapida(id, { estado });
       toast.success(`Estado → ${ESTADO_LABEL[estado] || estado}`);
       setFichas((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
     } catch (err) {
@@ -196,25 +205,20 @@ export default function DivisionTermicaFicha() {
 
   const handleEditar = (f) => {
     setForm({
-      fechaOrden:        f.fechaOrden || new Date().toISOString().slice(0, 10),
-      fechaEntrega:      f.fechaEntrega || "",
-      numeroOrdenCompra: f.numeroOrdenCompra || "",
-      numeroFicha:       f.numeroFicha || "",
-      cliente:           f.cliente || "",
-      cantidad:          f.cantidad ?? 1,
-      anchoVehiculo:     f.anchoVehiculo ?? "",
-      altoVehiculo:      f.altoVehiculo ?? "",
-      placa:             f.placa || "SI",
-      numeroPlaca:       f.numeroPlaca || "",
-      logo:              f.logo || "COLD CHAIN",
-      agujero:           f.agujero || "1 AGUJERO",
-      platinas:          f.platinas || "NO",
-      alturasPlatinas:   getAlturasPlatinas(f).length ? getAlturasPlatinas(f).map(String) : [""],
-      reatasRiel:        f.reatasRiel || "NO",
-      factura:           f.factura || "SI",
-      colorLona:         f.colorLona || "NEGRO",
-      adicional:         f.adicional || "",
+      cliente:               f.cliente || "",
+      cantidad:              f.cantidad ?? 1,
+      fechaOrden:            f.fechaOrden || hoy(),
+      anchoVano:             f.anchoVano ?? "",
+      altoVano:              f.altoVano ?? "",
+      colorLona:             f.colorLona || "AZUL",
+      ladoMotor:             f.ladoMotor || "IZQUIERDO",
+      exclusa:               f.exclusa || "SI",
+      fct:                   f.fct || "SI",
+      vinilo:                f.vinilo || "SI",
+      distanciaCortavientos: f.distanciaCortavientos ?? PARAMETROS_PUERTA_RAPIDA.DISTANCIA_CORTAVIENTOS_DEFAULT_MM,
+      adicional:             f.adicional || "",
     });
+    setEmpaque(conOpciones(Array.isArray(f.empaque) ? f.empaque : []));
     setEditingId(f.id);
     setSelectedId(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -223,13 +227,14 @@ export default function DivisionTermicaFicha() {
   const cancelarEdicion = () => {
     setEditingId(null);
     setForm(INITIAL_FORM);
+    setEmpaque([]);
   };
 
   const handleEliminar = async (f) => {
     const ok = await confirm(`¿Eliminar la ficha de ${f.cliente || "este cliente"}? Esta acción no se puede deshacer.`);
     if (!ok) return;
     try {
-      await eliminarFichaDivision(f.id);
+      await eliminarFichaPuertaRapida(f.id);
       setFichas((prev) => prev.filter((x) => x.id !== f.id));
       if (selectedId === f.id) setSelectedId(null);
       if (editingId === f.id) cancelarEdicion();
@@ -239,6 +244,8 @@ export default function DivisionTermicaFicha() {
       toast.error("Error eliminando ficha");
     }
   };
+
+  const med = calculo?.medidas;
 
   return (
     <div className="space-y-5">
@@ -252,23 +259,11 @@ export default function DivisionTermicaFicha() {
             <span className="flex items-center justify-center h-6 w-6 rounded-md bg-blue-600/10 text-blue-700 dark:text-blue-400">
               <FaIdCard className="text-[11px]" />
             </span>
-            {editingId ? "Editar ficha — División Térmica" : "Nueva ficha — División Térmica"}
+            {editingId ? "Editar ficha — Puerta Rápida" : "Nueva ficha — Puerta Rápida"}
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Identificación */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>N.° orden de compra</label>
-                <input value={form.numeroOrdenCompra} onChange={set("numeroOrdenCompra")}
-                  className={inputCls} placeholder="Ref. del cliente" />
-              </div>
-              <div>
-                <label className={labelCls}>N.° de ficha</label>
-                <input value={form.numeroFicha} onChange={set("numeroFicha")}
-                  className={inputCls} placeholder="Ficha física (opcional)" />
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <label className={labelCls}>Cliente</label>
@@ -277,37 +272,36 @@ export default function DivisionTermicaFicha() {
               </div>
               <div>
                 <label className={labelCls}>Cantidad</label>
-                <input type="number" min={1} value={form.cantidad}
+                <input type="number" min={1} step={1} value={form.cantidad}
                   onChange={(e) => setForm((p) => ({ ...p, cantidad: Number(e.target.value) }))}
                   className={inputCls} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Fecha orden</label>
                 <input type="date" value={form.fechaOrden} onChange={set("fechaOrden")} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Fecha entrega</label>
-                <input type="date" value={form.fechaEntrega} onChange={set("fechaEntrega")} className={inputCls} />
+                <label className={labelCls}>Fecha entrega (estimada)</label>
+                <input type="date" value={fechaEntrega} disabled
+                  className={`${inputCls} disabled:opacity-60`} />
               </div>
             </div>
 
-            {/* Medidas del vehículo */}
+            {/* Medidas del vano */}
             <div className="border-t border-gray-200 dark:border-gris-700 pt-4">
-              <SectionLabel icon={FaTruck}>Medidas del vehículo (mm)</SectionLabel>
+              <SectionLabel icon={FaRulerCombined}>Medidas del vano (mm)</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Ancho interior</label>
-                  <input type="number" min={1} value={form.anchoVehiculo}
-                    onChange={set("anchoVehiculo")}
-                    className={`${inputCls} font-mono`} placeholder="ej: 2160" />
+                  <label className={labelCls}>Ancho vano</label>
+                  <input type="number" min={100} step={1} value={form.anchoVano}
+                    onChange={set("anchoVano")}
+                    className={`${inputCls} font-mono`} placeholder="ej: 3500" />
                 </div>
                 <div>
-                  <label className={labelCls}>Alto interior</label>
-                  <input type="number" min={1} value={form.altoVehiculo}
-                    onChange={set("altoVehiculo")}
-                    className={`${inputCls} font-mono`} placeholder="ej: 2640" />
+                  <label className={labelCls}>Alto vano</label>
+                  <input type="number" min={100} step={1} value={form.altoVano}
+                    onChange={set("altoVano")}
+                    className={`${inputCls} font-mono`} placeholder="ej: 3050" />
                 </div>
               </div>
             </div>
@@ -316,101 +310,102 @@ export default function DivisionTermicaFicha() {
             <div className="border-t border-gray-200 dark:border-gris-700 pt-4">
               <SectionLabel icon={FaSlidersH}>Opciones</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
-
-                {/* Placa + número de placa */}
-                <div>
-                  <label className={labelCls}>Placa</label>
-                  <select value={form.placa} onChange={set("placa")} className={inputCls}>
-                    {OPCIONES.placa.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Número de placa</label>
-                  <input value={form.numeroPlaca} onChange={set("numeroPlaca")}
-                    disabled={form.placa !== "SI"}
-                    className={`${inputCls} disabled:opacity-40`} placeholder="ej: ABC123" />
-                </div>
-
-                {/* Logo + color de lona */}
-                <div>
-                  <label className={labelCls}>Logo</label>
-                  <select value={form.logo} onChange={set("logo")} className={inputCls}>
-                    {OPCIONES.logo.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
                 <div>
                   <label className={labelCls}>Color lona</label>
                   <select value={form.colorLona} onChange={set("colorLona")} className={inputCls}>
                     {OPCIONES.colorLona.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-
-                {/* Agujero */}
-                <div className="col-span-2">
-                  <label className={labelCls}>Agujero</label>
-                  <select value={form.agujero} onChange={set("agujero")} className={inputCls}>
-                    {OPCIONES.agujero.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-
-                {/* Platinas + reatas riel + alturas */}
                 <div>
-                  <label className={labelCls}>Platinas</label>
-                  <select value={form.platinas} onChange={set("platinas")} className={inputCls}>
-                    {OPCIONES.platinas.map((o) => <option key={o} value={o}>{o}</option>)}
+                  <label className={labelCls}>Lado de motor</label>
+                  <select value={form.ladoMotor} onChange={set("ladoMotor")} className={inputCls}>
+                    {OPCIONES.ladoMotor.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>¿Reatas para riel logístico?</label>
-                  <select value={form.reatasRiel} onChange={set("reatasRiel")}
-                    disabled={form.platinas !== "SI"}
-                    className={`${inputCls} disabled:opacity-40`}>
-                    {OPCIONES.reatasRiel.map((o) => <option key={o} value={o}>{o}</option>)}
+                  <label className={labelCls}>Exclusa</label>
+                  <select value={form.exclusa} onChange={set("exclusa")} className={inputCls}>
+                    {OPCIONES.siNo.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-
-                <div className="col-span-2">
-                  <div className="flex items-center justify-between">
-                    <label className={labelCls}>Altura platinas (mm)</label>
-                    <button type="button" onClick={addAlturaPlatina} disabled={form.platinas !== "SI"}
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:pointer-events-none">
-                      <FaPlus className="text-[9px]" /> Añadir línea
-                    </button>
-                  </div>
-                  <div className="space-y-2 mt-1">
-                    {form.alturasPlatinas.map((val, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4 text-right shrink-0">{idx + 1}</span>
-                        <input type="number" min={0} value={val}
-                          onChange={(e) => setAlturaPlatina(idx, e.target.value)}
-                          disabled={form.platinas !== "SI"}
-                          className={`${inputCls} font-mono disabled:opacity-40`} placeholder="ej: 450" />
-                        {form.alturasPlatinas.length > 1 && (
-                          <button type="button" onClick={() => removeAlturaPlatina(idx)}
-                            disabled={form.platinas !== "SI"}
-                            className="shrink-0 text-gray-400 hover:text-red-500 disabled:opacity-40 disabled:pointer-events-none p-1"
-                            title="Quitar línea">
-                            <FaTimes className="text-xs" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Factura (al final) */}
-                <div className="col-span-2">
-                  <label className={labelCls}>Factura</label>
-                  <select value={form.factura} onChange={set("factura")} className={inputCls}>
-                    {OPCIONES.factura.map((o) => <option key={o} value={o}>{o}</option>)}
+                <div>
+                  <label className={labelCls}>FCT</label>
+                  <select value={form.fct} onChange={set("fct")} className={inputCls}>
+                    {OPCIONES.siNo.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
-
+                <div>
+                  <label className={labelCls}>Vinilo</label>
+                  <select value={form.vinilo} onChange={set("vinilo")} className={inputCls}>
+                    {OPCIONES.siNo.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Distancia cortavientos (mm)</label>
+                  <input type="number" min={1} step={1} value={form.distanciaCortavientos}
+                    onChange={set("distanciaCortavientos")}
+                    className={`${inputCls} font-mono`} />
+                </div>
                 <div className="col-span-2">
                   <label className={labelCls}>Adicional / Notas</label>
                   <input value={form.adicional} onChange={set("adicional")} className={inputCls} />
                 </div>
               </div>
+            </div>
+
+            {/* Lista de empaque / accesorios */}
+            <div className="border-t border-gray-200 dark:border-gris-700 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <SectionLabel icon={FaBoxOpen}>Lista de empaque / accesorios</SectionLabel>
+                <button type="button" onClick={handleRecalcularEmpaque} disabled={!calculo}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:pointer-events-none">
+                  <FaSyncAlt className="text-[10px]" /> Recalcular según medidas
+                </button>
+              </div>
+
+              {empaque.length === 0 ? (
+                <div className="text-xs text-gray-400 dark:text-gray-500 py-2">
+                  Ingresa las medidas del vano para sugerir la lista, o añade accesorios manualmente.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 text-[10px] text-gray-400 uppercase tracking-wide px-1">
+                    <span className="col-span-6">Accesorio</span>
+                    <span className="col-span-3">Cantidad</span>
+                    <span className="col-span-2">Unidad</span>
+                  </div>
+                  {empaque.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                      <input value={item.insumo} onChange={(e) => updateEmpaqueField(idx, "insumo", e.target.value)}
+                        className={`${rowInputCls} col-span-6`} placeholder="Nombre del accesorio" />
+                      {item.opciones ? (
+                        <select value={item.texto ?? ""} onChange={(e) => updateEmpaqueField(idx, "texto", e.target.value)}
+                          className={`${rowInputCls} col-span-3`}>
+                          {item.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : item.texto !== undefined ? (
+                        <input value={item.texto ?? ""} onChange={(e) => updateEmpaqueField(idx, "texto", e.target.value)}
+                          className={`${rowInputCls} col-span-3`} />
+                      ) : (
+                        <input type="number" min={0} step="any" value={item.cantidad ?? ""}
+                          onChange={(e) => updateEmpaqueField(idx, "cantidad", e.target.value)}
+                          className={`${rowInputCls} col-span-3 font-mono`} />
+                      )}
+                      <input value={item.unidad ?? ""} onChange={(e) => updateEmpaqueField(idx, "unidad", e.target.value)}
+                        className={`${rowInputCls} col-span-2`} placeholder="und" />
+                      <button type="button" onClick={() => removeEmpaqueRow(idx)}
+                        className="col-span-1 flex justify-center text-gray-400 hover:text-red-500 p-1" title="Quitar accesorio">
+                        <FaTimes className="text-xs" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button type="button" onClick={addEmpaqueRow}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                <FaPlus className="text-[9px]" /> Añadir accesorio
+              </button>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -438,18 +433,18 @@ export default function DivisionTermicaFicha() {
             <span className="font-medium text-sm">Vista previa</span>
             {calculo && (
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                calculo.tipoIcopor === "GRANDE"
+                med.base === "GRANDE"
                   ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
                   : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
               }`}>
-                ICOPOR {calculo.tipoIcopor}
+                BASE {med.base} · MOTOR {med.motorKw}
               </span>
             )}
           </div>
 
           {!calculo ? (
             <div className="flex items-center justify-center h-48 text-sm text-gray-400 dark:text-gray-500">
-              Ingresa ancho y alto del vehículo para ver los cálculos
+              Ingresa ancho y alto del vano para ver los cálculos
             </div>
           ) : (
             <div className="space-y-5 text-sm">
@@ -460,102 +455,43 @@ export default function DivisionTermicaFicha() {
                   Medidas derivadas (mm)
                 </div>
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                      <th className="text-left py-1.5">Componente</th>
-                      <th className="text-right py-1.5">Ancho</th>
-                      <th className="text-right py-1.5">Alto</th>
-                    </tr>
-                  </thead>
                   <tbody>
                     {[
-                      ["Panel",         calculo.medidas.panel],
-                      ["Funda",         calculo.medidas.funda],
-                      ["Icopor",        calculo.medidas.icopor],
-                      ["Policarbonato", calculo.medidas.policarbonato],
-                    ].map(([name, m]) => (
+                      ["Vinilo",                                        med.vinilo],
+                      ["Largo cortina",                                 med.largoCortina],
+                      ["Cubre rollo",                                   med.cubreRollo],
+                      ["Altura parales",                                med.alturaParales],
+                      ["Eje, zócalo, caucho, cortavientos y lona",      med.ejeZocalo],
+                      ["Tubo estructura",                               med.tuboEstructura],
+                      ["Ancho total puerta",                            med.anchoTotalPuerta],
+                      ["Alto total puerta",                             med.altoTotalPuerta],
+                      ["Alto cubrerrollo",                              med.altoCubrerrollo],
+                      ["Añadido cubre rollo",                           med.anadidoCubreRollo],
+                      ["Añadido por paral",                             med.anadidoPorParal],
+                    ].map(([name, val]) => (
                       <tr key={name} className="border-b border-gray-100 dark:border-gris-700/50">
                         <td className="py-1.5 font-medium">{name}</td>
-                        <td className="text-right py-1.5 font-mono">{fmtMm(m.ancho)}</td>
-                        <td className="text-right py-1.5 font-mono">{fmtMm(m.alto)}</td>
+                        <td className="text-right py-1.5 font-mono">{fmtMm(val)}</td>
                       </tr>
                     ))}
-                    <tr className="border-b border-gray-100 dark:border-gris-700/50">
-                      <td className="py-1.5 font-medium">Piso</td>
-                      <td className="text-right py-1.5 font-mono" colSpan={2}>
-                        {fmtMm(calculo.medidas.medidaPiso)} largo
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
 
-              {/* Distribución de lona */}
-              <div>
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                  Distribución de lona (rollo {calculo.medidas.lona.anchoRollo} mm)
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    ["Tiras",      fmtN(calculo.medidas.lona.tiras),           ""],
-                    ["Largo tira", fmtMm(calculo.medidas.lona.largoTira),      "mm"],
-                    ["Sobrante",   fmtMm(calculo.medidas.lona.sobranteAncho),  "mm"],
-                  ].map(([label, val, unit]) => (
-                    <div key={label} className="bg-gray-50 dark:bg-gris-700 rounded p-2 text-center">
-                      <div className="text-base font-bold font-mono">{val}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {label}{unit ? ` (${unit})` : ""}
-                      </div>
+              {/* Cortavientos + M2 cortina */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ["M2 cortina",     fmtM2(med.m2Cortina),               "m²"],
+                  ["Distancia cortav.", fmtMm(med.distanciaCortavientos), "mm"],
+                  ["Cant. cortav.",  fmtN(med.cantidadCortavientos),     ""],
+                ].map(([label, val, unit]) => (
+                  <div key={label} className="bg-gray-50 dark:bg-gris-700 rounded p-2 text-center">
+                    <div className="text-base font-bold font-mono">{val}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {label}{unit ? ` (${unit})` : ""}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Consumo de materia prima */}
-              <div>
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                  Consumo de materia prima
-                </div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                      <th className="text-left py-1.5">Insumo</th>
-                      <th className="text-right py-1.5">C/U</th>
-                      {Number(form.cantidad) > 1 && (
-                        <th className="text-right py-1.5">×{form.cantidad}</th>
-                      )}
-                      <th className="text-right py-1.5">Unidad</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {calculo.consumo.map((c) => {
-                      const isM2 = c.unidad === "m²";
-                      const valCU    = isM2 ? fmtM2(c.cantidad) : fmtN(c.cantidad);
-                      const valTotal = isM2
-                        ? fmtM2(c.cantidad * Number(form.cantidad))
-                        : fmtN(c.cantidad * Number(form.cantidad));
-                      return (
-                        <tr key={c.insumo} className="border-b border-gray-100 dark:border-gris-700/50">
-                          <td className="py-1.5 font-medium">{c.insumo.replace("_", " ")}</td>
-                          <td className="text-right py-1.5 font-mono">{valCU}</td>
-                          {Number(form.cantidad) > 1 && (
-                            <td className="text-right py-1.5 font-mono">{valTotal}</td>
-                          )}
-                          <td className="text-right py-1.5 text-gray-500">
-                            {c.unidad}
-                            {c.largoMm ? ` (${fmtMm(c.largoMm)} mm)` : ""}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="text-xs text-gray-400 dark:text-gray-500">
-                Distancia ventana: <span className="font-mono font-medium text-gray-600 dark:text-gray-300">
-                  {fmtCm(calculo.medidas.distanciaVentana)} cm
-                </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -626,9 +562,10 @@ export default function DivisionTermicaFicha() {
                 <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
                   <th className="text-right py-2 font-medium w-10">#</th>
                   <th className="text-left py-2 font-medium pl-2">Cliente</th>
-                  <th className="text-left py-2 font-medium">Medidas (mm)</th>
+                  <th className="text-left py-2 font-medium">Vano (mm)</th>
                   <th className="text-center py-2 font-medium">Cant.</th>
-                  <th className="text-center py-2 font-medium">Icopor</th>
+                  <th className="text-center py-2 font-medium">Color</th>
+                  <th className="text-center py-2 font-medium">Motor</th>
                   <th className="text-center py-2 font-medium">Estado</th>
                   <th className="text-left py-2 font-medium">Creada</th>
                   <th className="py-2"></th>
@@ -652,17 +589,10 @@ export default function DivisionTermicaFicha() {
                             {f.cliente || "—"}
                           </span>
                         </td>
-                        <td className="py-2 font-mono">{f.anchoVehiculo}×{f.altoVehiculo}</td>
+                        <td className="py-2 font-mono">{fmtMm(f.anchoVano)}×{fmtMm(f.altoVano)}</td>
                         <td className="py-2 text-center">{f.cantidad}</td>
-                        <td className="py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                            f.tipoIcopor === "GRANDE"
-                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
-                              : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                          }`}>
-                            {f.tipoIcopor}
-                          </span>
-                        </td>
+                        <td className="py-2 text-center">{f.colorLona || "—"}</td>
+                        <td className="py-2 text-center">{f.medidas?.motorKw || "—"}</td>
                         <td className="py-2 text-center">
                           <EstadoBadge estado={f.estado} />
                         </td>
@@ -674,10 +604,7 @@ export default function DivisionTermicaFicha() {
                         <td className="py-2 pl-2">
                           <div className="flex items-center gap-1.5">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPrintFicha({ ficha: f, numero });
-                              }}
+                              onClick={(e) => { e.stopPropagation(); setPrintFicha({ ficha: f, numero }); }}
                               className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
                               title="Ver ficha imprimible"
                             >
@@ -701,10 +628,9 @@ export default function DivisionTermicaFicha() {
                         </td>
                       </tr>
 
-                      {/* Detalle expandido */}
                       {isSelected && (
                         <tr className="border-b border-gray-200 dark:border-gris-700">
-                          <td colSpan={8} className="py-3 px-2">
+                          <td colSpan={9} className="py-3 px-2">
                             <FichaDetalle
                               ficha={f}
                               numero={numero}
@@ -727,7 +653,7 @@ export default function DivisionTermicaFicha() {
 
       {/* ── Modal impresión ── */}
       {printFicha && (
-        <FichaImpresionDivision
+        <FichaImpresionPuertaRapida
           ficha={printFicha.ficha}
           numero={printFicha.numero}
           onClose={() => setPrintFicha(null)}
@@ -740,42 +666,41 @@ export default function DivisionTermicaFicha() {
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
 function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar, onEliminar }) {
   const med = f.medidas || {};
+  const empaque = f.empaque || [];
 
   const medidas = [
-    { label: "Panel",     ancho: med.panel?.ancho,         alto: med.panel?.alto,         border: "border-blue-700",  text: "text-blue-700"  },
-    { label: "Icopor",    ancho: med.icopor?.ancho,        alto: med.icopor?.alto,        border: "border-blue-500",  text: "text-blue-500"  },
-    { label: "Funda",     ancho: med.funda?.ancho,         alto: med.funda?.alto,         border: "border-cyan-600",  text: "text-cyan-600"  },
-    { label: "Policarb.", ancho: med.policarbonato?.ancho, alto: med.policarbonato?.alto, border: "border-teal-600",  text: "text-teal-600"  },
+    { label: "Vinilo",           val: med.vinilo },
+    { label: "Largo cortina",    val: med.largoCortina },
+    { label: "Cubre rollo",      val: med.cubreRollo },
+    { label: "Altura parales",   val: med.alturaParales },
+    { label: "Ancho total",      val: med.anchoTotalPuerta },
+    { label: "Alto total",       val: med.altoTotalPuerta },
   ];
 
   const opciones = [
-    ["Placa",      f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : (f.placa || "—"), f.placa === "SI"],
-    ["Logo",       f.logo      || "—", f.logo !== "NO" && !!f.logo],
-    ["Platinas",   formatPlatinas(f), f.platinas === "SI"],
-    ["Factura",    f.factura   || "—", f.factura    === "SI"],
-    ["Color lona", f.colorLona || "—", false],
-    ["Agujero",    f.agujero   || "—", false],
+    ["Color lona",  f.colorLona || "—", false],
+    ["Lado motor",  f.ladoMotor || "—", false],
+    ["Exclusa",     f.exclusa   || "—", f.exclusa === "SI"],
+    ["FCT",         f.fct       || "—", f.fct === "SI"],
+    ["Vinilo",      f.vinilo    || "—", f.vinilo === "SI"],
+    ["Base / Eje motor", `${med.base || "—"} / ${med.ejeMotor || "—"}`, false],
+    ["Motor",       med.motorKw || "—", false],
   ];
-
-  const consumoVisible = (f.consumo || []).filter((c) => c.cantidad > 0);
 
   return (
     <div className="bg-gray-50 dark:bg-gris-700/60 rounded-xl p-4 space-y-4 text-xs border border-gray-200 dark:border-gris-600">
 
-      {/* Cabecera del detalle */}
       <div className="flex items-center justify-between">
         <div>
           <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">{f.cliente || "Sin cliente"}</span>
-          <span className="ml-2 text-gray-400 font-mono">{f.anchoVehiculo}×{f.altoVehiculo} mm · ×{f.cantidad}</span>
+          <span className="ml-2 text-gray-400 font-mono">{fmtMm(f.anchoVano)}×{fmtMm(f.altoVano)} mm · ×{f.cantidad}</span>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            Orden producción #{f.ordenProduccion ?? numero}
-            {f.numeroOrdenCompra && <> · OC {f.numeroOrdenCompra}</>}
-            {f.numeroFicha && <> · Ficha {f.numeroFicha}</>}
+            Entrega estimada: {fmtDate(f.fechaEntrega)}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onVerFicha}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5">
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">
             Ver ficha
           </button>
           <button onClick={onEditar}
@@ -789,54 +714,16 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar,
         </div>
       </div>
 
-      {/* Medidas de corte */}
+      {/* Medidas de fabricación */}
       <div>
-        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Medidas de corte</div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {medidas.map(({ label, ancho, alto, border, text }) => (
-            <div key={label} className={`bg-white dark:bg-gris-800 rounded-lg border-2 ${border} overflow-hidden`}>
-              <div className={`text-center text-[10px] font-bold uppercase py-1 px-2 ${text}`}
-                style={{ background: "rgba(0,0,0,0.05)" }}>
-                {label}
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gris-700">
-                {[["Ancho", ancho], ["Alto", alto]].map(([dim, val]) => (
-                  <div key={dim} className="p-2 text-center">
-                    <div className="text-[9px] text-gray-400 uppercase">{dim}</div>
-                    <div className={`font-mono font-bold text-sm leading-tight ${text}`}>
-                      {val != null ? Math.round(val) : "—"}
-                    </div>
-                    <div className="text-[9px] text-gray-400">mm</div>
-                  </div>
-                ))}
-              </div>
+        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Medidas de fabricación (mm)</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {medidas.map(({ label, val }) => (
+            <div key={label} className="bg-white dark:bg-gris-800 border border-gray-100 dark:border-gris-700 rounded-lg p-2 text-center">
+              <div className="text-[9px] text-gray-400 uppercase">{label}</div>
+              <div className="font-mono font-bold text-sm text-blue-700 dark:text-blue-300">{fmtMm(val)}</div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Piso, lona y ventana */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2.5">
-          <div className="text-[9px] text-green-700 dark:text-green-400 font-bold uppercase tracking-wide">Piso</div>
-          <div className="font-mono font-bold text-green-800 dark:text-green-300 text-base leading-tight mt-0.5">
-            {med.medidaPiso != null ? Math.round(med.medidaPiso) : "—"} <span className="text-xs font-normal">mm</span>
-          </div>
-        </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2.5">
-          <div className="text-[9px] text-blue-700 dark:text-blue-400 font-bold uppercase tracking-wide">
-            Lona · {med.lona?.tiras ?? "—"} tiras
-          </div>
-          <div className="font-mono font-bold text-blue-800 dark:text-blue-300 text-base leading-tight mt-0.5">
-            {med.lona?.largoTira != null ? Math.round(med.lona.largoTira) : "—"} <span className="text-xs font-normal">mm</span>
-          </div>
-          <div className="text-[9px] text-blue-500 mt-0.5">sobrante {med.lona?.sobranteAncho != null ? Math.round(med.lona.sobranteAncho) : "—"} mm</div>
-        </div>
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2.5">
-          <div className="text-[9px] text-yellow-700 dark:text-yellow-400 font-bold uppercase tracking-wide">Dist. ventana</div>
-          <div className="font-mono font-bold text-yellow-800 dark:text-yellow-300 text-base leading-tight mt-0.5">
-            {med.distanciaVentana != null ? Number(med.distanciaVentana).toFixed(1) : "—"} <span className="text-xs font-normal">cm</span>
-          </div>
         </div>
       </div>
 
@@ -856,18 +743,18 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar,
         </div>
       </div>
 
-      {/* Consumo */}
-      {consumoVisible.length > 0 && (
+      {/* Lista de empaque */}
+      {empaque.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Consumo por unidad</div>
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Lista de empaque por puerta</div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-            {consumoVisible.map((c) => (
+            {empaque.map((c) => (
               <div key={c.insumo} className="bg-white dark:bg-gris-800 border border-gray-100 dark:border-gris-700 rounded-lg p-2">
-                <div className="text-[9px] text-gray-400 leading-tight mb-1">{c.insumo.replace(/_/g, " ")}</div>
+                <div className="text-[9px] text-gray-400 leading-tight mb-1">{c.insumo}</div>
                 <div className="font-mono font-bold text-gray-700 dark:text-gray-200 text-sm">
-                  {c.unidad === "m²" ? Number(c.cantidad).toFixed(3) : c.cantidad}
+                  {c.texto ?? fmtN(c.cantidad)}
                 </div>
-                <div className="text-[9px] text-gray-400">{c.unidad}{c.largoMm ? ` · ${c.largoMm}mm` : ""}</div>
+                <div className="text-[9px] text-gray-400">{c.unidad}</div>
               </div>
             ))}
           </div>
