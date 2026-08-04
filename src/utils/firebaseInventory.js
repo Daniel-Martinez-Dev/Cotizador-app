@@ -334,7 +334,10 @@ export async function eliminarProveedor(id) {
   await deleteDoc(doc(db, SUPPLIERS_COL, id));
 }
 
-export async function registrarMovimientoInventario(itemId, data) {
+// Núcleo compartido por el flujo de admin/inventario (costo obligatorio en
+// ingresos) y el flujo de empleado de planta (nunca fija costo; en salidas
+// exige quedar ligado a una orden de producción vía extraMovimientoFields).
+async function registrarMovimientoInventarioCore(itemId, data, { requireCosto, extraMovimientoFields = {} }) {
   await waitForAuth();
   const tipo = data?.tipo === "salida" ? "salida" : "ingreso";
   const cantidad = Number(data?.cantidad || 0);
@@ -342,10 +345,13 @@ export async function registrarMovimientoInventario(itemId, data) {
   if (Number.isNaN(cantidad) || cantidad <= 0) throw new Error("Cantidad inválida");
 
   const proveedorId = String(data?.proveedorId || "").trim();
+  const costoProvisto = data?.costoUnitario != null;
   const costoUnitario = Number(data?.costoUnitario || 0);
   if (tipo === "ingreso") {
     if (!proveedorId) throw new Error("proveedorId requerido");
-    if (Number.isNaN(costoUnitario) || costoUnitario <= 0) throw new Error("Costo unitario inválido");
+    if (requireCosto && (Number.isNaN(costoUnitario) || costoUnitario <= 0)) {
+      throw new Error("Costo unitario inválido");
+    }
   }
 
   const nota = (data?.nota || "").toString().trim();
@@ -371,7 +377,7 @@ export async function registrarMovimientoInventario(itemId, data) {
       lastMovimientoAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    if (tipo === "ingreso") itemPatch.costoUnitario = costoUnitario;
+    if (tipo === "ingreso" && costoProvisto) itemPatch.costoUnitario = costoUnitario;
     tx.update(itemRef, itemPatch);
     tx.set(movRef, {
       itemId,
@@ -382,15 +388,42 @@ export async function registrarMovimientoInventario(itemId, data) {
       stockDespues,
       nota,
       proveedorId: proveedorId || "",
-      costoUnitario: tipo === "ingreso" ? costoUnitario : 0,
+      costoUnitario: tipo === "ingreso" && costoProvisto ? costoUnitario : 0,
       prevMovimientoId,
       prevMovimientoAt,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      ...extraMovimientoFields,
     });
   });
 
   return movRef.id;
+}
+
+export async function registrarMovimientoInventario(itemId, data) {
+  return registrarMovimientoInventarioCore(itemId, data, { requireCosto: true });
+}
+
+// Variante para el panel de empleados de planta: nunca fija/actualiza el
+// costo del material, y toda salida debe quedar ligada a una orden de
+// producción (ficha en producción) para trazabilidad.
+export async function registrarMovimientoInventarioEmpleado(itemId, data) {
+  const tipo = data?.tipo === "salida" ? "salida" : "ingreso";
+  const extraMovimientoFields = {};
+  if (tipo === "salida") {
+    const ordenProduccion = Number(data?.ordenProduccion || 0);
+    if (!ordenProduccion || ordenProduccion <= 0) {
+      throw new Error("Debes indicar la orden de producción para la salida");
+    }
+    extraMovimientoFields.ordenProduccion = ordenProduccion;
+    if (data?.fichaId) extraMovimientoFields.fichaId = String(data.fichaId);
+    if (data?.fichaTipo) extraMovimientoFields.fichaTipo = String(data.fichaTipo);
+  }
+  return registrarMovimientoInventarioCore(
+    itemId,
+    { ...data, costoUnitario: undefined },
+    { requireCosto: false, extraMovimientoFields }
+  );
 }
 
 export async function listarMovimientosGeneral({ max = 200 } = {}) {

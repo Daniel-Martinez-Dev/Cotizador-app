@@ -14,6 +14,7 @@ import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoActions from "./fichas/EstadoActions";
 import { useQuote } from "../context/QuoteContext";
+import { crearNotificacionFichaEnProduccion } from "../utils/firebaseNotificaciones";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -143,6 +144,16 @@ export default function AbrigoRetractilFicha() {
       await actualizarFichaAbrigoRetractil(id, { estado });
       toast.success(`Estado → ${ESTADO_LABEL[estado] || estado}`);
       setFichas((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
+      if (estado === "en_produccion") {
+        const f = fichas.find((x) => x.id === id);
+        crearNotificacionFichaEnProduccion({
+          fichaTipo: "abrigoretractil",
+          tipoLabel: "Abrigo Retráctil",
+          fichaId: id,
+          cliente: f?.cliente,
+          ordenProduccion: f?.ordenProduccion,
+        }).catch((e) => console.error(e));
+      }
     } catch (err) {
       console.error(err);
       toast.error("Error actualizando estado");

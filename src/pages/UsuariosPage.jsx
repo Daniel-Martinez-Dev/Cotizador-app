@@ -11,13 +11,14 @@ import {
 import { useQuote } from "../context/QuoteContext";
 import Tabs from "../components/ui/Tabs";
 
-const ALL_ROLES = ["admin", "vendedor", "produccion", "inventario"];
+const ALL_ROLES = ["admin", "vendedor", "produccion", "inventario", "empleado"];
 
 const ROLE_LABELS = {
   admin: "Admin",
   vendedor: "Vendedor",
   produccion: "Producción",
   inventario: "Inventario",
+  empleado: "Empleado (planta)",
 };
 
 const STATUS_BADGE = {

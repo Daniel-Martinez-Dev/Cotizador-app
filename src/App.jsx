@@ -10,6 +10,11 @@ import InventarioPage from "./pages/InventarioPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import UsuariosPage from "./pages/UsuariosPage";
+import EmployeeShell from "./pages/empleado/EmployeeShell";
+import EmpleadoHome from "./pages/empleado/EmpleadoHome";
+import EmpleadoProduccionList from "./pages/empleado/EmpleadoProduccionList";
+import EmpleadoFichaDetalle from "./pages/empleado/EmpleadoFichaDetalle";
+import EmpleadoInventarioList from "./pages/empleado/EmpleadoInventarioList";
 import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -20,6 +25,20 @@ import menuIcon from "./assets/imagenes/menu-icon.png";
 import { ADMIN_EMAIL, ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
 // Carga catálogo central (side-effect) para futuras referencias globales
 import './data/catalogoProductos';
+
+// Un usuario con SOLO el rol "empleado" (sin admin/produccion/inventario/
+// vendedor) nunca debe llegar a montar AppShell — ni un instante, para que
+// no se alcance a ver el header/nav de oficina — así que la decisión se toma
+// antes de renderizarlo, no dentro de sus rutas hijas.
+function RootGate() {
+  const { hasRole, isMainAdmin } = useAuth();
+  const isAdminUser = isMainAdmin || hasRole('admin');
+  const isPureEmpleado = hasRole('empleado') && !isAdminUser &&
+    !hasRole('produccion') && !hasRole('inventario') && !hasRole('vendedor');
+
+  if (isPureEmpleado) return <Navigate to="/planta" replace />;
+  return <AppShell />;
+}
 
 function AppShell() {
   const { quoteData, setQuoteData, setResetToken, setEmpresaSeleccionada, setContactoSeleccionado } = useQuote();
@@ -256,7 +275,7 @@ export default function App(){
             <Route path="/login" element={<LoginPage />} />
 
             <Route element={<ProtectedRoute />}>
-              <Route element={<AppShell />}>
+              <Route element={<RootGate />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
 
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -281,6 +300,16 @@ export default function App(){
                 </Route>
 
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
+
+              <Route element={<ProtectedRoute requireRole="empleado" />}>
+                <Route path="/planta" element={<EmployeeShell />}>
+                  <Route index element={<EmpleadoHome />} />
+                  <Route path="produccion" element={<EmpleadoProduccionList />} />
+                  <Route path="produccion/:tipo/:id" element={<EmpleadoFichaDetalle />} />
+                  <Route path="inventario" element={<EmpleadoInventarioList />} />
+                  <Route path="*" element={<Navigate to="/planta" replace />} />
+                </Route>
               </Route>
             </Route>
           </Routes>

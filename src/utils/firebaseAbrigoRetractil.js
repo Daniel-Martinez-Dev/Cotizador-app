@@ -59,6 +59,13 @@ export async function listarFichasAbrigoRetractil({ max = 200 } = {}) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+export async function obtenerFichaAbrigoRetractil(id) {
+  await waitForAuth();
+  if (!id) return null;
+  const snap = await getDoc(doc(db, FICHAS_COL, id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 export async function actualizarFichaAbrigoRetractil(id, data) {
   await waitForAuth();
   await updateDoc(doc(db, FICHAS_COL, id), { ...data, updatedAt: serverTimestamp() });
