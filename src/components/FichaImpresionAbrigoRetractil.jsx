@@ -45,7 +45,7 @@ function PlanoTecnico({ ancho, alto, anchoLuz, bandaLateralAncho }) {
             left: pct(x, PLANO_ANCHO_PX),
             transform: `rotate(${rotate}deg)`,
             transformOrigin: "left center",
-            fontSize: "10px", fontWeight: "bold", fontFamily: "monospace",
+            fontSize: "11px", fontWeight: "bold", fontFamily: "monospace",
             color: "#111827", whiteSpace: "nowrap", lineHeight: 1,
             background: "rgba(255,255,255,0.92)", padding: "1px 3px", borderRadius: "2px",
           }}>
@@ -53,15 +53,15 @@ function PlanoTecnico({ ancho, alto, anchoLuz, bandaLateralAncho }) {
           </span>
         ))}
       </div>
-      <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "5px" }}>
+      <div style={{ fontSize: "9px", color: "#64748b", marginTop: "5px" }}>
         Plano de referencia — medidas del pedido superpuestas
       </div>
     </div>
   );
 }
 
-const tdStyle = { border: "1px solid #e2e8f0", padding: "5px 7px", fontSize: "10px", verticalAlign: "middle" };
-const thStyle = { ...tdStyle, background: "#1a3f8f", color: "white", fontWeight: "bold", textAlign: "center" };
+const tdStyle = { border: "1px solid #e2e8f0", padding: "5px 7px", fontSize: "11.5px", verticalAlign: "middle" };
+const thStyle = { ...tdStyle, background: "#1a3f8f", color: "white", fontWeight: "bold", textAlign: "center", fontSize: "11px" };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }) {
@@ -111,7 +111,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-        <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
+        <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — Abrigo Retráctil"
@@ -142,13 +142,13 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
 
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
                 </div>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                  <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>abrigos</div>
+                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "24px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                  <div style={{ fontSize: "10px", color: "#64748b", marginTop: "1px" }}>abrigos</div>
                 </div>
               </div>
 
@@ -162,7 +162,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                 <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
               </div>
 
-              <SectionTitle size="10px">Medidas de Fabricación</SectionTitle>
+              <SectionTitle size="11.5px">Medidas de Fabricación</SectionTitle>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "8px" }}>
                 <MedidaCard label="Lona perimetral" ancho={med.loneaPerimetro} alto={700} color="#1a3f8f" dimLabels={["Largo", "Ancho rollo"]} />
                 {llevaBanda && (
@@ -181,9 +181,9 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                   { label: "Mangueras (rollos de 6000 mm)",                val: fmtN(med.manguerasCantidad),     unit: "rollos", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
                 ].map(({ label, val, unit, color, bg, border }) => (
                   <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "8px", padding: "8px 9px", textAlign: "center" }}>
-                    <div style={{ fontSize: "8px", color, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>{label}</div>
-                    <div style={{ fontSize: "18px", fontWeight: "bold", fontFamily: "monospace", color, lineHeight: 1 }}>{val}</div>
-                    <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "2px" }}>{unit}</div>
+                    <div style={{ fontSize: "9px", color, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>{label}</div>
+                    <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color, lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>{unit}</div>
                   </div>
                 ))}
               </div>
@@ -199,14 +199,14 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
               </div>
 
               <div style={{ marginTop: "8px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
-                <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
+                <SectionTitle size="11.5px">Opciones y Acabados</SectionTitle>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Color"     value={f.color || "NEGRO"} color="#1a3f8f" active />
                   <AcabadoCard label="Acabado"   value={f.acabado || "PINTADO"} color="#0f6cbf" active />
                   <AcabadoCard label="Banda PVC" value={llevaBanda ? "SÍ" : "NO"} color="#059669" active={llevaBanda} />
                 </div>
                 <div style={{
-                  marginTop: "10px", fontSize: "8.5px", color: "#92400e", background: "#fffbeb",
+                  marginTop: "10px", fontSize: "10px", fontWeight: "600", color: "#92400e", background: "#fffbeb",
                   border: "1px solid #fde68a", borderRadius: "6px", padding: "7px 8px", lineHeight: 1.4,
                 }}>
                   ⚠ No olvidar colocar en el perimetral las recomendaciones de mantenimiento.
@@ -219,7 +219,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           <div style={{ padding: "0 20px 10px", display: "grid", gridTemplateColumns: "3fr 2fr", gap: "8px" }}>
 
             <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
-              <div style={{ fontSize: "9px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+              <div style={{ fontSize: "10px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                 Material a Alistar
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
@@ -230,27 +230,27 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                   ['Tornillos autorroscantes No10×¾"',                 `×${ali.tornillosAutorroscantes ?? 22 * cant}`],
                 ].map(([lbl, val]) => (
                   <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
-                    <div style={{ fontSize: "15px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>{val}</div>
-                    <div style={{ fontSize: "8px", color: "#64748b", marginTop: "2px" }}>{lbl}</div>
+                    <div style={{ fontSize: "17px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: "9px", color: "#475569", fontWeight: "600", marginTop: "2px" }}>{lbl}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "9px", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "9px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+              <div style={{ fontSize: "10px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                 Control de Despacho
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", borderRadius: "6px", padding: "8px 10px", marginBottom: "6px" }}>
-                <span style={{ fontSize: "9px", color: "#64748b" }}>Peso total pedido</span>
-                <span style={{ fontSize: "18px", fontWeight: "bold", color: "#15803d", fontFamily: "monospace" }}>{fmtDec(des.pesoTotalKg, 1)} kg</span>
+                <span style={{ fontSize: "10px", color: "#475569", fontWeight: "600" }}>Peso total pedido</span>
+                <span style={{ fontSize: "20px", fontWeight: "bold", color: "#15803d", fontFamily: "monospace" }}>{fmtDec(des.pesoTotalKg, 1)} kg</span>
               </div>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <tbody>
                   {(des.items || []).map(({ descripcion, pesoTotalKg }) => (
                     <tr key={descripcion}>
-                      <td style={{ fontSize: "8.5px", padding: "2px 0", color: "#334155" }}>{descripcion}</td>
-                      <td style={{ fontSize: "8.5px", padding: "2px 0", textAlign: "right", fontFamily: "monospace", color: "#15803d", fontWeight: "bold" }}>
+                      <td style={{ fontSize: "10px", padding: "2px 0", color: "#334155" }}>{descripcion}</td>
+                      <td style={{ fontSize: "10px", padding: "2px 0", textAlign: "right", fontFamily: "monospace", color: "#15803d", fontWeight: "bold" }}>
                         {fmtDec(pesoTotalKg, 1)} kg
                       </td>
                     </tr>
@@ -279,8 +279,8 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                   {insumos.map(({ label, unit, cu, tot, formula }, i) => (
                     <tr key={label} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
                       <td style={{ ...tdStyle, fontWeight: "600" }}>{label}</td>
-                      <td style={{ ...tdStyle, textAlign: "center", color: "#64748b" }}>{unit}</td>
-                      <td style={{ ...tdStyle, color: "#64748b", fontSize: "9px" }}>{formula}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", color: "#475569" }}>{unit}</td>
+                      <td style={{ ...tdStyle, color: "#475569", fontSize: "10px" }}>{formula}</td>
                       <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold" }}>{cu}</td>
                       <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1d4ed8" }}>{tot}</td>
                     </tr>
@@ -292,13 +292,13 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
 
           {/* ── Control de actividades ── */}
           <div style={{ padding: "0 20px 4px" }}>
-            <SectionTitle size="10px">Control de Actividades</SectionTitle>
+            <SectionTitle size="11.5px">Control de Actividades</SectionTitle>
             <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
                     {["ACTIVIDAD", "AUXILIAR RESPONSABLE", "FECHA INICIO", "FECHA FIN", "OBSERVACIONES"].map((h) => (
-                      <th key={h} style={{ ...thStyle, fontSize: "9px" }}>{h}</th>
+                      <th key={h} style={{ ...thStyle, fontSize: "10.5px" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>

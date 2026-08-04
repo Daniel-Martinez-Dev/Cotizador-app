@@ -247,7 +247,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-        <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
+        <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — División Térmica"
@@ -277,14 +277,14 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
 
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
                 </div>
 
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                  <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>unidades</div>
+                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "24px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                  <div style={{ fontSize: "10px", color: "#64748b", marginTop: "1px" }}>unidades</div>
                 </div>
               </div>
 
@@ -299,7 +299,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                 <InfoChip label="Placa"         value={f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : "NO"} highlight={f.placa === "SI"} />
               </div>
 
-              <SectionTitle size="10px">Medidas de Corte</SectionTitle>
+              <SectionTitle size="11.5px">Medidas de Corte</SectionTitle>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                 <MedidaCard label="Panel"                  ancho={med.panel?.ancho}          alto={med.panel?.alto}          color="#1a3f8f" />
                 <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0f6cbf" />
@@ -328,7 +328,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
               )}
 
               <div style={{ marginTop: "8px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
-                <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
+                <SectionTitle size="11.5px">Opciones y Acabados</SectionTitle>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Logo"     value={f.logo || "NO"} color="#1a3f8f" active={f.logo !== "NO" && !!f.logo} />
                   <AcabadoCard label="Platinas" value={formatPlatinas(f)} color="#d97706" active={f.platinas === "SI"} />
@@ -342,9 +342,9 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
 
                 {/* Lona */}
                 <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
-                  <div style={{ fontSize: "9px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+                  <div style={{ fontSize: "10px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                     Distribución de Lona
-                    <span style={{ fontWeight: "normal", color: "#64748b", marginLeft: "6px" }}>
+                    <span style={{ fontWeight: "600", color: "#475569", marginLeft: "6px" }}>
                       Rollo {med.lona?.anchoRollo ?? "—"} mm — Color: {f.colorLona || "—"}
                     </span>
                   </div>
@@ -355,10 +355,10 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                       ["Sobrante",     med.lona?.sobranteAncho,  "mm"],
                     ].map(([lbl, val, unit]) => (
                       <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
-                        <div style={{ fontSize: lbl === "Tiras" ? "20px" : "15px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>
+                        <div style={{ fontSize: lbl === "Tiras" ? "22px" : "17px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>
                           {val ?? "—"}
                         </div>
-                        <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
+                        <div style={{ fontSize: "9px", color: "#475569", fontWeight: "600", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
                       </div>
                     ))}
                   </div>
@@ -367,16 +367,16 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                 {/* Piso y ventana */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                    <div style={{ fontSize: "8px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
-                    <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#15803d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
-                    <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>mm</div>
+                    <div style={{ fontSize: "9px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
+                    <div style={{ fontSize: "22px", fontWeight: "bold", fontFamily: "monospace", color: "#15803d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
+                    <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>mm</div>
                   </div>
                   <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                    <div style={{ fontSize: "8px", color: "#ca8a04", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
-                    <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color: "#92400e", lineHeight: 1 }}>
+                    <div style={{ fontSize: "9px", color: "#ca8a04", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
+                    <div style={{ fontSize: "22px", fontWeight: "bold", fontFamily: "monospace", color: "#92400e", lineHeight: 1 }}>
                       {med.distanciaVentana != null ? fmt1(med.distanciaVentana) : "—"}
                     </div>
-                    <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "2px" }}>cm</div>
+                    <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>cm</div>
                   </div>
                 </div>
               </div>
@@ -387,10 +387,10 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           {f.adicional && (
             <div style={{ padding: "0 20px 8px" }}>
               <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#ea580c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
+                <div style={{ fontSize: "9.5px", color: "#c2410c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
                   Adicional / Notas
                 </div>
-                <div style={{ fontSize: "11px", color: "#1a1a2e" }}>{f.adicional}</div>
+                <div style={{ fontSize: "12.5px", color: "#1a1a2e" }}>{f.adicional}</div>
               </div>
             </div>
           )}
@@ -405,11 +405,11 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                     background: "#f8fafc", border: "1px solid #e2e8f0",
                     borderRadius: "6px", padding: "6px 8px",
                   }}>
-                    <div style={{ fontSize: "8px", color: "#94a3b8", marginBottom: "2px" }}>{c.insumo.replace(/_/g, " ")}</div>
-                    <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "13px", color: "#374151" }}>
+                    <div style={{ fontSize: "9px", color: "#64748b", fontWeight: "600", marginBottom: "2px" }}>{c.insumo.replace(/_/g, " ")}</div>
+                    <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "15px", color: "#1e293b" }}>
                       {c.unidad === "m²" ? Number(c.cantidad).toFixed(3) : c.cantidad}
                     </div>
-                    <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "1px" }}>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>
                       {c.unidad}{c.largoMm ? ` · ${c.largoMm} mm` : ""}
                     </div>
                   </div>

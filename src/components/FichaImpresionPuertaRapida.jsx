@@ -32,8 +32,8 @@ function DimV({ x, y1, y2, label, color = "#475569", dx = -7 }) {
 }
 // ── Plano técnico (vista frontal, réplica del plano de referencia "Puerta
 // Rápida Enrrollable") — guías laterales, cubremotor, cortina dividida por
-// cortavientos con el visor centrado, cortina óptica, airbag y el cuadro de
-// control siempre al mismo costado que el motor (ladoMotor). Las cotas de
+// cortavientos con el visor centrado, y el cuadro de control siempre al
+// mismo costado y a la misma altura que el motor (ladoMotor). Las cotas de
 // Ancho/Alto Vano, Altura total puerta, Distancia entre Cortavientos y
 // Alto/Altura Visor se recalculan de las medidas reales de la ficha; las
 // distancias de montaje fijas del modelo (guía, holguras de motor, etc.) se
@@ -79,35 +79,45 @@ function PlanoTecnicoPuertaRapida({
 
   // Bandas de la cortina separadas por cortavientos; el visor ocupa una banda
   // COMPLETA (no un recorte inscrito) — por convención de fábrica, va en la
-  // segunda banda contando de abajo hacia arriba.
+  // segunda banda contando de abajo hacia arriba, salvo con cortavientos
+  // cada 500mm (bandas más bajas), donde se corre a la tercera banda.
   const distCortav = distanciaCortavientos || altoVano;
   const bays = Math.max(1, Math.round(altoVano / distCortav));
   const bayH = vanoH / bays;
   const bayH_mm = altoVano / bays;
-  const visorBayFromBottom = bays >= 2 ? 1 : 0;
+  const defaultVisorBay = bays >= 2 ? 1 : 0;
+  const visorBayFromBottom = distCortav === 500 ? Math.min(2, bays - 1) : defaultVisorBay;
   const visorY = floorY - (visorBayFromBottom + 1) * bayH;
   const altoVisor_mm = bayH_mm;
   const alturaVisor_mm = visorBayFromBottom * bayH_mm;
+  // Cota de distancia entre cortavientos — en la banda justo encima del
+  // visor (si solo hay una banda, comparte la del visor).
+  const cotaCortavY0 = bays >= 2 ? visorY - bayH : vanoY0;
+
+  // Motor — bloque mecánico pegado al costado del cubremotor (misma altura,
+  // no asomando por encima), del lado configurado (ladoMotor).
+  const motorW = headerH * 0.95;
+  const motorH = headerH * 1.2;
+  const motorY = topY;
+  const motorX = motorIzquierda ? x0 - motorW : outerRightX;
+  const motorCx = motorX + motorW / 2;
+
+  // El rótulo del motor se calcula desde el borde real de su caja (no un
+  // offset fijo) para que nunca quede tapado, sin importar el ancho de motorW.
+  const motorLabelX = motorIzquierda ? motorX - 14 : motorX + motorW + 14;
+  const motorLabelY = topY + headerH * 0.5 + 2;
+  const motorLabelAnchor = motorIzquierda ? "end" : "start";
+  const topMostY = Math.min(topY, motorY);
 
   // Cuadro de control — siempre al mismo costado que el motor (ladoMotor),
-  // pegado a la guía de ese lado; sin botonera ni accesorios adicionales.
+  // a media altura del vano, pegado a la guía de ese lado; sin botonera ni
+  // accesorios adicionales.
   const boxW = Math.max(14, guideW * 2.2);
   const boxH = vanoH * 0.15;
   const boxY = vanoY0 + vanoH * 0.60;
   const boxX = motorIzquierda ? x0 - 4 - boxW : outerRightX + 4;
   const boxTextX = motorIzquierda ? boxX - 4 : boxX + boxW + 4;
   const boxTextAnchor = motorIzquierda ? "end" : "start";
-
-  // Motor — caja mecánica sobre la guía del lado configurado (ladoMotor),
-  // asomando por encima del cubremotor, igual que en el plano de referencia.
-  const motorW = guideW * 2.4;
-  const motorH = headerH * 1.7;
-  const motorCx = motorIzquierda ? x0 + guideW / 2 : rightGuideX0 + guideW / 2;
-  const motorX = motorCx - motorW / 2;
-  const motorY = topY - motorH * 0.55;
-  const motorLabelX = outerRightX + 14;
-  const motorLabelY = topY + headerH * 0.5 + 2;
-  const topMostY = Math.min(topY, motorY);
 
   // Cotas de Altura total puerta / Alto vano — al costado libre de equipo,
   // opuesto al motor y al cuadro de control.
@@ -125,6 +135,24 @@ function PlanoTecnicoPuertaRapida({
         <marker id="arrPR-b" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
           <path d="M6,0 L0,3 L6,6 Z" fill={dim} />
         </marker>
+        <linearGradient id="aluminioPR" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#dfe6ee" />
+          <stop offset="45%" stopColor="#9aa8b6" />
+          <stop offset="100%" stopColor="#eef2f7" />
+        </linearGradient>
+        <linearGradient id="motorGradPR" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#6b7280" />
+          <stop offset="100%" stopColor="#1f2937" />
+        </linearGradient>
+        <linearGradient id="visorGradPR" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#f8fbff" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#d6e7f5" stopOpacity="0.85" />
+        </linearGradient>
+        <linearGradient id="lonaGradPR" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={cortinaCol} stopOpacity="0.85" />
+          <stop offset="50%" stopColor={cortinaCol} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={cortinaCol} stopOpacity="0.8" />
+        </linearGradient>
       </defs>
 
       {/* Línea de holgura mínima de montaje, por encima del motor y el cubremotor */}
@@ -133,33 +161,49 @@ function PlanoTecnicoPuertaRapida({
         Seguridad montaje = {params.DISTANCIA_MIN_SEGURIDAD_MONTAJE_MM} mm
       </text>
 
-      {/* Cubremotor (caja superior) */}
-      <rect x={x0} y={topY} width={fw} height={headerH} fill="#cbd5e1" stroke={linea} strokeWidth="1.2" />
-      <text x={cx} y={topY + headerH / 2 + 2.5} fontSize="6.5" fontWeight="bold" fill="#1e293b" textAnchor="middle">CUBREMOTOR</text>
+      {/* Cubrerrollo (caja superior) */}
+      <rect x={x0} y={topY} width={fw} height={headerH} fill="url(#aluminioPR)" stroke={linea} strokeWidth="1.2" />
+      <line x1={x0 + 3} y1={topY + headerH * 0.22} x2={x0 + fw - 3} y2={topY + headerH * 0.22} stroke="#ffffff" strokeOpacity="0.6" strokeWidth="0.75" />
+      <text x={cx} y={topY + headerH / 2 + 2.5} fontSize="6.5" fontWeight="bold" fill="#1e293b" textAnchor="middle">
+        CUBRERROLLO: {fmtMm(altoCubrerrollo)} mm
+      </text>
 
-      {/* Guías laterales */}
-      <rect x={x0} y={vanoY0} width={guideW} height={vanoH} fill="#e2e8f0" stroke={linea} strokeWidth="1.2" />
-      <rect x={rightGuideX0} y={vanoY0} width={guideW} height={vanoH} fill="#e2e8f0" stroke={linea} strokeWidth="1.2" />
+      {/* Guías laterales — perfil metálico con tornillería */}
+      <rect x={x0} y={vanoY0} width={guideW} height={vanoH} fill="url(#aluminioPR)" stroke={linea} strokeWidth="1.2" />
+      <rect x={x0 + guideW * 0.22} y={vanoY0 + 3} width={guideW * 0.56} height={vanoH - 6} fill="#eef3f8" stroke="#94a3b8" strokeWidth="0.5" />
+      {Array.from({ length: 6 }, (_, i) => vanoY0 + 10 + (i * (vanoH - 20)) / 5).map((y, i) => (
+        <circle key={`lg${i}`} cx={x0 + guideW / 2} cy={y} r="1" fill="#475569" />
+      ))}
+      <rect x={rightGuideX0} y={vanoY0} width={guideW} height={vanoH} fill="url(#aluminioPR)" stroke={linea} strokeWidth="1.2" />
+      <rect x={rightGuideX0 + guideW * 0.22} y={vanoY0 + 3} width={guideW * 0.56} height={vanoH - 6} fill="#eef3f8" stroke="#94a3b8" strokeWidth="0.5" />
+      {Array.from({ length: 6 }, (_, i) => vanoY0 + 10 + (i * (vanoH - 20)) / 5).map((y, i) => (
+        <circle key={`rg${i}`} cx={rightGuideX0 + guideW / 2} cy={y} r="1" fill="#475569" />
+      ))}
 
       {/* Motor — posición vertical, sobre la guía del lado configurado */}
-      <rect x={motorX} y={motorY} width={motorW} height={motorH} rx="1.5" fill="#94a3b8" stroke={linea} strokeWidth="1.2" />
-      <rect x={motorX + motorW * 0.15} y={motorY + motorH * 0.1} width={motorW * 0.7} height={motorH * 0.35} fill="#64748b" stroke={linea} strokeWidth="0.75" />
-      <circle cx={motorCx} cy={motorY + motorH * 0.72} r={Math.max(1.2, motorW * 0.1)} fill="#334155" />
-      <line x1={motorLabelX - 4} y1={motorLabelY} x2={motorCx + (motorIzquierda ? motorW / 2 : -motorW / 2)} y2={motorY + motorH * 0.35} stroke="#94a3b8" strokeWidth="0.75" strokeDasharray="2,1.5" />
-      <text x={motorLabelX} y={motorLabelY} fontSize="6.5" fontWeight="bold" fill="#475569">
+      <rect x={motorX} y={motorY} width={motorW} height={motorH} rx="1.5" fill="url(#motorGradPR)" stroke={linea} strokeWidth="1.2" />
+      <rect x={motorX + motorW * 0.15} y={motorY + motorH * 0.1} width={motorW * 0.7} height={motorH * 0.35} fill="#4b5563" stroke={linea} strokeWidth="0.75" />
+      <circle cx={motorCx} cy={motorY + motorH * 0.72} r={Math.max(1.2, motorW * 0.1)} fill="#0f172a" />
+      <text x={motorLabelX} y={motorLabelY} fontSize="6.5" fontWeight="bold" fill="#475569" textAnchor={motorLabelAnchor}>
         MOTOR POSICIÓN VERTICAL ({ladoMotor || "IZQUIERDO"})
       </text>
 
       {/* Cortina — bandas separadas por cortavientos */}
-      <rect x={vanoX0} y={vanoY0} width={vanoW} height={vanoH} fill={cortinaCol} fillOpacity="0.18" stroke={cortinaCol} strokeWidth="2" />
+      <rect x={vanoX0} y={vanoY0} width={vanoW} height={vanoH} fill="url(#lonaGradPR)" stroke={cortinaCol} strokeWidth="2" />
+      {Array.from({ length: 14 }, (_, i) => vanoY0 + (i + 0.5) * (vanoH / 14)).map((y, i) => (
+        <line key={i} x1={vanoX0} y1={y} x2={vanoX0 + vanoW} y2={y} stroke="#ffffff" strokeOpacity="0.07" />
+      ))}
       {Array.from({ length: bays - 1 }, (_, i) => vanoY0 + (i + 1) * bayH).map((y, i) => (
-        <rect key={i} x={vanoX0} y={y - 1.2} width={vanoW} height="2.4" fill={linea} />
+        <g key={i}>
+          <rect x={vanoX0} y={y - 1.6} width={vanoW} height="3.2" fill="url(#aluminioPR)" stroke={linea} strokeWidth="0.5" />
+          <line x1={vanoX0} y1={y - 1.6} x2={vanoX0 + vanoW} y2={y - 1.6} stroke="#ffffff" strokeOpacity="0.5" />
+        </g>
       ))}
 
-      {/* Distancia entre cortavientos — cota corta sobre la banda superior */}
-      <line x1={cx} y1={vanoY0 + 3} x2={cx} y2={vanoY0 + bayH - 3} stroke={dim} strokeWidth="1" markerStart="url(#arrPR-b)" markerEnd="url(#arrPR-a)" />
-      <rect x={cx - 24} y={vanoY0 + bayH / 2 - 6} width="48" height="11" fill="white" fillOpacity="0.85" rx="2" />
-      <text x={cx} y={vanoY0 + bayH / 2 + 3} fontSize="6.5" fontWeight="bold" fill={dim} textAnchor="middle">
+      {/* Distancia entre cortavientos — cota corta en la banda justo encima del visor */}
+      <line x1={cx} y1={cotaCortavY0 + 3} x2={cx} y2={cotaCortavY0 + bayH - 3} stroke={dim} strokeWidth="1" markerStart="url(#arrPR-b)" markerEnd="url(#arrPR-a)" />
+      <rect x={cx - 24} y={cotaCortavY0 + bayH / 2 - 6} width="48" height="11" fill="white" fillOpacity="0.85" rx="2" />
+      <text x={cx} y={cotaCortavY0 + bayH / 2 + 3} fontSize="6.5" fontWeight="bold" fill={dim} textAnchor="middle">
         {fmtMm(distCortav)} mm
       </text>
 
@@ -169,45 +213,34 @@ function PlanoTecnicoPuertaRapida({
           <rect x={vanoX0} y={visorY} width={vanoW} height={bayH} />
         </clipPath>
       </defs>
-      <rect x={vanoX0} y={visorY} width={vanoW} height={bayH} fill="#eff6ff" />
+      <rect x={vanoX0} y={visorY} width={vanoW} height={bayH} fill="url(#visorGradPR)" />
       <g clipPath="url(#visorClipPR)">
         {Array.from({ length: Math.round(vanoW / bayH) + 1 }, (_, i) => {
           const sx = vanoX0 - bayH + i * bayH * 1.4;
           return <line key={i} x1={sx} y1={visorY + bayH} x2={sx + bayH} y2={visorY} stroke={cortinaCol} strokeWidth="0.5" strokeOpacity="0.3" />;
         })}
+        <line x1={vanoX0} y1={visorY + bayH * 0.85} x2={vanoX0 + vanoW} y2={visorY + bayH * 0.15} stroke="#ffffff" strokeOpacity="0.5" strokeWidth="1.4" />
       </g>
+      <rect x={vanoX0} y={visorY} width={vanoW} height={bayH} fill="none" stroke="#94a3b8" strokeWidth="0.6" />
       <text x={vanoX0 + vanoW / 2} y={visorY + bayH * 0.5} fontSize="6.5" fontWeight="bold" fill={cortinaCol} textAnchor="middle">VISOR</text>
       <text x={vanoX0 + vanoW / 2} y={visorY + bayH * 0.5 + 9} fontSize="5.5" fill={cortinaCol} textAnchor="middle">
         alto {fmtMm(altoVisor_mm)} · a {fmtMm(alturaVisor_mm)} mm del piso
       </text>
 
-      {/* Airbag de seguridad (borde inferior) */}
-      <rect x={vanoX0} y={floorY - 6} width={vanoW} height="6" fill="#1f2937" />
-      <text x={vanoX0 + vanoW / 2} y={floorY - 1.5} fontSize="5" fontWeight="bold" fill="white" textAnchor="middle">AIRBAG DE SEGURIDAD</text>
-
-      {/* Cortina óptica (cara interior de la guía izquierda) */}
-      <rect x={vanoX0 - 3} y={vanoY0} width="3" height={vanoH} fill="#0f172a" />
-      <text
-        x={vanoX0 + 4} y={vanoY0 + vanoH * 0.42}
-        fontSize="5.5" fontWeight="bold" fill="#0f172a" textAnchor="middle"
-        transform={`rotate(-90,${vanoX0 + 4},${vanoY0 + vanoH * 0.42})`}
-      >
-        CORTINA ÓPTICA
-      </text>
+      {/* Zócalo — barra inferior de refuerzo de la cortina */}
+      <rect x={vanoX0} y={floorY - Math.min(4, bayH * 0.12)} width={vanoW} height={Math.min(4, bayH * 0.12)} fill="#111827" />
 
       {/* Cuadro de control — mismo costado que el motor */}
       <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="1" fill="white" stroke="#d97706" strokeWidth="1" />
+      {[0.28, 0.5, 0.72].map((f, i) => (
+        <circle key={i} cx={boxX + boxW / 2} cy={boxY + boxH * f} r={Math.min(1.6, boxW * 0.12)} fill={["#16a34a", "#f59e0b", "#dc2626"][i]} />
+      ))}
       <text x={boxTextX} y={boxY + boxH * 0.65} fontSize="6.5" fontWeight="bold" fill="#b45309" textAnchor={boxTextAnchor}>CUADRO DE CONTROL</text>
 
       {/* ── Cotas dinámicas (recalculadas de la ficha) ── */}
       <DimV x={altoDimFarX} y1={topY} y2={floorY} label={`ALTURA TOTAL PUERTA: ${fmtMm(altoTotalPuerta)} mm`} dx={altoDimSign * 7} />
       <DimV x={altoDimNearX} y1={vanoY0} y2={floorY} label={`ALTO VANO: ${fmtMm(altoVano)} mm`} dx={altoDimSign * 7} />
       <DimH x1={vanoX0} x2={rightGuideX0} y={floorY + 14} label={`ANCHO VANO: ${fmtMm(anchoVano)} mm`} dy={9} />
-      <DimH x1={x0} x2={vanoX0} y={floorY + 30} label={fmtMm(anchoGuia)} dy={9} color="#94a3b8" />
-      <DimH x1={rightGuideX0} x2={outerRightX} y={floorY + 30} label={fmtMm(anchoGuia)} dy={9} color="#94a3b8" />
-
-      {/* Holgura mínima instalación/mantenimiento (izquierda) */}
-      <DimH x1={Math.max(6, x0 - 50)} x2={x0} y={floorY + 46} label={`INSTAL./MANTENIM. = ${params.MIN_DISTANCIA_INSTALACION_MANTENIMIENTO_MM} mm`} dy={9} color="#94a3b8" />
 
       {/* Título */}
       <text x={W / 2} y={H - 6} fontSize="9" fontWeight="bold" textAnchor="middle" fill="#333">
@@ -233,7 +266,7 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-      <div style={{ color: "#1a1a2e", fontSize: "11px" }}>
+      <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
         <Membrete
           logoSrc={logoPng}
           tituloFicha="Ficha de Fabricación — Puerta Rápida"
@@ -254,13 +287,13 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
 
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
               <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
               </div>
               <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: "8px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                <div style={{ fontSize: "9px", color: "#94a3b8", marginTop: "1px" }}>puertas</div>
+                <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
+                <div style={{ fontSize: "10px", color: "#64748b", marginTop: "1px" }}>puertas</div>
               </div>
             </div>
 
@@ -269,45 +302,45 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
               <InfoChip label="Fecha entrega (estimada)" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
             </div>
 
-            <SectionTitle size="10px">Medidas de Fabricación (mm)</SectionTitle>
+            <SectionTitle size="11.5px">Medidas de Fabricación (mm)</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
               {[
-                { label: "Vinilo", val: fmtMm(med.vinilo) },
-                { label: "Largo cortina", val: fmtMm(med.largoCortina) },
-                { label: "Cubre rollo", val: fmtMm(med.cubreRollo) },
-                { label: "Altura parales", val: fmtMm(med.alturaParales) },
                 { label: "Eje, zócalo, caucho, cortavientos y lona", val: fmtMm(med.ejeZocalo) },
+                { label: "Largo cortina", val: fmtMm(med.largoCortina) },
+                { label: "Vinilo", val: fmtMm(med.vinilo) },
                 { label: "Tubo estructura", val: fmtMm(med.tuboEstructura) },
+                { label: "Cubre rollo", val: fmtMm(med.cubreRollo) },
+                { label: "Añadido cubre rollo", val: fmtMm(med.anadidoCubreRollo) },
+                { label: "Altura parales", val: fmtMm(med.alturaParales) },
+                { label: "Añadido por paral", val: fmtMm(med.anadidoPorParal) },
+                { label: "Alto cubrerrollo", val: fmtMm(med.altoCubrerrollo) },
                 { label: "Ancho total", val: fmtMm(med.anchoTotalPuerta) },
                 { label: "Alto total", val: fmtMm(med.altoTotalPuerta) },
-                { label: "Alto cubrerrollo", val: fmtMm(med.altoCubrerrollo) },
-                { label: "Añadido cubre rollo", val: fmtMm(med.anadidoCubreRollo) },
-                { label: "Añadido por paral", val: fmtMm(med.anadidoPorParal) },
                 { label: "M² cortina", val: fmtM2(med.m2Cortina) },
               ].map(({ label, val }) => (
                 <div key={label} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "6px", textAlign: "center" }}>
-                  <div style={{ fontSize: "7px", color: "#94a3b8", textTransform: "uppercase", marginBottom: "2px" }}>{label}</div>
-                  <div style={{ fontSize: "13px", fontWeight: "bold", fontFamily: "monospace", color: "#1a3f8f" }}>{val}</div>
+                  <div style={{ fontSize: "8.5px", color: "#475569", fontWeight: "600", textTransform: "uppercase", marginBottom: "2px" }}>{label}</div>
+                  <div style={{ fontSize: "15px", fontWeight: "bold", fontFamily: "monospace", color: "#1a3f8f" }}>{val}</div>
                 </div>
               ))}
             </div>
 
             <div style={{ marginTop: "10px", background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "9px 10px" }}>
-              <SectionTitle size="10px">Opciones y Acabados</SectionTitle>
+              <SectionTitle size="11.5px">Opciones y Acabados</SectionTitle>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
                 <AcabadoCard label="Color lona"  value={f.colorLona || "—"} color="#1a3f8f" active />
                 <AcabadoCard label="Lado motor"  value={f.ladoMotor || "—"} color="#0f6cbf" active />
-                <AcabadoCard label="Exclusa"     value={f.exclusa   || "NO"} color="#0891b2" active={f.exclusa === "SI"} />
-                <AcabadoCard label="FCT"         value={f.fct       || "NO"} color="#0d9488" active={f.fct === "SI"} />
-                <AcabadoCard label="Vinilo"      value={f.vinilo    || "NO"} color="#7c3aed" active={f.vinilo === "SI"} />
-                <AcabadoCard label="Base / Eje"  value={`${med.base || "—"} / ${med.ejeMotor || "—"}`} color="#d97706" active />
                 <AcabadoCard label="Motor"       value={med.motorKw || "—"} color="#be123c" active />
                 <AcabadoCard label="Cortavientos" value={`${fmtN(med.cantidadCortavientos)} · cada ${fmtMm(med.distanciaCortavientos)} mm`} color="#334155" active />
+                <AcabadoCard label="Vinilo"      value={f.vinilo    || "NO"} color="#7c3aed" active={f.vinilo === "SI"} />
+                <AcabadoCard label="Base / Eje"  value={`${med.base || "—"} / ${med.ejeMotor || "—"}`} color="#d97706" active />
+                <AcabadoCard label="Exclusa"     value={f.exclusa   || "NO"} color="#0891b2" active={f.exclusa === "SI"} />
+                <AcabadoCard label="FCT"         value={f.fct       || "NO"} color="#0d9488" active={f.fct === "SI"} />
               </div>
             </div>
           </div>
 
-          {/* Columna derecha — plano técnico + distancias de instalación */}
+          {/* Columna derecha — plano técnico + adicional/notas */}
           <div>
             <div style={{
               border: "1px solid #ccc", borderRadius: "8px", padding: "4px",
@@ -325,29 +358,15 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
               />
             </div>
 
-            {/* ── Distancias de instalación (referencia de fábrica, fijas del modelo) ── */}
-            <div style={{ marginTop: "8px", background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "9px 10px" }}>
-              <SectionTitle size="10px">Distancias de Instalación (Referencia de Fábrica)</SectionTitle>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
-                {[
-                  ["Ancho guía",                "ANCHO_GUIA_MM"],
-                  ["Seguridad montaje",         "DISTANCIA_MIN_SEGURIDAD_MONTAJE_MM"],
-                  ["Guía-ext. motor",           "DISTANCIA_GUIA_EXTERIOR_MOTOR_MM"],
-                  ["Guía-ext. cubremotor",      "DISTANCIA_GUIA_EXTERIOR_CUBREMOTOR_MM"],
-                  ["Seguridad recomendada",     "DISTANCIA_RECOMENDADA_SEGURIDAD_MM"],
-                  ["Instalación/mantenim.",     "MIN_DISTANCIA_INSTALACION_MANTENIMIENTO_MM"],
-                  ["Estructura control",        "ANCHO_ESTRUCTURA_CONTROL_MM"],
-                  ["Espesor pared ext./int.",   null],
-                ].map(([label, key]) => (
-                  <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "5px", textAlign: "center" }}>
-                    <div style={{ fontSize: "6.5px", color: "#94a3b8", textTransform: "uppercase", marginBottom: "2px" }}>{label}</div>
-                    <div style={{ fontSize: "11px", fontWeight: "bold", fontFamily: "monospace", color: "#334155" }}>
-                      {key ? `${PARAMETROS_PUERTA_RAPIDA[key]} mm` : `${PARAMETROS_PUERTA_RAPIDA.ESPESOR_PARED_EXTERNA_MM} / ${PARAMETROS_PUERTA_RAPIDA.ESPESOR_PARED_INTERNA_MM} mm`}
-                    </div>
-                  </div>
-                ))}
+            {/* ── Adicional / Notas ── */}
+            {f.adicional && (
+              <div style={{ marginTop: "8px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
+                <div style={{ fontSize: "9.5px", color: "#c2410c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
+                  Adicional / Notas
+                </div>
+                <div style={{ fontSize: "12.5px", color: "#1a1a2e" }}>{f.adicional}</div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -361,25 +380,13 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
                   background: "#f8fafc", border: "1px solid #e2e8f0",
                   borderRadius: "6px", padding: "6px 8px",
                 }}>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", marginBottom: "2px" }}>{c.insumo}</div>
-                  <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "13px", color: "#374151" }}>
+                  <div style={{ fontSize: "9px", color: "#64748b", fontWeight: "600", marginBottom: "2px" }}>{c.insumo}</div>
+                  <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "15px", color: "#1e293b" }}>
                     {c.texto ?? fmtN(c.cantidad)}
                   </div>
-                  <div style={{ fontSize: "8px", color: "#94a3b8", marginTop: "1px" }}>{c.unidad}</div>
+                  <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>{c.unidad}</div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Adicional / Notas ── */}
-        {f.adicional && (
-          <div style={{ padding: "0 20px 8px" }}>
-            <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
-              <div style={{ fontSize: "8px", color: "#ea580c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
-                Adicional / Notas
-              </div>
-              <div style={{ fontSize: "11px", color: "#1a1a2e" }}>{f.adicional}</div>
             </div>
           </div>
         )}

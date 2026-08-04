@@ -34,20 +34,23 @@ export default function FichaImpresionShell({
         html, body { margin: 0; padding: 0; }
         body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #111; }
         table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #999; padding: 4px 7px; font-size: 11px; vertical-align: middle; }
-        @media print { body { margin: 5mm; } @page { size: A4 landscape; margin: 0; } }
+        td, th { border: 1px solid #999; padding: 4px 7px; font-size: 12px; vertical-align: middle; }
+        @media print { body { margin: 5mm; } @page { size: letter landscape; margin: 0; } }
       </style>
     </head><body><div id="print-content">${printRef.current.innerHTML}</div></body></html>`);
     win.document.close();
 
     // Encoge el contenido (si hace falta) para que cualquier ficha, sin importar
-    // cuántas filas/insumos tenga, entre siempre en una sola página A4 horizontal.
+    // cuántas filas/insumos tenga, entre siempre en una sola página carta (Letter)
+    // horizontal — el tamaño real en el que se imprime. Si este cálculo usara
+    // A4 (más ancho que carta) y el driver de impresión luego reescala a carta,
+    // el contenido se encoge dos veces y el texto sale más pequeño de lo previsto.
     const fitToOnePage = () => {
       const el = win.document.getElementById("print-content");
       if (el) {
         const mmToPx = 96 / 25.4;
-        const pageW = (297 - 10) * mmToPx; // A4 horizontal menos márgenes de 5mm
-        const pageH = (210 - 10) * mmToPx;
+        const pageW = (279.4 - 10) * mmToPx; // Carta (Letter) horizontal menos márgenes de 5mm
+        const pageH = (215.9 - 10) * mmToPx;
         const scale = Math.min(1, pageW / el.scrollWidth, pageH / el.scrollHeight);
         if (scale < 1) el.style.zoom = scale;
       }
