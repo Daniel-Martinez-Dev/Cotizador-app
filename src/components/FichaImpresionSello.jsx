@@ -4,102 +4,57 @@ import { fmtMm, fmtM2, fmtN, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { FaUserTie, FaRegCalendarAlt, FaUserCircle } from "react-icons/fa";
 import { MedidaCard, InfoChip, AcabadoCard, FichaFooter } from "./fichas/FichaVisualKit";
+import planoSelloAnden from "../assets/imagenes/SelloDeAnden/Plano.png";
 
-// ── Diagrama SVG del SELLO — caja isométrica limpia (una sola pieza, sin
-// despiece), con las 8 cotas de fabricación de referencia. ─────────────────
-function DiagramaSelloFrente({ anchoVano, altoVano, selloAncho, selloAlto, espesorSello, espesorPoste, despliegueCortina }) {
-  const W = 680, H = 440;
-  const boxW = 320, boxH = 240, depth = 44;
-  const ox = 170, oy = 78;
+// ─── Plano técnico (imagen de referencia + medidas superpuestas) ─────────────
+// La imagen fuente (Plano.png) trae cada cota como "Etiqueta =" sin el valor
+// impreso — cada "=" quedó en blanco a propósito para poder superponer aquí
+// las medidas reales del pedido (mismo patrón que usa Abrigo Retráctil con su
+// Plano.png). Coordenadas (px sobre 1231×716, la resolución del archivo
+// fuente) medidas a mano sobre cada "=" del plano; si se reemplaza Plano.png
+// por otro archivo con otro layout, estas posiciones hay que recalibrarlas.
+const PLANO_ANCHO_PX = 1231;
+const PLANO_ALTO_PX  = 716;
+const pct = (px, total) => `${((px / total) * 100).toFixed(2)}%`;
 
-  const left = ox, right = ox + boxW;
-  const top = oy, bottom = oy + boxH;
-  const cx = (left + right) / 2;
-
-  const linea = "#1f2937";
-  const dim = "#475569";
-  const faceSide = "#d7dbe2";
-  const faceFront = "#fbfbfc";
-
-  const despH = altoVano
-    ? Math.min(boxH * 0.42, Math.max(30, (Number(despliegueCortina) / Number(altoVano)) * boxH))
-    : 50;
+function PlanoTecnico({ anchoVano, altoVano, selloAncho, selloAlto, espesorSello, espesorPoste, despliegueCortina }) {
+  const overlays = [
+    { x: 120, y: 175, value: `${fmtMm(despliegueCortina)} mm`, rotate: 0 },   // Despliegue cortina
+    { x: 308, y: 290, value: `${fmtMm(altoVano)} mm`,          rotate: -90 }, // Alto total Luz
+    { x: 815, y: 232, value: `${fmtMm(selloAlto)} mm`,         rotate: -90 }, // Alto total sello
+    { x: 435, y: 586, value: `${fmtMm(espesorPoste)} mm`,      rotate: 0 },   // Espesor
+    { x: 148, y: 633, value: `${fmtMm(espesorSello)} mm`,      rotate: 0 },   // Ancho poste
+    { x: 415, y: 661, value: `${fmtMm(anchoVano)} mm`,         rotate: 0 },   // Ancho Vano
+    { x: 408, y: 701, value: `${fmtMm(selloAncho)} mm`,        rotate: 0 },   // Ancho total sello
+  ];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", fontFamily: "Arial, sans-serif" }}>
-      <defs>
-        <marker id="arrSF" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill={dim} />
-        </marker>
-        <linearGradient id="topGradSF" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f6f7f9" />
-          <stop offset="100%" stopColor="#e3e6eb" />
-        </linearGradient>
-      </defs>
-
-      {/* Sombra suave debajo de la caja */}
-      <ellipse cx={cx + depth / 2} cy={bottom + depth * 0.55} rx={boxW / 2 + 8} ry="9" fill="#0f172a" opacity="0.06" />
-
-      {/* Cara superior */}
-      <path
-        d={`M${left + 18},${top} H${right} L${right + depth},${top - depth} H${left + depth + 18} Z`}
-        fill="url(#topGradSF)" stroke={linea} strokeWidth="1.3" strokeLinejoin="round"
-      />
-      {/* Cara lateral derecha (profundidad) */}
-      <polygon
-        points={`${right},${top} ${right + depth},${top - depth} ${right + depth},${bottom - depth} ${right},${bottom}`}
-        fill={faceSide} stroke={linea} strokeWidth="1.3"
-      />
-      {/* Cara frontal, esquina superior izquierda redondeada */}
-      <path
-        d={`M${left},${top + 18} A18,18 0 0 1 ${left + 18},${top} H${right} V${bottom} H${left} Z`}
-        fill={faceFront} stroke={linea} strokeWidth="1.4" strokeLinejoin="round"
-      />
-
-      {/* Franjas verticales de lona */}
-      <rect x={left + 34} y={top + 16} width="12" height={boxH - 32} fill="#f5f6f8" stroke="#94a3b8" strokeWidth="0.8" rx="2" ry="2" />
-      <rect x={right - 46} y={top + 16} width="12" height={boxH - 32} fill="#f5f6f8" stroke="#94a3b8" strokeWidth="0.8" rx="2" ry="2" />
-
-      {/* Callouts Lona 750K */}
-      <line x1={left + 40} y1={top + 40} x2={left - 6} y2={top + 18} stroke="#666" strokeWidth="0.8" />
-      <text x={left - 10} y={top + 16} fontSize="9.5" fill="#334155" textAnchor="end">Lona 750K</text>
-
-      <line x1={cx + 20} y1={top - depth * 0.4} x2={cx + 70} y2={top - depth - 14} stroke="#666" strokeWidth="0.8" />
-      <text x={cx + 74} y={top - depth - 12} fontSize="9.5" fill="#334155" textAnchor="start">Lona 750K</text>
-
-      {/* Despliegue cortina */}
-      <line x1={left - 30} y1={top + 18} x2={left - 30} y2={top + 18 + despH} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={left - 38} y={top + 18 + despH / 2 - 4} fontSize="9" fill={dim} textAnchor="end">Despliegue</text>
-      <text x={left - 38} y={top + 18 + despH / 2 + 8} fontSize="9" fill={dim} textAnchor="end">cortina: {fmtMm(despliegueCortina)} mm</text>
-
-      {/* Alto bajo lona */}
-      <line x1={left + 70} y1={top + 4} x2={left + 70} y2={bottom} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={left + 58} y={(top + bottom) / 2} fontSize="9" fill={dim} textAnchor="middle" transform={`rotate(-90,${left + 58},${(top + bottom) / 2})`}>
-        Alto bajo lona: {fmtMm(altoVano)} mm
-      </text>
-
-      {/* Alto total sello */}
-      <line x1={right + depth + 22} y1={top - depth} x2={right + depth + 22} y2={bottom} stroke={linea} strokeWidth="1.2" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={right + depth + 34} y={(top - depth + bottom) / 2} fontSize="10" fill={linea} fontWeight="bold" textAnchor="middle" transform={`rotate(90,${right + depth + 34},${(top - depth + bottom) / 2})`}>
-        Alto total sello: {fmtMm(selloAlto)} mm
-      </text>
-
-      {/* Espesor (profundidad) */}
-      <line x1={right} y1={bottom + 16} x2={right + depth} y2={bottom + 16 - depth} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={right + depth / 2 + 6} y={bottom + 30} fontSize="9" fill={dim} textAnchor="middle">Espesor: {fmtMm(espesorPoste)} mm</text>
-
-      {/* Ancho poste */}
-      <line x1={left} y1={bottom + 14} x2={left + 46} y2={bottom + 14} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={left + 23} y={bottom + 26} fontSize="8.5" fill={dim} textAnchor="middle">Ancho poste: {fmtMm(espesorSello)} mm</text>
-
-      {/* Ancho bajo lona */}
-      <line x1={left + 46} y1={bottom + 14} x2={right - 46} y2={bottom + 14} stroke={dim} strokeWidth="1" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={cx} y={bottom + 26} fontSize="9" fill={dim} textAnchor="middle">Ancho bajo lona: {fmtMm(anchoVano)} mm</text>
-
-      {/* Ancho total sello */}
-      <line x1={left} y1={bottom + 42} x2={right} y2={bottom + 42} stroke={linea} strokeWidth="1.2" markerStart="url(#arrSF)" markerEnd="url(#arrSF)" />
-      <text x={cx} y={bottom + 54} fontSize="10" fill={linea} fontWeight="bold" textAnchor="middle">Ancho total sello: {fmtMm(selloAncho)} mm</text>
-    </svg>
+    <div style={{ textAlign: "center" }}>
+      <div style={{ position: "relative", display: "inline-block", width: "520px", maxWidth: "100%" }}>
+        <img
+          src={planoSelloAnden}
+          alt="Plano — Sello de Andén"
+          style={{ display: "block", width: "100%", height: "auto" }}
+        />
+        {overlays.map(({ x, y, value, rotate }, i) => (
+          <span key={i} style={{
+            position: "absolute",
+            top: pct(y, PLANO_ALTO_PX),
+            left: pct(x, PLANO_ANCHO_PX),
+            transform: `rotate(${rotate}deg)`,
+            transformOrigin: "left center",
+            fontSize: "9px", fontWeight: "bold", fontFamily: "monospace",
+            color: "#111827", whiteSpace: "nowrap", lineHeight: 1,
+            background: "rgba(255,255,255,0.92)", padding: "1px 3px", borderRadius: "2px",
+          }}>
+            {value}
+          </span>
+        ))}
+      </div>
+      <div style={{ fontSize: "9px", color: "#64748b", marginTop: "5px" }}>
+        Plano de referencia — medidas del pedido superpuestas
+      </div>
+    </div>
   );
 }
 
@@ -255,7 +210,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
                   <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Alto</div>
                 </div>
               </div>
-              <DiagramaSelloFrente
+              <PlanoTecnico
                 anchoVano={f.anchoVano}
                 altoVano={f.altoVano}
                 selloAncho={med.selloAncho}
