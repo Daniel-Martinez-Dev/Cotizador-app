@@ -45,7 +45,7 @@ function getMimeType(filePath) {
 
 function startStaticServer() {
   const distDir = path.join(__dirname, '..', 'dist')
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const reqUrl = new URL(req.url ?? '/', `http://${req.headers.host}`)
       let pathname = decodeURIComponent(reqUrl.pathname)
@@ -74,22 +74,12 @@ function startStaticServer() {
       serveFile(path.join(distDir, 'index.html'))
     })
 
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        // Puerto ocupado por otra instancia — reusarlo
-        resolve(49821)
-      } else {
-        // Fallback a puerto aleatorio
-        server.listen(0, '127.0.0.1', () => {
-          staticServer = server
-          resolve(server.address()?.port)
-        })
-      }
-    })
+    server.on('error', reject)
 
-    server.listen(49821, '127.0.0.1', () => {
+    // Puerto 0 = el SO asigna un puerto libre, sin conflictos entre instancias
+    server.listen(0, '127.0.0.1', () => {
       staticServer = server
-      resolve(49821)
+      resolve(server.address().port)
     })
   })
 }
