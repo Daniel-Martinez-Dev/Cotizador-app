@@ -8,6 +8,7 @@ import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, cr
 import { waitForAuth, getAuthError } from '../firebase';
 import toast from 'react-hot-toast';
 import { numeroALetras } from '../utils/numeroALetras';
+import Combobox from '../components/ui/Combobox';
 
 // Utilidades
 const redondear5000 = v => Math.round(v / 5000) * 5000;
@@ -209,12 +210,10 @@ export default function CotizadorApp(){
       setEmpresaNombreInput(empresaSeleccionada.nombre||'');
       setEmpresaNITInput(empresaSeleccionada.nit||'');
       setEmpresaCiudadInput(empresaSeleccionada.ciudad||'');
-    } else {
-      // limpiar si se des-selecciona
-      setEmpresaNombreInput('');
-      setEmpresaNITInput('');
-      setEmpresaCiudadInput('');
     }
+    // Al des-seleccionar NO se borran los campos: normalmente ocurre porque el
+    // usuario está corrigiendo el nombre a mano y borrarlos le impedía escribir.
+    // El borrado real lo hace "Nueva cotización" (resetToken).
     // al cambiar empresa limpiar contacto si no pertenece
     setContactoSeleccionado(null);
     setContactoNombreInput('');
@@ -334,6 +333,20 @@ export default function CotizadorApp(){
     navigate('/preview');
   };
 
+  // Opciones para los autocompletar de empresa/contacto
+  const opcionesEmpresas = React.useMemo(()=> (empresas||[]).map(em=> ({
+    id: em.id,
+    label: em.nombre || '',
+    sublabel: [em.nit, em.ciudad].filter(Boolean).join(' · '),
+    data: em,
+  })), [empresas]);
+  const opcionesContactos = React.useMemo(()=> (contactosEmpresa||[]).map(c=> ({
+    id: c.id,
+    label: c.nombre || '',
+    sublabel: [c.email, c.telefono].filter(Boolean).join(' · '),
+    data: c,
+  })), [contactosEmpresa]);
+
   // Preview en vivo
   const previewBruto = redondear5000(productos.reduce((s,p,i)=> s + calcularPrecio(p,i)*(parseInt(p.cantidad)||1) + calcularSubtotalExtras(p),0));
   const previewAjustado = redondear5000(aplicarAjuste(previewBruto, ajusteTotalTipo, parseFloat(ajusteTotalValor)||0));
@@ -376,8 +389,15 @@ export default function CotizadorApp(){
               <div className="grid md:grid-cols-4 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-medium">Nombre Empresa</label>
-                  <input list="listaEmpresas" value={empresaNombreInput} onChange={e=>{ const val=e.target.value; setEmpresaNombreInput(val); const emp=empresas.find(em=> em.nombre.toLowerCase()===val.toLowerCase()); if(emp){ setEmpresaSeleccionada(emp); setEmpresaNITInput(emp.nit||''); setEmpresaCiudadInput(emp.ciudad||''); } else { setEmpresaSeleccionada(null);} }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Empresa (opcional)" />
-                  <datalist id="listaEmpresas">{empresas.map(em=> <option key={em.id} value={em.nombre} />)}</datalist>
+                  <Combobox
+                    value={empresaNombreInput}
+                    options={opcionesEmpresas}
+                    placeholder="Empresa (opcional)"
+                    emptyText="Sin empresas que coincidan"
+                    inputClassName="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"
+                    onChange={val=>{ setEmpresaNombreInput(val); const emp=empresas.find(em=> (em.nombre||'').toLowerCase()===val.toLowerCase()); if(emp){ setEmpresaSeleccionada(emp); setEmpresaNITInput(emp.nit||''); setEmpresaCiudadInput(emp.ciudad||''); } else { setEmpresaSeleccionada(null);} }}
+                    onSelect={op=>{ setEmpresaSeleccionada(op.data); setEmpresaNITInput(op.data.nit||''); setEmpresaCiudadInput(op.data.ciudad||''); }}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-medium">NIT</label>
@@ -400,8 +420,15 @@ export default function CotizadorApp(){
               <div className="grid md:grid-cols-6 gap-3 items-start">
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-[11px] font-medium">Nombre Contacto *</label>
-                  <input list="listaContactos" value={contactoNombreInput} onChange={e=>{ const val=e.target.value; setContactoNombreInput(val); if(empresaSeleccionada){ const cont=contactosEmpresa.find(c=> c.nombre.toLowerCase()===val.toLowerCase()); if(cont){ setContactoSeleccionado(cont); setContactoEmailInput(cont.email||''); setContactoTelInput(cont.telefono||''); } else { setContactoSeleccionado(null);} } }} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" placeholder="Nombre Contacto" />
-                  <datalist id="listaContactos">{contactosEmpresa.map(c=> <option key={c.id} value={c.nombre} />)}</datalist>
+                  <Combobox
+                    value={contactoNombreInput}
+                    options={opcionesContactos}
+                    placeholder="Nombre Contacto"
+                    emptyText={empresaSeleccionada? 'Sin contactos que coincidan' : 'Selecciona una empresa para ver sus contactos'}
+                    inputClassName="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"
+                    onChange={val=>{ setContactoNombreInput(val); if(empresaSeleccionada){ const cont=contactosEmpresa.find(c=> (c.nombre||'').toLowerCase()===val.toLowerCase()); if(cont){ setContactoSeleccionado(cont); setContactoEmailInput(cont.email||''); setContactoTelInput(cont.telefono||''); } else { setContactoSeleccionado(null);} } }}
+                    onSelect={op=>{ setContactoSeleccionado(op.data); setContactoEmailInput(op.data.email||''); setContactoTelInput(op.data.telefono||''); }}
+                  />
                 </div>
                 <div className="flex flex-col gap-1 md:col-span-3">
                   <label className="text-[11px] font-medium">Email</label>

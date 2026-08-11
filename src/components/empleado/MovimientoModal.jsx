@@ -44,6 +44,7 @@ export default function MovimientoModal({ item, tipo, onClose, onDone }) {
         nota,
         proveedorId: esSalida ? "" : proveedorId,
         ordenProduccion: esSalida ? orden.ordenProduccion : undefined,
+        codigoFicha: esSalida ? orden.codigo : undefined,
         fichaId: esSalida ? orden.fichaId : undefined,
         fichaTipo: esSalida ? orden.fichaTipo : undefined,
       });

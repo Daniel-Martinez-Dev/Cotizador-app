@@ -2,8 +2,8 @@ import React from "react";
 import toast from "react-hot-toast";
 import {
   FaTruck, FaSlidersH, FaIdCard, FaSearch, FaSyncAlt, FaEye,
-  FaChevronRight, FaLayerGroup, FaPauseCircle, FaIndustry, FaCheckCircle, FaInbox,
-  FaEdit, FaTrash, FaTimes, FaPlus,
+  FaChevronRight, FaLayerGroup, FaInbox,
+  FaEdit, FaTrash, FaTimes, FaPlus
 } from "react-icons/fa";
 import { calcularDesdeInput } from "../utils/divisionTermica";
 import {
@@ -14,11 +14,13 @@ import {
 } from "../utils/firebaseDivision";
 import FichaImpresionDivision from "./FichaImpresionDivision";
 import { fmtMm, fmtM2, fmtN, fmtCm } from "../utils/fichaFormat";
-import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
-import EstadoActions from "./fichas/EstadoActions";
+import EstadoControl from "./fichas/EstadoControl";
+import useEstadoFicha from "./fichas/useEstadoFicha";
+import EstadoResumen from "./fichas/EstadoResumen";
 import { useQuote } from "../context/QuoteContext";
-import { crearNotificacionFichaEnProduccion } from "../utils/firebaseNotificaciones";
+import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
+import IdentificacionFicha from "./fichas/IdentificacionFicha";
 
 const OPCIONES = {
   placa:     ["SI", "NO"],
@@ -31,6 +33,7 @@ const OPCIONES = {
 };
 
 const INITIAL_FORM = {
+  codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
   fechaOrden:        new Date().toISOString().slice(0, 10),
   fechaEntrega:      "",
   numeroOrdenCompra: "",
@@ -90,6 +93,8 @@ export default function DivisionTermicaFicha() {
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
 
+  const { cambiarEstado, agregarNota, editarEntrega, entregaModal } = useEstadoFicha("division", fichas, setFichas);
+
   const calculo = React.useMemo(
     () => calcularDesdeInput(form),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,17 +106,10 @@ export default function DivisionTermicaFicha() {
     [fichas, selectedId]
   );
 
-  const stats = React.useMemo(() => ({
-    total: fichas.length,
-    borrador: fichas.filter((f) => (f.estado || "borrador") === "borrador").length,
-    en_produccion: fichas.filter((f) => f.estado === "en_produccion").length,
-    terminado: fichas.filter((f) => f.estado === "terminado").length,
-  }), [fichas]);
-
   const fichasFiltradas = React.useMemo(() => {
     const term = search.trim().toLowerCase();
     return fichas
-      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx) }))
+      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx), codigo: codigoDeFicha(f, "division") }))
       .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
       .filter(({ f }) => !term || (f.cliente || "").toLowerCase().includes(term));
   }, [fichas, search, estadoFiltro]);
@@ -184,29 +182,9 @@ export default function DivisionTermicaFicha() {
     }
   };
 
-  const cambiarEstado = async (id, estado) => {
-    try {
-      await actualizarFichaDivision(id, { estado });
-      toast.success(`Estado → ${ESTADO_LABEL[estado] || estado}`);
-      setFichas((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
-      if (estado === "en_produccion") {
-        const f = fichas.find((x) => x.id === id);
-        crearNotificacionFichaEnProduccion({
-          fichaTipo: "division",
-          tipoLabel: "División Térmica",
-          fichaId: id,
-          cliente: f?.cliente,
-          ordenProduccion: f?.ordenProduccion,
-        }).catch((e) => console.error(e));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error actualizando estado");
-    }
-  };
-
   const handleEditar = (f) => {
     setForm({
+      codigoFicha:       codigoDeFicha(f, "division"),
       fechaOrden:        f.fechaOrden || new Date().toISOString().slice(0, 10),
       fechaEntrega:      f.fechaEntrega || "",
       numeroOrdenCompra: f.numeroOrdenCompra || "",
@@ -268,18 +246,20 @@ export default function DivisionTermicaFicha() {
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Identificación */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>N.° orden de compra</label>
-                <input value={form.numeroOrdenCompra} onChange={set("numeroOrdenCompra")}
-                  className={inputCls} placeholder="Ref. del cliente" />
-              </div>
-              <div>
-                <label className={labelCls}>N.° de ficha</label>
-                <input value={form.numeroFicha} onChange={set("numeroFicha")}
-                  className={inputCls} placeholder="Ficha física (opcional)" />
-              </div>
-            </div>
+            <IdentificacionFicha
+              codigo={form.codigoFicha}
+              ordenCompra={form.numeroOrdenCompra}
+              onOrdenCompraChange={set("numeroOrdenCompra")}
+              inputCls={inputCls}
+              labelCls={labelCls}
+              extra={
+                <div className="col-span-2 sm:col-span-1">
+                  <label className={labelCls}>N.° ficha física <span className="opacity-60">(opcional)</span></label>
+                  <input value={form.numeroFicha} onChange={set("numeroFicha")}
+                    className={inputCls} placeholder="Ficha en papel" />
+                </div>
+              }
+            />
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <label className={labelCls}>Cliente</label>
@@ -583,29 +563,7 @@ export default function DivisionTermicaFicha() {
           </button>
         </div>
 
-        {/* Resumen de estados */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-          {[
-            { key: "todos",         label: "Total",         value: stats.total,         icon: FaLayerGroup,  tone: "text-gray-600 dark:text-gray-300",  ring: "border-gray-200 dark:border-gris-600" },
-            { key: "borrador",      label: "Borrador",      value: stats.borrador,      icon: FaPauseCircle, tone: "text-gray-500 dark:text-gray-300",  ring: "border-gray-200 dark:border-gris-600" },
-            { key: "en_produccion", label: "En producción", value: stats.en_produccion, icon: FaIndustry,    tone: "text-blue-700 dark:text-blue-300",  ring: "border-blue-200 dark:border-blue-800" },
-            { key: "terminado",     label: "Terminadas",    value: stats.terminado,     icon: FaCheckCircle, tone: "text-green-700 dark:text-green-300", ring: "border-green-200 dark:border-green-800" },
-          ].map(({ key, label, value, icon: Icon, tone, ring }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setEstadoFiltro((prev) => (prev === key ? "todos" : key))}
-              className={`text-left rounded-lg border px-3 py-2 transition-colors ${ring} ${
-                estadoFiltro === key ? "bg-gray-50 dark:bg-gris-700 ring-2 ring-offset-1 ring-blue-500 dark:ring-offset-gris-800" : "bg-white dark:bg-gris-800 hover:bg-gray-50 dark:hover:bg-gris-700/60"
-              }`}
-            >
-              <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${tone}`}>
-                <Icon className="text-[10px]" /> {label}
-              </div>
-              <div className={`text-xl font-bold font-mono mt-0.5 ${tone}`}>{value}</div>
-            </button>
-          ))}
-        </div>
+        <EstadoResumen fichas={fichas} filtro={estadoFiltro} onFiltrar={setEstadoFiltro} />
 
         {/* Búsqueda */}
         <div className="relative mb-3 max-w-xs">
@@ -635,7 +593,7 @@ export default function DivisionTermicaFicha() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                  <th className="text-right py-2 font-medium w-10">#</th>
+                  <th className="text-left py-2 font-medium whitespace-nowrap">N.° ficha</th>
                   <th className="text-left py-2 font-medium pl-2">Cliente</th>
                   <th className="text-left py-2 font-medium">Medidas (mm)</th>
                   <th className="text-center py-2 font-medium">Cant.</th>
@@ -646,7 +604,7 @@ export default function DivisionTermicaFicha() {
                 </tr>
               </thead>
               <tbody>
-                {fichasFiltradas.map(({ f, numero }) => {
+                {fichasFiltradas.map(({ f, numero, codigo }) => {
                   const isSelected = selectedId === f.id;
                   return (
                     <React.Fragment key={f.id}>
@@ -656,7 +614,7 @@ export default function DivisionTermicaFicha() {
                           isSelected ? "bg-blue-50/60 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gris-700/40"
                         }`}
                       >
-                        <td className="py-2 text-right font-mono text-gray-400">{numero}</td>
+                        <td className="py-2 font-mono text-gray-500 whitespace-nowrap">{codigo || numero}</td>
                         <td className="py-2 font-medium pl-2">
                           <span className="inline-flex items-center gap-1.5">
                             <FaChevronRight className={`text-[9px] text-gray-400 transition-transform ${isSelected ? "rotate-90" : ""}`} />
@@ -675,7 +633,7 @@ export default function DivisionTermicaFicha() {
                           </span>
                         </td>
                         <td className="py-2 text-center">
-                          <EstadoBadge estado={f.estado} />
+                          <EstadoBadge estado={f.estado} onChange={(estado) => cambiarEstado(f.id, estado)} />
                         </td>
                         <td className="py-2 text-gray-500">
                           {f.createdAt?.toDate
@@ -720,6 +678,8 @@ export default function DivisionTermicaFicha() {
                               ficha={f}
                               numero={numero}
                               onCambiarEstado={cambiarEstado}
+                              onAgregarNota={agregarNota}
+                              onEditarEntrega={editarEntrega}
                               onVerFicha={() => setPrintFicha({ ficha: f, numero })}
                               onEditar={() => handleEditar(f)}
                               onEliminar={() => handleEliminar(f)}
@@ -744,12 +704,14 @@ export default function DivisionTermicaFicha() {
           onClose={() => setPrintFicha(null)}
         />
       )}
+
+      {entregaModal}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar, onEliminar }) {
+function FichaDetalle({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onVerFicha, onEditar, onEliminar }) {
   const med = f.medidas || {};
 
   const medidas = [
@@ -779,9 +741,9 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar,
           <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">{f.cliente || "Sin cliente"}</span>
           <span className="ml-2 text-gray-400 font-mono">{f.anchoVehiculo}×{f.altoVehiculo} mm · ×{f.cantidad}</span>
           <div className="text-[11px] text-gray-400 mt-0.5">
-            Orden producción #{f.ordenProduccion ?? numero}
+            Ficha {codigoDeFicha(f, "division") || `#${f.ordenProduccion ?? numero}`}
             {f.numeroOrdenCompra && <> · OC {f.numeroOrdenCompra}</>}
-            {f.numeroFicha && <> · Ficha {f.numeroFicha}</>}
+            {f.numeroFicha && <> · Ficha física {f.numeroFicha}</>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -885,7 +847,14 @@ function FichaDetalle({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar,
         </div>
       )}
 
-      <EstadoActions estado={f.estado} onCambiarEstado={(estado) => onCambiarEstado(f.id, estado)} />
+      <EstadoControl
+        estado={f.estado}
+        notas={f.notas}
+        entrega={f.entrega}
+        onCambiarEstado={(estado, nota) => onCambiarEstado(f.id, estado, nota)}
+        onAgregarNota={(texto) => onAgregarNota(f.id, texto)}
+        onEditarEntrega={() => onEditarEntrega(f.id)}
+      />
     </div>
   );
 }

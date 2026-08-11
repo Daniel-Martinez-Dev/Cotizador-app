@@ -2,8 +2,9 @@ import React from "react";
 import FichaImpresionShell from "./fichas/FichaImpresionShell";
 import { fmtMm, fmtM2, fmtN, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
-import { FaUserTie, FaRegCalendarAlt, FaUserCircle } from "react-icons/fa";
-import { MedidaCard, InfoChip, AcabadoCard, FichaFooter } from "./fichas/FichaVisualKit";
+import { FaUserTie, FaRegCalendarAlt } from "react-icons/fa";
+import { MedidaCard, InfoChip, AcabadoCard, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
+import { codigoFichaOFallback } from "../utils/codigoFicha";
 import planoSelloAnden from "../assets/imagenes/SelloDeAnden/Plano.png";
 
 // ─── Plano técnico (imagen de referencia + medidas superpuestas) ─────────────
@@ -43,15 +44,15 @@ function PlanoTecnico({ anchoVano, altoVano, selloAncho, selloAlto, espesorSello
             left: pct(x, PLANO_ANCHO_PX),
             transform: `rotate(${rotate}deg)`,
             transformOrigin: "left center",
-            fontSize: "9px", fontWeight: "bold", fontFamily: "monospace",
-            color: "#111827", whiteSpace: "nowrap", lineHeight: 1,
-            background: "rgba(255,255,255,0.92)", padding: "1px 3px", borderRadius: "2px",
+            fontSize: "11px", fontWeight: "bold", fontFamily: "monospace",
+            color: "#000000", whiteSpace: "nowrap", lineHeight: 1,
+            background: "#ffffff", padding: "1px 3px", borderRadius: "2px", border: "0.5px solid #000000",
           }}>
             {value}
           </span>
         ))}
       </div>
-      <div style={{ fontSize: "9px", color: "#64748b", marginTop: "5px" }}>
+      <div style={{ fontSize: "9px", color: "#000000", marginTop: "5px" }}>
         Plano de referencia — medidas del pedido superpuestas
       </div>
     </div>
@@ -76,22 +77,9 @@ function InfoBadge({ icon, label, value }) {
     <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "6px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
       {icon && <span style={{ color: "#1a3f8f", fontSize: "14px" }}>{icon}</span>}
       <div>
-        <div style={{ fontSize: "8.5px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
-        <div style={{ fontSize: "12.5px", color: "#1a1a2e", fontWeight: "bold" }}>{value}</div>
+        <div style={{ fontSize: "8.5px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>
+        <div style={{ fontSize: "12.5px", color: "#000000", fontWeight: "bold" }}>{value}</div>
       </div>
-    </div>
-  );
-}
-
-function FirmaBox({ rol }) {
-  return (
-    <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px 14px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
-        <FaUserCircle style={{ color: "#94a3b8" }} />
-        <span style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", color: "#334155" }}>{rol}</span>
-      </div>
-      <div style={{ fontSize: "10px", color: "#64748b", marginBottom: "16px", borderBottom: "1px solid #cbd5e1", paddingBottom: "3px" }}>Nombre:</div>
-      <div style={{ fontSize: "10px", color: "#64748b", borderBottom: "1px solid #cbd5e1", paddingBottom: "3px" }}>Fecha:</div>
     </div>
   );
 }
@@ -101,6 +89,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
   if (!ficha) return null;
 
   const f   = ficha;
+  const codigo = codigoFichaOFallback({ ...f, ordenProduccion: f.ordenProduccion ?? numero }, "sello");
   const med = f.medidas      || {};
   const mp  = f.materiaPrima || {};
   const cantidad = Number(f.cantidad) || 1;
@@ -122,19 +111,19 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
 
   const bandas = [f.bandaLateral, f.bandaSuperior].filter(Boolean).join(" / ");
 
-  const tdStyle = { border: "1px solid #e2e8f0", padding: "5px 7px", fontSize: "11.5px", verticalAlign: "middle" };
+  const tdStyle = { border: "1px solid #000000", padding: "5px 7px", fontSize: "11.5px", verticalAlign: "middle" };
   const thStyle = { ...tdStyle, background: "#1a3f8f", color: "white", fontWeight: "bold", textAlign: "center", fontSize: "11px" };
 
   return (
     <FichaImpresionShell
       productLabel="Sello de Andén"
-      numero={numero}
+      numero={codigo}
       cliente={f.cliente}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-        <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
+        <div style={{ color: "#000000", fontSize: "12.5px" }}>
 
           {/* ── Encabezado ── */}
           <div style={{
@@ -154,9 +143,9 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
               <InfoBadge label="Versión:" value="1.0" />
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "9px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1.5px" }}>N.° Ficha</div>
-              <div style={{ background: "linear-gradient(135deg, #1a3f8f 0%, #0f6cbf 100%)", color: "#fff", fontSize: "22px", fontWeight: "bold", padding: "6px 18px", borderRadius: "8px", marginTop: "4px" }}>
-                #{numero ?? "—"}
+              <div style={{ fontSize: "9px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1.5px" }}>N.° Ficha de producción</div>
+              <div style={{ background: "linear-gradient(135deg, #1a3f8f 0%, #0b4a7d 100%)", color: "#fff", fontSize: "21px", fontWeight: "bold", fontFamily: "monospace", letterSpacing: "0.5px", whiteSpace: "nowrap", padding: "7px 16px", borderRadius: "8px", marginTop: "4px" }}>
+                {codigo}
               </div>
             </div>
           </div>
@@ -170,28 +159,28 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             {/* Columna izquierda — información general + medidas de fabricación */}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <Panel title="Información General">
-                <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Cliente:</div>
+                <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Cliente:</div>
                 <div style={{ fontSize: "19px", fontWeight: "bold", color: "#1a3f8f", marginBottom: "10px" }}>{f.cliente || "—"}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                   <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
                   <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
                   <InfoChip label="Cantidad"      value={`${f.cantidad} sellos`} />
-                  <InfoChip label="Referencia / Notas" value="—" />
+                  <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} highlight={!!f.numeroOrdenCompra} />
                 </div>
               </Panel>
 
               <Panel title="Medidas de Fabricación (mm)">
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                   <MedidaCard label="Sello principal"  ancho={med.selloAncho}        alto={med.selloAlto}         color="#1a3f8f" />
-                  <MedidaCard label="Espuma postes"    ancho={med.espumaPostesAncho} alto={med.espumaPostesAlto}  color="#0f6cbf" />
-                  <MedidaCard label="Tapa superior"    ancho={med.tapaSuperiorAncho} alto={med.tapaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
-                  <MedidaCard label="Tapa inferior"    ancho={med.tapaInferiorAncho} alto={med.tapaInferiorLargo} color="#0d9488" dimLabels={["Ancho", "Largo"]} />
-                  <MedidaCard label="Forros / chaleco" ancho={med.forroAncho}        alto={med.forroLargo}        color="#7c3aed" dimLabels={["Ancho", "Largo"]} />
+                  <MedidaCard label="Espuma postes"    ancho={med.espumaPostesAncho} alto={med.espumaPostesAlto}  color="#0b4a7d" />
+                  <MedidaCard label="Tapa superior"    ancho={med.tapaSuperiorAncho} alto={med.tapaSuperiorLargo} color="#155e75" dimLabels={["Ancho", "Largo"]} />
+                  <MedidaCard label="Tapa inferior"    ancho={med.tapaInferiorAncho} alto={med.tapaInferiorLargo} color="#115e59" dimLabels={["Ancho", "Largo"]} />
+                  <MedidaCard label="Forros / chaleco" ancho={med.forroAncho}        alto={med.forroLargo}        color="#5b21b6" dimLabels={["Ancho", "Largo"]} />
                   {f.llevaCortina && (
-                    <MedidaCard label="Cortina" ancho={med.cortinaAncho} alto={med.cortinaLargoLona} color="#059669" dimLabels={["Largo", "Ancho rollo"]} />
+                    <MedidaCard label="Cortina" ancho={med.cortinaAncho} alto={med.cortinaLargoLona} color="#065f46" dimLabels={["Largo", "Ancho rollo"]} />
                   )}
                   {f.llevaTravesano && (
-                    <MedidaCard label="Travesaño" ancho={med.travesanoAncho} alto={med.travesanoLargoLona} color="#d97706" dimLabels={["Largo", "Largo lona"]} />
+                    <MedidaCard label="Travesaño" ancho={med.travesanoAncho} alto={med.travesanoLargoLona} color="#92400e" dimLabels={["Largo", "Largo lona"]} />
                   )}
                 </div>
               </Panel>
@@ -202,12 +191,12 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "16px", marginBottom: "6px" }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "34px", fontWeight: "bold", color: "#1a3f8f", fontFamily: "monospace", lineHeight: 1 }}>{fmtMm(f.anchoVano)}</div>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Ancho</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Ancho</div>
                 </div>
-                <div style={{ fontSize: "22px", color: "#94a3b8", fontWeight: "300" }}>×</div>
+                <div style={{ fontSize: "22px", color: "#000000", fontWeight: "300" }}>×</div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "34px", fontWeight: "bold", color: "#1a3f8f", fontFamily: "monospace", lineHeight: 1 }}>{fmtMm(f.altoVano)}</div>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Alto</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Alto</div>
                 </div>
               </div>
               <PlanoTecnico
@@ -225,12 +214,12 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             <Panel title="Opciones y Acabados">
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <AcabadoCard label="Material base"   value={f.materialBase || "MADERA"} color="#1a3f8f" active />
-                <AcabadoCard label="Cortina"          value={f.llevaCortina ? `SÍ · ${fmtMm(f.despliegueCortina)} mm` : "NO"} color="#059669" active={!!f.llevaCortina} />
-                <AcabadoCard label="Travesaño"        value={f.llevaTravesano ? "SÍ" : "NO"} color="#d97706" active={!!f.llevaTravesano} />
-                <AcabadoCard label="Factura"          value={f.fact || "SI"} color="#16a34a" active={f.fact === "SI"} />
-                <AcabadoCard label="Sello abrigo"     value={f.selloAbrigo || "NO"} color="#7c3aed" active={f.selloAbrigo === "SI"} />
-                <AcabadoCard label="Forma de cuña"    value={f.formaCuna || "NO"}   color="#be123c" active={f.formaCuna === "SI"} />
-                <AcabadoCard label="Espesores S/P/T"  value={`${fmtMm(f.espesorSello)}/${fmtMm(f.espesorPoste)}/${fmtMm(f.espesorTravesano)}`} color="#0891b2" active />
+                <AcabadoCard label="Cortina"          value={f.llevaCortina ? `SÍ · ${fmtMm(f.despliegueCortina)} mm` : "NO"} color="#065f46" active={!!f.llevaCortina} />
+                <AcabadoCard label="Travesaño"        value={f.llevaTravesano ? "SÍ" : "NO"} color="#92400e" active={!!f.llevaTravesano} />
+                <AcabadoCard label="Factura"          value={f.fact || "SI"} color="#166534" active={f.fact === "SI"} />
+                <AcabadoCard label="Sello abrigo"     value={f.selloAbrigo || "NO"} color="#5b21b6" active={f.selloAbrigo === "SI"} />
+                <AcabadoCard label="Forma de cuña"    value={f.formaCuna || "NO"}   color="#9f1239" active={f.formaCuna === "SI"} />
+                <AcabadoCard label="Espesores S/P/T"  value={`${fmtMm(f.espesorSello)}/${fmtMm(f.espesorPoste)}/${fmtMm(f.espesorTravesano)}`} color="#155e75" active />
                 <AcabadoCard label="Bandas"           value={bandas || "—"} color="#334155" active={!!bandas} />
               </div>
             </Panel>
@@ -239,7 +228,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
           {/* ── Consumo de materia prima ── */}
           <div style={{ padding: "14px 22px 8px" }}>
             <Panel title="Consumo de Materia Prima (por sello)">
-              <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", margin: "-12px" }}>
+              <div style={{ border: "1px solid #000000", borderRadius: "8px", overflow: "hidden", margin: "-12px" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead>
                     <tr>
@@ -255,10 +244,10 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
                     {insumos.map(({ label, unit, cu, tot, formula }, i) => (
                       <tr key={label} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
                         <td style={{ ...tdStyle, fontWeight: "600" }}>{label}</td>
-                        <td style={{ ...tdStyle, textAlign: "center", color: "#475569" }}>{unit}</td>
-                        <td style={{ ...tdStyle, color: "#475569", fontSize: "10px" }}>{formula}</td>
+                        <td style={{ ...tdStyle, textAlign: "center", color: "#000000" }}>{unit}</td>
+                        <td style={{ ...tdStyle, color: "#000000", fontSize: "10px" }}>{formula}</td>
                         <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold" }}>{cu}</td>
-                        <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1d4ed8" }}>{tot}</td>
+                        <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1e3a8a" }}>{tot}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -267,21 +256,20 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             </Panel>
           </div>
 
-          {/* ── Firmas + Observaciones ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr", gap: "14px", padding: "4px 22px 14px" }}>
-            <FirmaBox rol="Elaboró" />
-            <FirmaBox rol="Revisó" />
-            <FirmaBox rol="Aprobó" />
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px 14px" }}>
-              <div style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", color: "#334155", marginBottom: "10px" }}>Observaciones</div>
-              <div style={{ borderBottom: "1px solid #cbd5e1", height: "16px" }} />
-              <div style={{ borderBottom: "1px solid #cbd5e1", height: "16px" }} />
+          {/* ── Observaciones ── */}
+          <div style={{ padding: "4px 22px 0" }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 14px" }}>
+              <div style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", color: "#000000", marginBottom: "8px" }}>Observaciones</div>
+              <div style={{ borderBottom: "1px solid #334155", height: "16px" }} />
+              <div style={{ borderBottom: "1px solid #334155", height: "16px" }} />
             </div>
           </div>
 
+          <Firmas padX="22px" />
+
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — DEPARTAMENTO DE INGENIERÍA"
-            numero={numero}
+            numero={codigo}
             fecha={fmtDate(new Date().toISOString())}
           />
         </div>

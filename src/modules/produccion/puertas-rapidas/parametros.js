@@ -29,6 +29,11 @@ export const PARAMETROS_PUERTA_RAPIDA = {
   ALTO_CUBRERROLLO_PEQUENO_MM: 280,
   ALTO_CUBRERROLLO_GRANDE_MM:  300,
 
+  // Visor / vinilo transparente — el rollo viene de 600 mm de alto y se instala
+  // completo, así que el alto del visor es FIJO: no depende de la distancia
+  // entre cortavientos ni del alto del vano.
+  ALTO_VISOR_MM: 600,
+
   // Cortavientos
   DISTANCIA_CORTAVIENTOS_DEFAULT_MM: 750,
   CORTAVIENTOS_MARGEN_MM:            500, // cantidadCortavientos = REDONDEAR.MAS((largoCortina - margen) / distancia)

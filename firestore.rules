@@ -69,16 +69,20 @@ service cloud.firestore {
       return isActiveStaff() && hasRole('empleado');
     }
 
-    // Un empleado solo puede tocar notas/estado/firmas/updatedAt en una ficha,
-    // y solo puede llevar el estado a "terminado" si aporta las firmas
-    // (fabricante(s) + verificador).
+    // Un empleado solo puede tocar notas/estado/firmas/entrega/updatedAt en una
+    // ficha. Los dos estados que puede fijar exigen su respaldo: "terminado"
+    // necesita las firmas (fabricante(s) + verificador) y "entregado" necesita
+    // la fecha de entrega. No puede devolver una ficha a borrador ni a producción.
     function fichaUpdateEmpleadoOk() {
       let diffKeys = request.resource.data.diff(resource.data).affectedKeys();
-      return diffKeys.hasOnly(['notas', 'estado', 'firmas', 'updatedAt']) &&
+      return diffKeys.hasOnly(['notas', 'estado', 'firmas', 'entrega', 'updatedAt']) &&
         (!diffKeys.hasAny(['estado']) ||
           (request.resource.data.estado == 'terminado' &&
             request.resource.data.firmas.fabricantes.size() > 0 &&
-            request.resource.data.firmas.verificador != null));
+            request.resource.data.firmas.verificador != null) ||
+          (request.resource.data.estado == 'entregado' &&
+            request.resource.data.entrega.fecha is string &&
+            request.resource.data.entrega.fecha.size() > 0));
     }
 
     // ─── Cotizaciones ──────────────────────────────────────────────────────────
@@ -175,6 +179,14 @@ service cloud.firestore {
     }
 
     match /fichas_puertas_rapidas/{docId} {
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+    }
+
+    // Fichas básicas: órdenes sin ficha de fabricación (repuestos, semáforos,
+    // lámparas, topes, rampas…). Mismos permisos que las demás fichas.
+    match /fichas_generales/{docId} {
       allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());

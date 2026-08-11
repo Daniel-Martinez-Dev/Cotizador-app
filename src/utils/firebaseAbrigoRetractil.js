@@ -4,6 +4,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -12,6 +13,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getNextOrdenProduccionGlobal } from "./firebaseConsecutivos";
+import { formatearCodigoFicha } from "./codigoFicha";
 
 const FICHAS_COL = "fichas_abrigo_retractil";
 
@@ -26,7 +28,10 @@ export async function crearFichaAbrigoRetractil(input, calculo) {
   const ordenProduccion = await getNextOrdenProduccionGlobal();
   const ref = await addDoc(collection(db, FICHAS_COL), {
     ordenProduccion,
-    numeroOP:          (input.numeroOP          || "").trim(),
+    // Código impreso de la ficha (AR + ddmmaa + consecutivo). Se congela aquí:
+    // aunque después se edite la ficha, el número no cambia.
+    codigoFicha:       formatearCodigoFicha({ tipo: "abrigoretractil", fecha: new Date(), consecutivo: ordenProduccion }),
+    numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
     cliente:           (input.cliente           || "").trim(),
     cantidad:          Number(input.cantidad     || 1),
     fechaOrden:        toIso(input.fechaOrden),

@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Los controles nativos (select, scrollbars, teclado) deben seguir el tema */
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+/* El desplegable nativo de <select> hereda el color de texto del control pero
+   no su fondo: en modo oscuro quedaba texto blanco sobre fondo claro y en
+   Android se veía "transparente". Se fijan fondo y color en cada opción. */
+select option, select optgroup { background-color: #ffffff; color: #111827; }
+.dark select option, .dark select optgroup { background-color: #1f2937; color: #f3f4f6; }
+
 /* Ajustes de contraste para modo oscuro corporativo */
 .dark .text-gray-600, .dark .text-gray-500, .dark .text-gray-700 { color: #e5e5e5 !important; }
 .dark label.text-gray-600, .dark label.text-gray-700 { color: #fafafa !important; }

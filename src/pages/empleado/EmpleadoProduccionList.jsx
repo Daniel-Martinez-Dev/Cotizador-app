@@ -5,10 +5,12 @@ import { FaSearch, FaSyncAlt, FaChevronRight } from "react-icons/fa";
 import { listarTodasFichasProduccion, FICHA_TIPOS } from "../../utils/firebaseFichas";
 import EstadoBadge from "../../components/fichas/EstadoBadge";
 import EmptyState from "../../components/ui/EmptyState";
+import { codigoFicha as codigoDeFicha, codigoFichaOFallback } from "../../utils/codigoFicha";
 
 const ESTADO_TABS = [
   { key: "en_produccion", label: "En producción" },
   { key: "terminado", label: "Terminadas" },
+  { key: "entregado", label: "Entregadas" },
   { key: "todos", label: "Todas" },
 ];
 
@@ -53,7 +55,7 @@ export default function EmpleadoProduccionList() {
       .filter((f) => tipoFiltro === "todos" || f.tipo === tipoFiltro)
       .filter((f) => {
         if (!term) return true;
-        const blob = `${f.cliente || ""} ${f.ordenProduccion || ""}`.toLowerCase();
+        const blob = `${f.cliente || ""} ${f.ordenProduccion || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
         return blob.includes(term);
       });
   }, [fichas, estadoFiltro, tipoFiltro, search]);
@@ -137,7 +139,7 @@ export default function EmpleadoProduccionList() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{f.tipoLabel}</span>
-                  <span className="text-[10px] text-gray-400 font-mono">OP #{f.ordenProduccion ?? "—"}</span>
+                  <span className="text-[10px] text-gray-400 font-mono">{codigoFichaOFallback(f)}</span>
                 </div>
                 <div className="font-medium text-sm truncate mt-0.5">{f.cliente || "Sin cliente"}</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">

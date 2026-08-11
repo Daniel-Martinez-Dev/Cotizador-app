@@ -17,7 +17,7 @@ const NOTIFICACIONES_COL = "notificaciones";
 // Aviso a planta de que una ficha de fabricación pasó a producción. Se llama
 // desde los componentes de fichas (admin/producción) cuando cambian el
 // estado a "en_produccion" — ver DivisionTermicaFicha.jsx y análogos.
-export async function crearNotificacionFichaEnProduccion({ fichaTipo, tipoLabel, fichaId, cliente, ordenProduccion }) {
+export async function crearNotificacionFichaEnProduccion({ fichaTipo, tipoLabel, fichaId, cliente, ordenProduccion, codigoFicha }) {
   if (!fichaTipo || !fichaId) return;
   await waitForAuth();
   await addDoc(collection(db, NOTIFICACIONES_COL), {
@@ -27,6 +27,7 @@ export async function crearNotificacionFichaEnProduccion({ fichaTipo, tipoLabel,
     fichaId,
     cliente: cliente || "",
     ordenProduccion: Number(ordenProduccion || 0),
+    codigoFicha: codigoFicha || "",
     leidoPor: [],
     createdAt: serverTimestamp(),
   });

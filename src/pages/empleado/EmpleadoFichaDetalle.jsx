@@ -1,23 +1,16 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FaChevronLeft, FaFileAlt, FaCheckCircle } from "react-icons/fa";
+import { FaChevronLeft, FaFileAlt, FaCheckCircle, FaTruck } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { obtenerFichaProduccion, agregarNotaFicha } from "../../utils/firebaseFichas";
 import EstadoBadge from "../../components/fichas/EstadoBadge";
+import EntregaModal from "../../components/fichas/EntregaModal";
+import EntregaResumen from "../../components/fichas/EntregaResumen";
 import NotaSection from "../../components/empleado/NotaSection";
 import FirmaModal from "../../components/empleado/FirmaModal";
-import FichaImpresionDivision from "../../components/FichaImpresionDivision";
-import FichaImpresionSello from "../../components/FichaImpresionSello";
-import FichaImpresionAbrigoRetractil from "../../components/FichaImpresionAbrigoRetractil";
-import FichaImpresionPuertaRapida from "../../components/FichaImpresionPuertaRapida";
-
-const IMPRESION_POR_TIPO = {
-  division: FichaImpresionDivision,
-  sello: FichaImpresionSello,
-  abrigoretractil: FichaImpresionAbrigoRetractil,
-  puertarapida: FichaImpresionPuertaRapida,
-};
+import { getImpresionComponent } from "../../components/fichas/impresionPorTipo";
+import { codigoFichaOFallback } from "../../utils/codigoFicha";
 
 function fmtFecha(f) {
   if (!f) return "—";
@@ -37,6 +30,7 @@ export default function EmpleadoFichaDetalle() {
   const [loading, setLoading] = React.useState(true);
   const [showImpresion, setShowImpresion] = React.useState(false);
   const [showFirma, setShowFirma] = React.useState(false);
+  const [showEntrega, setShowEntrega] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -77,7 +71,7 @@ export default function EmpleadoFichaDetalle() {
     );
   }
 
-  const ImpresionComponent = IMPRESION_POR_TIPO[tipo];
+  const ImpresionComponent = getImpresionComponent(tipo);
   const firmas = ficha.firmas || null;
 
   return (
@@ -96,8 +90,8 @@ export default function EmpleadoFichaDetalle() {
         </div>
         <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
           <div>
-            <div className="text-gray-400">Orden de producción</div>
-            <div className="font-mono font-medium">#{ficha.ordenProduccion ?? "—"}</div>
+            <div className="text-gray-400">N.° ficha de producción</div>
+            <div className="font-mono font-medium">{codigoFichaOFallback(ficha, tipo)}</div>
           </div>
           <div>
             <div className="text-gray-400">Cantidad</div>
@@ -138,6 +132,10 @@ export default function EmpleadoFichaDetalle() {
         </div>
       )}
 
+      {ficha.entrega && (
+        <EntregaResumen entrega={ficha.entrega} onEditar={() => setShowEntrega(true)} />
+      )}
+
       {ficha.estado === "en_produccion" && (
         <button
           type="button"
@@ -145,6 +143,16 @@ export default function EmpleadoFichaDetalle() {
           className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-semibold"
         >
           <FaCheckCircle /> Marcar como terminada
+        </button>
+      )}
+
+      {ficha.estado === "terminado" && (
+        <button
+          type="button"
+          onClick={() => setShowEntrega(true)}
+          className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold"
+        >
+          <FaTruck /> Registrar entrega
         </button>
       )}
 
@@ -158,8 +166,18 @@ export default function EmpleadoFichaDetalle() {
         <FirmaModal
           tipo={tipo}
           id={id}
+          estadoActual={ficha.estado}
           onClose={() => setShowFirma(false)}
           onDone={() => { setShowFirma(false); load(); }}
+        />
+      )}
+
+      {showEntrega && (
+        <EntregaModal
+          tipo={tipo}
+          ficha={ficha}
+          onClose={() => setShowEntrega(false)}
+          onDone={() => { setShowEntrega(false); load(); }}
         />
       )}
     </div>

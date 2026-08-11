@@ -1,6 +1,9 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { FaEdit, FaTrash, FaTimes } from "react-icons/fa";
+import {
+  FaEdit, FaTrash, FaTimes, FaSearch, FaSyncAlt, FaEye, FaChevronRight,
+  FaInbox
+} from "react-icons/fa";
 import { calcularAbrigoRetractil } from "../modules/produccion/abrigo-retractil/calcular.js";
 import {
   crearFichaAbrigoRetractil,
@@ -10,32 +13,25 @@ import {
 } from "../utils/firebaseAbrigoRetractil";
 import FichaImpresionAbrigoRetractil from "./FichaImpresionAbrigoRetractil";
 import { fmtMm, fmtM2, fmtDec, fmtN } from "../utils/fichaFormat";
-import { ESTADO_LABEL } from "./fichas/estadoFicha";
 import EstadoBadge from "./fichas/EstadoBadge";
-import EstadoActions from "./fichas/EstadoActions";
+import EstadoControl from "./fichas/EstadoControl";
+import useEstadoFicha from "./fichas/useEstadoFicha";
+import EstadoResumen from "./fichas/EstadoResumen";
 import { useQuote } from "../context/QuoteContext";
-import { crearNotificacionFichaEnProduccion } from "../utils/firebaseNotificaciones";
+import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
+import IdentificacionFicha from "./fichas/IdentificacionFicha";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
 const hoy = () => new Date().toISOString().slice(0, 10);
-
-const genOP = () => {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mi = String(now.getMinutes()).padStart(2, "0");
-  return `AR-${yy}${mm}${dd}-${hh}${mi}`;
-};
 
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
 const labelCls = "text-xs text-gray-600 dark:text-gray-300";
 const sectionTitleCls = "text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2";
 
 const INITIAL_FORM = {
-  numeroOP:          genOP(),
+  codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
+  numeroOrdenCompra: "",
   cliente:           "",
   cantidad:          1,
   fechaOrden:        hoy(),
@@ -59,8 +55,12 @@ export default function AbrigoRetractilFicha() {
   const [saving, setSaving]         = React.useState(false);
   const [selectedId, setSelectedId] = React.useState(null);
   const [printFicha, setPrintFicha] = React.useState(null);
+  const [search, setSearch]         = React.useState("");
+  const [estadoFiltro, setEstadoFiltro] = React.useState("todos");
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
+
+  const { cambiarEstado, agregarNota, editarEntrega, entregaModal } = useEstadoFicha("abrigoretractil", fichas, setFichas);
 
   // ── Cálculo reactivo ─────────────────────────────────────────────────────
 
@@ -78,6 +78,16 @@ export default function AbrigoRetractilFicha() {
       setForm((p) => ({ ...p, fechaEntrega: calculo.fechaEntrega }));
     }
   }, [calculo?.fechaEntrega, fechaManual]);
+
+  // ── Listado: resumen por estado + filtros ────────────────────────────────
+
+  const fichasFiltradas = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return fichas
+      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx), codigo: codigoDeFicha(f, "abrigoretractil") }))
+      .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
+      .filter(({ f }) => !term || (f.cliente || "").toLowerCase().includes(term));
+  }, [fichas, search, estadoFiltro]);
 
   // ── Firebase ─────────────────────────────────────────────────────────────
 
@@ -128,7 +138,7 @@ export default function AbrigoRetractilFicha() {
         await crearFichaAbrigoRetractil(datos, calculo);
         toast.success("Ficha guardada");
       }
-      setForm({ ...INITIAL_FORM, numeroOP: genOP() });
+      setForm(INITIAL_FORM);
       setFechaManual(false);
       await loadFichas();
     } catch (err) {
@@ -139,30 +149,10 @@ export default function AbrigoRetractilFicha() {
     }
   };
 
-  const cambiarEstado = async (id, estado) => {
-    try {
-      await actualizarFichaAbrigoRetractil(id, { estado });
-      toast.success(`Estado → ${ESTADO_LABEL[estado] || estado}`);
-      setFichas((prev) => prev.map((f) => (f.id === id ? { ...f, estado } : f)));
-      if (estado === "en_produccion") {
-        const f = fichas.find((x) => x.id === id);
-        crearNotificacionFichaEnProduccion({
-          fichaTipo: "abrigoretractil",
-          tipoLabel: "Abrigo Retráctil",
-          fichaId: id,
-          cliente: f?.cliente,
-          ordenProduccion: f?.ordenProduccion,
-        }).catch((e) => console.error(e));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error actualizando estado");
-    }
-  };
-
   const handleEditar = (f) => {
     setForm({
-      numeroOP:          f.numeroOP || genOP(),
+      codigoFicha:       codigoDeFicha(f, "abrigoretractil"),
+      numeroOrdenCompra: f.numeroOrdenCompra || "",
       cliente:           f.cliente || "",
       cantidad:          f.cantidad ?? 1,
       fechaOrden:        f.fechaOrden || hoy(),
@@ -183,7 +173,7 @@ export default function AbrigoRetractilFicha() {
 
   const cancelarEdicion = () => {
     setEditingId(null);
-    setForm({ ...INITIAL_FORM, numeroOP: genOP() });
+    setForm(INITIAL_FORM);
     setFechaManual(false);
   };
 
@@ -221,12 +211,14 @@ export default function AbrigoRetractilFicha() {
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Identificación */}
+            <IdentificacionFicha
+              codigo={form.codigoFicha}
+              ordenCompra={form.numeroOrdenCompra}
+              onOrdenCompraChange={set("numeroOrdenCompra")}
+              inputCls={inputCls}
+              labelCls={labelCls}
+            />
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>N° OP</label>
-                <input value={form.numeroOP} onChange={set("numeroOP")}
-                  className={`${inputCls} font-mono`} placeholder="AR-YYMMDD-HHMM" />
-              </div>
               <div>
                 <label className={labelCls}>Cantidad</label>
                 <input type="number" min={1} step={1} value={form.cantidad}
@@ -444,23 +436,43 @@ export default function AbrigoRetractilFicha() {
       <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="font-medium text-sm">Fichas guardadas</div>
-          <button onClick={loadFichas}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-            Actualizar
+          <button onClick={loadFichas} disabled={loading}
+            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50">
+            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualizar
           </button>
         </div>
 
+        <EstadoResumen fichas={fichas} filtro={estadoFiltro} onFiltrar={setEstadoFiltro} />
+
+        {/* Búsqueda */}
+        <div className="relative mb-3 max-w-xs">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente…"
+            className={`${inputCls} pl-8`}
+          />
+        </div>
+
         {loading ? (
-          <div className="text-sm opacity-60">Cargando…</div>
+          <div className="flex items-center gap-2 text-sm opacity-60 py-6 justify-center">
+            <FaSyncAlt className="animate-spin" /> Cargando…
+          </div>
         ) : fichas.length === 0 ? (
-          <div className="text-sm opacity-60">Sin fichas guardadas</div>
+          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
+            <FaInbox className="text-2xl" /> Sin fichas guardadas
+          </div>
+        ) : fichasFiltradas.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
+            <FaSearch className="text-2xl" /> Ninguna ficha coincide con el filtro
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                  <th className="text-right py-2 font-medium w-10">#</th>
-                  <th className="text-left py-2 font-medium pl-2">OP</th>
+                  <th className="text-left py-2 font-medium whitespace-nowrap">N.° ficha</th>
                   <th className="text-left py-2 font-medium">Cliente</th>
                   <th className="text-center py-2 font-medium">Ancho×Alto (mm)</th>
                   <th className="text-center py-2 font-medium">Travesaños</th>
@@ -471,22 +483,28 @@ export default function AbrigoRetractilFicha() {
                 </tr>
               </thead>
               <tbody>
-                {fichas.map((f, idx) => {
-                  const numero = f.ordenProduccion ?? (fichas.length - idx);
+                {fichasFiltradas.map(({ f, numero, codigo }) => {
+                  const isSelected = selectedId === f.id;
                   return (
                     <React.Fragment key={f.id}>
                       <tr
-                        onClick={() => setSelectedId(selectedId === f.id ? null : f.id)}
-                        className="border-b border-gray-100 dark:border-gris-700/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gris-700/40 transition-colors"
+                        onClick={() => setSelectedId(isSelected ? null : f.id)}
+                        className={`border-b border-gray-100 dark:border-gris-700/50 cursor-pointer transition-colors ${
+                          isSelected ? "bg-blue-50/60 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gris-700/40"
+                        }`}
                       >
-                        <td className="py-2 text-right font-mono text-gray-400">{numero}</td>
-                        <td className="py-2 font-mono pl-2 text-gray-500">{f.numeroOP || "—"}</td>
-                        <td className="py-2 font-medium">{f.cliente || "—"}</td>
+                        <td className="py-2 font-mono text-gray-500 whitespace-nowrap">{codigo || numero}</td>
+                        <td className="py-2 font-medium">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FaChevronRight className={`text-[9px] text-gray-400 transition-transform ${isSelected ? "rotate-90" : ""}`} />
+                            {f.cliente || "—"}
+                          </span>
+                        </td>
                         <td className="py-2 text-center font-mono">{f.ancho}×{f.alto}</td>
                         <td className="py-2 text-center font-mono">{f.travesanos}</td>
                         <td className="py-2 text-center">{f.cantidad}</td>
                         <td className="py-2 text-center">
-                          <EstadoBadge estado={f.estado} />
+                          <EstadoBadge estado={f.estado} onChange={(estado) => cambiarEstado(f.id, estado)} />
                         </td>
                         <td className="py-2 text-gray-500">
                           {f.createdAt?.toDate
@@ -497,20 +515,21 @@ export default function AbrigoRetractilFicha() {
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={(e) => { e.stopPropagation(); setPrintFicha({ ficha: f, numero }); }}
-                              className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap"
+                              className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
+                              title="Ver ficha imprimible"
                             >
-                              Ver ficha
+                              <FaEye className="text-[11px]" /> Ver ficha
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleEditar(f); }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
                               title="Editar ficha"
                             >
                               <FaEdit className="text-[11px]" />
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleEliminar(f); }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 transition-colors"
                               title="Eliminar ficha"
                             >
                               <FaTrash className="text-[11px]" />
@@ -519,13 +538,15 @@ export default function AbrigoRetractilFicha() {
                         </td>
                       </tr>
 
-                      {selectedId === f.id && (
+                      {isSelected && (
                         <tr className="border-b border-gray-200 dark:border-gris-700">
                           <td colSpan={9} className="py-3 px-2">
                             <FichaDetalleAbrigoRetractil
                               ficha={f}
                               numero={numero}
                               onCambiarEstado={cambiarEstado}
+                              onAgregarNota={agregarNota}
+                              onEditarEntrega={editarEntrega}
                               onVerFicha={() => setPrintFicha({ ficha: f, numero })}
                               onEditar={() => handleEditar(f)}
                               onEliminar={() => handleEliminar(f)}
@@ -549,12 +570,14 @@ export default function AbrigoRetractilFicha() {
           onClose={() => setPrintFicha(null)}
         />
       )}
+
+      {entregaModal}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onVerFicha, onEditar, onEliminar }) {
+function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onVerFicha, onEditar, onEliminar }) {
   const med  = f.medidas               || {};
   const mp   = f.materiaPrimaPorAbrigo || {};
   const mpt  = f.materiaPrimaTotal     || {};
@@ -634,7 +657,14 @@ function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onVerF
         ))}
       </div>
 
-      <EstadoActions estado={f.estado} onCambiarEstado={(estado) => onCambiarEstado(f.id, estado)} />
+      <EstadoControl
+        estado={f.estado}
+        notas={f.notas}
+        entrega={f.entrega}
+        onCambiarEstado={(estado, nota) => onCambiarEstado(f.id, estado, nota)}
+        onAgregarNota={(texto) => onAgregarNota(f.id, texto)}
+        onEditarEntrega={() => onEditarEntrega(f.id)}
+      />
     </div>
   );
 }

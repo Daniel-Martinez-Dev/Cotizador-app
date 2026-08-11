@@ -2,6 +2,7 @@ import React from "react";
 import toast from "react-hot-toast";
 import { FaSearch, FaCheckCircle, FaTimes } from "react-icons/fa";
 import { listarTodasFichasProduccion } from "../../utils/firebaseFichas";
+import { codigoFicha as codigoDeFicha, codigoFichaOFallback } from "../../utils/codigoFicha";
 
 // Selector de "orden de producción" para ligar una salida de materia prima a
 // la ficha que la está consumiendo. Prioriza fichas "en producción".
@@ -30,7 +31,7 @@ export default function OrdenProduccionPicker({ value, onChange }) {
   const resultados = React.useMemo(() => {
     const t = term.trim().toLowerCase();
     const base = t
-      ? fichas.filter((f) => `${f.cliente || ""} ${f.ordenProduccion || ""}`.toLowerCase().includes(t))
+      ? fichas.filter((f) => `${f.cliente || ""} ${f.ordenProduccion || ""} ${codigoDeFicha(f) || ""}`.toLowerCase().includes(t))
       : fichas;
     return base
       .slice()
@@ -50,7 +51,7 @@ export default function OrdenProduccionPicker({ value, onChange }) {
           <FaCheckCircle className="text-green-600 dark:text-green-400 shrink-0" />
           <div className="min-w-0">
             <div className="font-medium text-green-900 dark:text-green-200 truncate">
-              OP #{value.ordenProduccion} · {value.tipoLabel}
+              {value.codigo || `OP #${value.ordenProduccion}`} · {value.tipoLabel}
             </div>
             <div className="text-green-800/80 dark:text-green-300/80 truncate">{value.cliente || "Sin cliente"}</div>
           </div>
@@ -83,11 +84,11 @@ export default function OrdenProduccionPicker({ value, onChange }) {
             <button
               key={`${f.tipo}-${f.id}`}
               type="button"
-              onClick={() => onChange({ ordenProduccion: f.ordenProduccion, fichaId: f.id, fichaTipo: f.tipo, tipoLabel: f.tipoLabel, cliente: f.cliente })}
+              onClick={() => onChange({ ordenProduccion: f.ordenProduccion, codigo: codigoDeFicha(f), fichaId: f.id, fichaTipo: f.tipo, tipoLabel: f.tipoLabel, cliente: f.cliente })}
               className="w-full text-left rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-900 px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gris-700/50"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">OP #{f.ordenProduccion} · {f.tipoLabel}</span>
+                <span className="font-medium">{codigoFichaOFallback(f)} · {f.tipoLabel}</span>
                 {f.estado === "en_produccion" && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">En producción</span>}
               </div>
               <div className="text-gray-500 dark:text-gray-400 truncate">{f.cliente || "Sin cliente"}</div>

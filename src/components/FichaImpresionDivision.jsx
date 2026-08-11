@@ -3,6 +3,7 @@ import FichaImpresionShell from "./fichas/FichaImpresionShell";
 import { fmtMm, fmtCm as fmt1, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { MedidaCard, InfoChip, AcabadoCard, SectionTitle, MedidaHero, Membrete, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
+import { codigoFichaOFallback } from "../utils/codigoFicha";
 
 // Convierte un valor en milímetros a metros (2 decimales) — distinto de fmtM2,
 // que formatea un área en m² ya calculada.
@@ -59,10 +60,14 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
   const insetY = Math.max(4, ((panel.alto - icopor.alto) / 2) * scale);
 
   const marco = "#1a3f8f";
-  const nucleo = "#93c5fd";
+  const nucleo = "#93c5fd";     // relleno del icopor (no texto)
   const bg = "#f0f4ff";
-  const hardware = "#d97706";
-  const reataCol = "#475569";
+  const hardware = "#7c2d12";
+  const reataCol = "#000000";
+  // Los rótulos del plano van en negro con halo blanco: sobre el dibujo, un
+  // gris o un azul claro se pierden al imprimir.
+  const rotulo = "#000000";
+  const haloTexto = { paintOrder: "stroke", stroke: "#ffffff", strokeWidth: 2.4, strokeLinejoin: "round" };
 
   const tieneLogo = !!logo && logo !== "NO";
   const tienePlaca = placa === "SI";
@@ -125,10 +130,10 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", maxWidth: "640px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <defs>
         <marker id="arrDivA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill="#555" />
+          <path d="M0,0 L6,3 L0,6 Z" fill="#000000" />
         </marker>
         <marker id="arrDivB" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto">
-          <path d="M6,0 L0,3 L6,6 Z" fill="#555" />
+          <path d="M6,0 L0,3 L6,6 Z" fill="#000000" />
         </marker>
       </defs>
 
@@ -144,10 +149,10 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
       <line x1={x0 + pw} y1={y0} x2={x0 + pw} y2={y0 + fh} stroke={marco} strokeWidth="1" strokeDasharray="2,2" />
 
       {/* Etiquetas de panel */}
-      <text x={x0 + pw / 2} y={y0 - 6} fontSize="7" fill={marco} textAnchor="middle" fontWeight="bold">IZQ.</text>
-      <text x={x0 + pw + pw / 2} y={y0 - 6} fontSize="7" fill={marco} textAnchor="middle" fontWeight="bold">DER.</text>
-      <text x={x0 + pw / 2} y={y0 + fh / 2 + 3} fontSize="6" fill={nucleo} textAnchor="middle">ICOPOR</text>
-      <text x={x0 + pw + pw / 2} y={y0 + fh / 2 + 3} fontSize="6" fill={nucleo} textAnchor="middle">ICOPOR</text>
+      <text x={x0 + pw / 2} y={y0 - 6} fontSize="8" fill={rotulo} textAnchor="middle" fontWeight="bold" style={haloTexto}>IZQ.</text>
+      <text x={x0 + pw + pw / 2} y={y0 - 6} fontSize="8" fill={rotulo} textAnchor="middle" fontWeight="bold" style={haloTexto}>DER.</text>
+      <text x={x0 + pw / 2} y={y0 + fh / 2 + 3} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>ICOPOR</text>
+      <text x={x0 + pw + pw / 2} y={y0 + fh / 2 + 3} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>ICOPOR</text>
 
       {/* Reatas de amarre (siempre presentes) + rótulo con líneas guía */}
       {reatas.map((r, i) => (
@@ -159,20 +164,20 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
       ))}
       <line x1={reatas[0].x + reataW / 2} y1={reatas[0].y + reataH} x2={reataLabelX - 6} y2={reataLabelY - 4} stroke={reataCol} strokeWidth="0.6" />
       <line x1={reatas[1].x + reataW / 2} y1={reatas[1].y + reataH} x2={reataLabelX + 4} y2={reataLabelY - 4} stroke={reataCol} strokeWidth="0.6" />
-      <text x={reataLabelX} y={reataLabelY + 5} fontSize="6.5" fontWeight="bold" fill={reataCol} textAnchor="middle">REATAS</text>
+      <text x={reataLabelX} y={reataLabelY + 5} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>REATAS</text>
 
       {/* Tag Logo / Placa — panel izquierdo */}
       {(tieneLogo || tienePlaca) && (
         <g>
           <rect x={tagX} y={tagY} width={tagW} height={tagH} rx="2" fill="white" stroke={hardware} strokeWidth="1" />
           {tieneLogo && (
-            <text x={tagX + tagW / 2} y={tagY + (tienePlaca ? 8 : 8.5)} fontSize="6" fontWeight="bold" fill={hardware} textAnchor="middle">LOGO</text>
+            <text x={tagX + tagW / 2} y={tagY + (tienePlaca ? 8 : 8.5)} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>LOGO</text>
           )}
           {tieneLogo && tienePlaca && (
             <line x1={tagX + 2} y1={tagY + 10} x2={tagX + tagW - 2} y2={tagY + 10} stroke={hardware} strokeWidth="0.5" />
           )}
           {tienePlaca && (
-            <text x={tagX + tagW / 2} y={tagY + (tieneLogo ? 18 : 8.5)} fontSize="6" fontWeight="bold" fill={hardware} textAnchor="middle">PLACA</text>
+            <text x={tagX + tagW / 2} y={tagY + (tieneLogo ? 18 : 8.5)} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>PLACA</text>
           )}
         </g>
       )}
@@ -185,7 +190,7 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
           <rect x={ventCx - frameW / 2 + postW} y={crossbarY} width={frameW - postW * 2} height={frameTop + frameH - crossbarY} fill="none" stroke={nucleo} strokeWidth="0.75" />
           <line x1={ventCx - frameW / 2} y1={crossbarY} x2={ventCx + frameW / 2} y2={crossbarY} stroke={nucleo} strokeWidth="1" />
           <circle cx={ventCx} cy={ventCy} r={ventR} fill="white" stroke={nucleo} strokeWidth="1.2" />
-          <text x={ventCx} y={frameTop - 5} fontSize="6" fontWeight="bold" fill={nucleo} textAnchor="middle">
+          <text x={ventCx} y={frameTop - 5} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>
             VENTANA{medidaEspecial ? " (medida dif.)" : ""}
           </text>
         </g>
@@ -194,35 +199,35 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
         <circle key={i} cx={vx} cy={vy} r={ventRSimple} fill="white" stroke={nucleo} strokeWidth="1.2" />
       ))}
       {ventanasSimples.length > 0 && (
-        <text x={ventCxSimple} y={ventanasSimplesTopY - 5} fontSize="6" fontWeight="bold" fill={nucleo} textAnchor="middle">VENTANA</text>
+        <text x={ventCxSimple} y={ventanasSimplesTopY - 5} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>VENTANA</text>
       )}
 
       {/* Franja de piso con pernos — base de cada panel */}
-      <rect x={x0} y={pisoY} width={pw - 1.5} height={pisoH} rx="1.5" fill="#e2e8f0" stroke="#64748b" strokeWidth="0.75" />
-      <rect x={x0 + pw + 1.5} y={pisoY} width={pw - 1.5} height={pisoH} rx="1.5" fill="#e2e8f0" stroke="#64748b" strokeWidth="0.75" />
-      {pernosX(x0).map((px, i) => <circle key={`pl${i}`} cx={px} cy={pisoY + pisoH / 2} r="1" fill="#475569" />)}
-      {pernosX(x0 + pw + 1.5).map((px, i) => <circle key={`pr${i}`} cx={px} cy={pisoY + pisoH / 2} r="1" fill="#475569" />)}
-      <text x={cx} y={pisoY + pisoH / 2 + 2.5} fontSize="6" fontWeight="bold" fill="#334155" textAnchor="middle">PISO</text>
+      <rect x={x0} y={pisoY} width={pw - 1.5} height={pisoH} rx="1.5" fill="#e2e8f0" stroke="#1f2937" strokeWidth="0.75" />
+      <rect x={x0 + pw + 1.5} y={pisoY} width={pw - 1.5} height={pisoH} rx="1.5" fill="#e2e8f0" stroke="#1f2937" strokeWidth="0.75" />
+      {pernosX(x0).map((px, i) => <circle key={`pl${i}`} cx={px} cy={pisoY + pisoH / 2} r="1" fill="#1f2937" />)}
+      {pernosX(x0 + pw + 1.5).map((px, i) => <circle key={`pr${i}`} cx={px} cy={pisoY + pisoH / 2} r="1" fill="#1f2937" />)}
+      <text x={cx} y={pisoY + pisoH / 2 + 2.5} fontSize="7" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>PISO</text>
 
       {/* Cota ANCHO (inferior) */}
-      <line x1={x0} y1={y0 + fh + 14} x2={x0 + fw} y2={y0 + fh + 14} stroke="#555" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
-      <text x={cx} y={y0 + fh + 26} fontSize="9" fill="#333" textAnchor="middle">
+      <line x1={x0} y1={y0 + fh + 14} x2={x0 + fw} y2={y0 + fh + 14} stroke="#000000" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
+      <text x={cx} y={y0 + fh + 26} fontSize="9.5" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}>
         ANCHO VEHÍCULO: {fmtMm(anchoVehiculo)} mm (paneles {fmtMm(panel.ancho)} c/u)
       </text>
 
       {/* Cota ALTO (derecha) */}
-      <line x1={x0 + fw + 12} y1={y0} x2={x0 + fw + 12} y2={y0 + fh} stroke="#555" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
+      <line x1={x0 + fw + 12} y1={y0} x2={x0 + fw + 12} y2={y0 + fh} stroke="#000000" strokeWidth="1" markerStart="url(#arrDivB)" markerEnd="url(#arrDivA)" />
       <text
         x={x0 + fw + 26}
         y={cy}
-        fontSize="9" fill="#333" textAnchor="middle"
+        fontSize="9.5" fontWeight="bold" fill={rotulo} textAnchor="middle" style={haloTexto}
         transform={`rotate(90,${x0 + fw + 26},${cy})`}
       >
         ALTO VEHÍCULO: {fmtMm(altoVehiculo)} mm
       </text>
 
       {/* Título */}
-      <text x={W / 2} y={H - 4} fontSize="10" fontWeight="bold" textAnchor="middle" fill="#333">
+      <text x={W / 2} y={H - 4} fontSize="10" fontWeight="bold" textAnchor="middle" fill={rotulo}>
         VISTA FRONTAL — DIVISIÓN TÉRMICA (2 PANELES)
       </text>
     </svg>
@@ -234,6 +239,7 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
 export default function FichaImpresionDivision({ ficha, numero, onClose }) {
   if (!ficha) return null;
   const f   = ficha;
+  const codigo = codigoFichaOFallback({ ...f, ordenProduccion: f.ordenProduccion ?? numero }, "division");
   const med = f.medidas || {};
 
   const consumoVisible = (f.consumo || []).filter((c) => c.cantidad > 0);
@@ -241,18 +247,18 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
   return (
     <FichaImpresionShell
       productLabel="División Térmica"
-      numero={numero}
+      numero={codigo}
       cliente={f.cliente}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-        <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
+        <div style={{ color: "#000000", fontSize: "12.5px" }}>
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — División Térmica"
-            numero={f.ordenProduccion ?? numero}
-            numeroLabel="N.° de ficha"
+            numero={codigo}
+            numeroLabel="N.° ficha de producción"
           />
 
           {/* ── Identificación + medidas (izquierda) / Plano + acabados (derecha) ── */}
@@ -269,7 +275,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                 ancho={f.anchoVehiculo}
                 alto={f.altoVehiculo}
                 extra={
-                  <span style={{ color: "#7dd3fc", fontSize: "14px", fontWeight: "bold", fontFamily: "monospace" }}>
+                  <span style={{ color: "#ffffff", fontSize: "14px", fontWeight: "bold", fontFamily: "monospace" }}>
                     {toM(f.anchoVehiculo)} × {toM(f.altoVehiculo)} m
                   </span>
                 }
@@ -277,34 +283,34 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
 
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
                   <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
                 </div>
 
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
                   <div style={{ fontSize: "24px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                  <div style={{ fontSize: "10px", color: "#64748b", marginTop: "1px" }}>unidades</div>
+                  <div style={{ fontSize: "10px", color: "#000000", marginTop: "1px" }}>unidades</div>
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
-                <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} />
-                <InfoChip label="N.° de ficha"    value={f.numeroFicha || "—"} />
+                <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} highlight={!!f.numeroOrdenCompra} />
+                <InfoChip label="N.° ficha física" value={f.numeroFicha || "—"} />
                 <InfoChip label="Agujero"         value={f.agujero || "—"} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
-                <InfoChip label="Fecha orden"   value={f.fechaOrden   ? new Date(f.fechaOrden).toLocaleDateString("es-CO")   : "—"} />
-                <InfoChip label="Fecha entrega" value={f.fechaEntrega ? new Date(f.fechaEntrega).toLocaleDateString("es-CO") : "—"} highlight={!!f.fechaEntrega} />
+                <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
+                <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />
                 <InfoChip label="Placa"         value={f.placa === "SI" ? `SI · ${f.numeroPlaca || "—"}` : "NO"} highlight={f.placa === "SI"} />
               </div>
 
               <SectionTitle size="11.5px">Medidas de Corte</SectionTitle>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                 <MedidaCard label="Panel"                  ancho={med.panel?.ancho}          alto={med.panel?.alto}          color="#1a3f8f" />
-                <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0f6cbf" />
-                <MedidaCard label="Funda"                  ancho={med.funda?.ancho}          alto={med.funda?.alto}          color="#0891b2" />
-                <MedidaCard label="Policarb. / Cartonplast" ancho={med.policarbonato?.ancho} alto={med.policarbonato?.alto}  color="#0d9488" />
+                <MedidaCard label="Icopor"                 ancho={med.icopor?.ancho}         alto={med.icopor?.alto}         color="#0b4a7d" />
+                <MedidaCard label="Funda"                  ancho={med.funda?.ancho}          alto={med.funda?.alto}          color="#155e75" />
+                <MedidaCard label="Policarb. / Cartonplast" ancho={med.policarbonato?.ancho} alto={med.policarbonato?.alto}  color="#115e59" />
               </div>
             </div>
 
@@ -312,7 +318,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
             <div>
               {med.panel && med.icopor && (
                 <div style={{
-                  border: "1px solid #ccc", borderRadius: "8px", padding: "4px",
+                  border: "1px solid #334155", borderRadius: "8px", padding: "4px",
                   background: "#fafafa", display: "flex", justifyContent: "center", alignItems: "center",
                 }}>
                   <PlanoTecnicoDivision
@@ -331,9 +337,9 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                 <SectionTitle size="11.5px">Opciones y Acabados</SectionTitle>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Logo"     value={f.logo || "NO"} color="#1a3f8f" active={f.logo !== "NO" && !!f.logo} />
-                  <AcabadoCard label="Platinas" value={formatPlatinas(f)} color="#d97706" active={f.platinas === "SI"} />
-                  <AcabadoCard label="Espuma"   value="8 CAB / 4+4 LAT" color="#0d9488" active />
-                  <AcabadoCard label="Factura"  value={f.factura || "NO"} color="#16a34a" active={f.factura === "SI"} />
+                  <AcabadoCard label="Platinas" value={formatPlatinas(f)} color="#92400e" active={f.platinas === "SI"} />
+                  <AcabadoCard label="Espuma"   value="8 CAB / 4+4 LAT" color="#115e59" active />
+                  <AcabadoCard label="Factura"  value={f.factura || "NO"} color="#166534" active={f.factura === "SI"} />
                 </div>
               </div>
 
@@ -342,9 +348,9 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
 
                 {/* Lona */}
                 <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
-                  <div style={{ fontSize: "10px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+                  <div style={{ fontSize: "10px", color: "#075985", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                     Distribución de Lona
-                    <span style={{ fontWeight: "600", color: "#475569", marginLeft: "6px" }}>
+                    <span style={{ fontWeight: "600", color: "#000000", marginLeft: "6px" }}>
                       Rollo {med.lona?.anchoRollo ?? "—"} mm — Color: {f.colorLona || "—"}
                     </span>
                   </div>
@@ -355,10 +361,10 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                       ["Sobrante",     med.lona?.sobranteAncho,  "mm"],
                     ].map(([lbl, val, unit]) => (
                       <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
-                        <div style={{ fontSize: lbl === "Tiras" ? "22px" : "17px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>
+                        <div style={{ fontSize: lbl === "Tiras" ? "22px" : "17px", fontWeight: "bold", color: "#075985", fontFamily: "monospace", lineHeight: 1 }}>
                           {val ?? "—"}
                         </div>
-                        <div style={{ fontSize: "9px", color: "#475569", fontWeight: "600", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
+                        <div style={{ fontSize: "9px", color: "#000000", fontWeight: "600", marginTop: "2px" }}>{lbl}{unit ? ` (${unit})` : ""}</div>
                       </div>
                     ))}
                   </div>
@@ -367,16 +373,16 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                 {/* Piso y ventana */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                    <div style={{ fontSize: "9px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
-                    <div style={{ fontSize: "22px", fontWeight: "bold", fontFamily: "monospace", color: "#15803d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
-                    <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>mm</div>
+                    <div style={{ fontSize: "9px", color: "#166534", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Medida Piso</div>
+                    <div style={{ fontSize: "22px", fontWeight: "bold", fontFamily: "monospace", color: "#14532d", lineHeight: 1 }}>{fmtMm(med.medidaPiso)}</div>
+                    <div style={{ fontSize: "10px", color: "#000000", marginTop: "2px" }}>mm</div>
                   </div>
                   <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: "8px", padding: "8px 9px", flex: 1 }}>
-                    <div style={{ fontSize: "9px", color: "#ca8a04", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
+                    <div style={{ fontSize: "9px", color: "#854d0e", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Distancia Ventana</div>
                     <div style={{ fontSize: "22px", fontWeight: "bold", fontFamily: "monospace", color: "#92400e", lineHeight: 1 }}>
                       {med.distanciaVentana != null ? fmt1(med.distanciaVentana) : "—"}
                     </div>
-                    <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>cm</div>
+                    <div style={{ fontSize: "10px", color: "#000000", marginTop: "2px" }}>cm</div>
                   </div>
                 </div>
               </div>
@@ -387,10 +393,10 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           {f.adicional && (
             <div style={{ padding: "0 20px 8px" }}>
               <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "8px", padding: "9px 10px" }}>
-                <div style={{ fontSize: "9.5px", color: "#c2410c", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
+                <div style={{ fontSize: "9.5px", color: "#7c2d12", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>
                   Adicional / Notas
                 </div>
-                <div style={{ fontSize: "12.5px", color: "#1a1a2e" }}>{f.adicional}</div>
+                <div style={{ fontSize: "12.5px", color: "#000000" }}>{f.adicional}</div>
               </div>
             </div>
           )}
@@ -405,11 +411,11 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
                     background: "#f8fafc", border: "1px solid #e2e8f0",
                     borderRadius: "6px", padding: "6px 8px",
                   }}>
-                    <div style={{ fontSize: "9px", color: "#64748b", fontWeight: "600", marginBottom: "2px" }}>{c.insumo.replace(/_/g, " ")}</div>
-                    <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "15px", color: "#1e293b" }}>
+                    <div style={{ fontSize: "9px", color: "#000000", fontWeight: "600", marginBottom: "2px" }}>{c.insumo.replace(/_/g, " ")}</div>
+                    <div style={{ fontWeight: "bold", fontFamily: "monospace", fontSize: "15px", color: "#000000" }}>
                       {c.unidad === "m²" ? Number(c.cantidad).toFixed(3) : c.cantidad}
                     </div>
-                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "1px" }}>
+                    <div style={{ fontSize: "9px", color: "#000000", marginTop: "1px" }}>
                       {c.unidad}{c.largoMm ? ` · ${c.largoMm} mm` : ""}
                     </div>
                   </div>
@@ -421,7 +427,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           <Firmas />
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN DIVISIONES TÉRMICAS"
-            numero={numero}
+            numero={codigo}
             fecha={fmtDate(new Date().toISOString())}
           />
         </div>

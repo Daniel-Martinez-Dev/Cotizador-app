@@ -90,7 +90,7 @@ export default function NotificationBell() {
                     }`}
                   >
                     <div className="text-xs font-medium text-gray-800 dark:text-gray-100">
-                      {n.tipoLabel || "Ficha"} · OP #{n.ordenProduccion ?? "—"}
+                      {n.tipoLabel || "Ficha"} · {n.codigoFicha || `OP #${n.ordenProduccion ?? "—"}`}
                     </div>
                     <div className="text-[11px] text-gray-500 dark:text-gray-400">
                       {n.cliente || "Sin cliente"} pasó a producción

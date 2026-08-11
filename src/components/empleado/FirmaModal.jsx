@@ -9,8 +9,8 @@ function nombreDe(u) {
   return u.displayName || u.email || u.id;
 }
 
-export default function FirmaModal({ tipo, id, onClose, onDone }) {
-  const { user } = useAuth();
+export default function FirmaModal({ tipo, id, estadoActual, onClose, onDone }) {
+  const { user, profile } = useAuth();
   const [staff, setStaff] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [fabricantesSel, setFabricantesSel] = React.useState(() => new Set(user?.uid ? [user.uid] : []));
@@ -59,6 +59,9 @@ export default function FirmaModal({ tipo, id, onClose, onDone }) {
       await marcarFichaTerminada(tipo, id, {
         fabricantes,
         verificador: { uid: verificadorUser.id, nombre: nombreDe(verificadorUser) },
+        estadoAnterior: estadoActual,
+        autorNombre: profile?.displayName || user?.displayName || user?.email || "",
+        autorUid: user?.uid || "",
       });
       toast.success("Ficha marcada como terminada");
       onDone?.();

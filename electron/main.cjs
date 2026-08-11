@@ -109,6 +109,26 @@ async function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Ventanas internas generadas por la propia app — no navegan a ningún sitio
+    // externo, así que el filtro de hosts no aplica:
+    //   · about:blank → ventana de impresión de las fichas de producción
+    //     (FichaImpresionShell hace window.open('', '_blank') y le escribe el HTML).
+    //   · blob:/data: → vista previa de los PDF generados en el cliente.
+    // Sin esta excepción el handler las denegaba, window.open devolvía null y
+    // no se podía imprimir ni ver ningún PDF desde el escritorio.
+    if (!url || url === 'about:blank' || url.startsWith('blob:') || url.startsWith('data:')) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          autoHideMenuBar: true,
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        },
+      }
+    }
+
     const allowedHosts = [
       'accounts.google.com',
       'apis.google.com',

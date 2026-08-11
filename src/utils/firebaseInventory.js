@@ -416,6 +416,7 @@ export async function registrarMovimientoInventarioEmpleado(itemId, data) {
       throw new Error("Debes indicar la orden de producción para la salida");
     }
     extraMovimientoFields.ordenProduccion = ordenProduccion;
+    if (data?.codigoFicha) extraMovimientoFields.codigoFicha = String(data.codigoFicha);
     if (data?.fichaId) extraMovimientoFields.fichaId = String(data.fichaId);
     if (data?.fichaTipo) extraMovimientoFields.fichaTipo = String(data.fichaTipo);
   }

@@ -29,7 +29,7 @@ function addWorkDays(fechaIso, dias) {
  * @param {number}  input.alto               Alto del abrigo (mm)
  * @param {number}  [input.travesanos=910]   Largo de los travesaños (mm)
  * @param {number}  [input.cantidad=1]       Cantidad de abrigos del pedido
- * @param {string}  [input.numeroOP]
+ * @param {string}  [input.numeroOrdenCompra] Referencia de compra del cliente (opcional)
  * @param {string}  [input.fechaOrden]       "YYYY-MM-DD"
  * @param {string}  [input.auxiliarEncargado]
  * @param {string}  [input.color]

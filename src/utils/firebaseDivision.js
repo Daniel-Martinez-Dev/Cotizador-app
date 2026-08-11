@@ -13,6 +13,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getNextOrdenProduccionGlobal } from "./firebaseConsecutivos";
+import { formatearCodigoFicha } from "./codigoFicha";
 
 const FICHAS_COL     = "division_fichas";
 const INSUMOS_COL    = "division_insumos";
@@ -29,6 +30,9 @@ export async function crearFichaDivision(input, calculo) {
   const ordenProduccion = await getNextOrdenProduccionGlobal();
   const ref = await addDoc(collection(db, FICHAS_COL), {
     ordenProduccion,
+    // Código impreso de la ficha (DT + ddmmaa + consecutivo). Se congela aquí:
+    // aunque después se edite la ficha, el número no cambia.
+    codigoFicha:   formatearCodigoFicha({ tipo: "division", fecha: new Date(), consecutivo: ordenProduccion }),
     numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
     numeroFicha:   (input.numeroFicha || "").trim(),
     cliente:       (input.cliente || "").trim(),

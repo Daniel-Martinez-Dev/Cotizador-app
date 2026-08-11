@@ -1,6 +1,24 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Staff autenticado con cuenta real (la auth anónima del cotizador público
+    // no debe poder tocar nada de producción).
+    function isStaff() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Registro fotográfico de la entrega de una ficha de producción. Las fotos
+    // se comprimen en el cliente (ver fotosEntrega.js); el tope y el tipo se
+    // revalidan aquí porque el cliente no es de fiar.
+    match /fichas/{allPaths=**} {
+      allow read: if isStaff();
+      allow write: if isStaff()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isStaff();
+    }
+
     match /productos/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null

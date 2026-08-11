@@ -3,6 +3,7 @@ import FichaImpresionShell from "./fichas/FichaImpresionShell";
 import { fmtMm, fmtM2, fmtDec, fmtN, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { MedidaCard, InfoChip, AcabadoCard, SectionTitle, MedidaHero, Membrete, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
+import { codigoFichaOFallback } from "../utils/codigoFicha";
 import planoAbrigoRetractil from "../assets/imagenes/AbrigoRetractil/Plano.png";
 
 // ─── Plano técnico (imagen isométrica de referencia + medidas superpuestas) ──
@@ -45,22 +46,22 @@ function PlanoTecnico({ ancho, alto, anchoLuz, bandaLateralAncho }) {
             left: pct(x, PLANO_ANCHO_PX),
             transform: `rotate(${rotate}deg)`,
             transformOrigin: "left center",
-            fontSize: "11px", fontWeight: "bold", fontFamily: "monospace",
-            color: "#111827", whiteSpace: "nowrap", lineHeight: 1,
-            background: "rgba(255,255,255,0.92)", padding: "1px 3px", borderRadius: "2px",
+            fontSize: "11.5px", fontWeight: "bold", fontFamily: "monospace",
+            color: "#000000", whiteSpace: "nowrap", lineHeight: 1,
+            background: "#ffffff", padding: "1px 3px", borderRadius: "2px", border: "0.5px solid #000000",
           }}>
             {value}
           </span>
         ))}
       </div>
-      <div style={{ fontSize: "9px", color: "#64748b", marginTop: "5px" }}>
+      <div style={{ fontSize: "9px", color: "#000000", marginTop: "5px" }}>
         Plano de referencia — medidas del pedido superpuestas
       </div>
     </div>
   );
 }
 
-const tdStyle = { border: "1px solid #e2e8f0", padding: "5px 7px", fontSize: "11.5px", verticalAlign: "middle" };
+const tdStyle = { border: "1px solid #000000", padding: "5px 7px", fontSize: "11.5px", verticalAlign: "middle" };
 const thStyle = { ...tdStyle, background: "#1a3f8f", color: "white", fontWeight: "bold", textAlign: "center", fontSize: "11px" };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
   if (!ficha) return null;
 
   const f   = ficha;
+  const codigo = codigoFichaOFallback({ ...f, ordenProduccion: f.ordenProduccion ?? numero }, "abrigoretractil");
   const med = f.medidas               || {};
   const mp  = f.materiaPrimaPorAbrigo || {};
   const mpt = f.materiaPrimaTotal     || {};
@@ -105,18 +107,18 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
   return (
     <FichaImpresionShell
       productLabel="Abrigo Retráctil"
-      numero={numero}
+      numero={codigo}
       cliente={f.cliente}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
     >
-        <div style={{ color: "#1a1a2e", fontSize: "12.5px" }}>
+        <div style={{ color: "#000000", fontSize: "12.5px" }}>
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — Abrigo Retráctil"
-            numero={numero}
-            numeroLabel="N.° de ficha"
+            numero={codigo}
+            numeroLabel="N.° ficha de producción"
             subtitulo="Todas las dimensiones en milímetros"
           />
 
@@ -134,7 +136,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                 ancho={f.ancho}
                 alto={f.alto}
                 extra={
-                  <span style={{ color: "#7dd3fc", fontSize: "12px", fontWeight: "bold", fontFamily: "monospace" }}>
+                  <span style={{ color: "#ffffff", fontSize: "12px", fontWeight: "bold", fontFamily: "monospace" }}>
                     Travesaños: {fmtMm(f.travesanos)} mm
                   </span>
                 }
@@ -142,18 +144,18 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
 
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
                   <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
                 </div>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
-                  <div style={{ fontSize: "9.5px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
+                  <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>
                   <div style={{ fontSize: "24px", fontWeight: "bold", color: "#1a3f8f", lineHeight: 1 }}>{f.cantidad}</div>
-                  <div style={{ fontSize: "10px", color: "#64748b", marginTop: "1px" }}>abrigos</div>
+                  <div style={{ fontSize: "10px", color: "#000000", marginTop: "1px" }}>abrigos</div>
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
-                <InfoChip label="Orden de producción" value={f.numeroOP || "—"} />
+                <InfoChip label="Orden de compra" value={f.numeroOrdenCompra || "—"} highlight={!!f.numeroOrdenCompra} />
                 <InfoChip label="Auxiliar encargado"   value={f.auxiliarEncargado || "TODOS"} />
                 <InfoChip label="Color / Acabado"      value={f.acabado === "GALVANIZADO" ? "GALVANIZADO" : `${f.color || "NEGRO"} / PINTADO`} />
               </div>
@@ -167,23 +169,23 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                 <MedidaCard label="Lona perimetral" ancho={med.loneaPerimetro} alto={700} color="#1a3f8f" dimLabels={["Largo", "Ancho rollo"]} />
                 {llevaBanda && (
                   <>
-                    <MedidaCard label="Banda PVC lateral ×2" ancho={med.bandaLateralAncho}  alto={med.bandaLateralLargo}  color="#0f6cbf" dimLabels={["Ancho", "Largo"]} />
-                    <MedidaCard label="Banda PVC superior"   ancho={med.bandaSuperiorAncho} alto={med.bandaSuperiorLargo} color="#0891b2" dimLabels={["Ancho", "Largo"]} />
+                    <MedidaCard label="Banda PVC lateral ×2" ancho={med.bandaLateralAncho}  alto={med.bandaLateralLargo}  color="#0b4a7d" dimLabels={["Ancho", "Largo"]} />
+                    <MedidaCard label="Banda PVC superior"   ancho={med.bandaSuperiorAncho} alto={med.bandaSuperiorLargo} color="#155e75" dimLabels={["Ancho", "Largo"]} />
                   </>
                 )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                 {[
-                  { label: `Largueros ×${fmtN(med.largueroCantidad)}`,   val: fmtMm(med.largueroLargo),        unit: "mm",     color: "#be123c", bg: "#fff1f2", border: "#fecdd3" },
-                  { label: `Travesaños ×${fmtN(med.travesanoCantidad)}`, val: fmtMm(med.travesanoLargo),       unit: "mm",     color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
-                  { label: `Casitas ×${fmtN(med.casitasCantidad)}`,       val: fmtMm(med.casitasLargo),         unit: "mm",     color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
-                  { label: "Mangueras (rollos de 6000 mm)",                val: fmtN(med.manguerasCantidad),     unit: "rollos", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0" },
+                  { label: `Largueros ×${fmtN(med.largueroCantidad)}`,   val: fmtMm(med.largueroLargo),        unit: "mm",     color: "#9f1239", bg: "#fff1f2", border: "#fecdd3" },
+                  { label: `Travesaños ×${fmtN(med.travesanoCantidad)}`, val: fmtMm(med.travesanoLargo),       unit: "mm",     color: "#5b21b6", bg: "#f5f3ff", border: "#ddd6fe" },
+                  { label: `Casitas ×${fmtN(med.casitasCantidad)}`,       val: fmtMm(med.casitasLargo),         unit: "mm",     color: "#92400e", bg: "#fffbeb", border: "#fde68a" },
+                  { label: "Mangueras (rollos de 6000 mm)",                val: fmtN(med.manguerasCantidad),     unit: "rollos", color: "#065f46", bg: "#ecfdf5", border: "#a7f3d0" },
                 ].map(({ label, val, unit, color, bg, border }) => (
                   <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "8px", padding: "8px 9px", textAlign: "center" }}>
                     <div style={{ fontSize: "9px", color, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>{label}</div>
                     <div style={{ fontSize: "20px", fontWeight: "bold", fontFamily: "monospace", color, lineHeight: 1 }}>{val}</div>
-                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>{unit}</div>
+                    <div style={{ fontSize: "9px", color: "#000000", marginTop: "2px" }}>{unit}</div>
                   </div>
                 ))}
               </div>
@@ -192,7 +194,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
             {/* Columna derecha — plano técnico + opciones/acabados */}
             <div>
               <div style={{
-                border: "1px solid #ccc", borderRadius: "8px", padding: "8px",
+                border: "1px solid #334155", borderRadius: "8px", padding: "8px",
                 background: "#fafafa", display: "flex", justifyContent: "center", alignItems: "center",
               }}>
                 <PlanoTecnico ancho={f.ancho} alto={f.alto} anchoLuz={med.anchoLuz} bandaLateralAncho={med.bandaLateralAncho} />
@@ -202,8 +204,8 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                 <SectionTitle size="11.5px">Opciones y Acabados</SectionTitle>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                   <AcabadoCard label="Color"     value={f.color || "NEGRO"} color="#1a3f8f" active />
-                  <AcabadoCard label="Acabado"   value={f.acabado || "PINTADO"} color="#0f6cbf" active />
-                  <AcabadoCard label="Banda PVC" value={llevaBanda ? "SÍ" : "NO"} color="#059669" active={llevaBanda} />
+                  <AcabadoCard label="Acabado"   value={f.acabado || "PINTADO"} color="#0b4a7d" active />
+                  <AcabadoCard label="Banda PVC" value={llevaBanda ? "SÍ" : "NO"} color="#065f46" active={llevaBanda} />
                 </div>
                 <div style={{
                   marginTop: "10px", fontSize: "10px", fontWeight: "600", color: "#92400e", background: "#fffbeb",
@@ -219,7 +221,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           <div style={{ padding: "0 20px 10px", display: "grid", gridTemplateColumns: "3fr 2fr", gap: "8px" }}>
 
             <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "9px" }}>
-              <div style={{ fontSize: "10px", color: "#0284c7", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+              <div style={{ fontSize: "10px", color: "#075985", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                 Material a Alistar
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
@@ -230,27 +232,27 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                   ['Tornillos autorroscantes No10×¾"',                 `×${ali.tornillosAutorroscantes ?? 22 * cant}`],
                 ].map(([lbl, val]) => (
                   <div key={lbl} style={{ textAlign: "center", background: "white", borderRadius: "6px", padding: "6px" }}>
-                    <div style={{ fontSize: "17px", fontWeight: "bold", color: "#0284c7", fontFamily: "monospace", lineHeight: 1 }}>{val}</div>
-                    <div style={{ fontSize: "9px", color: "#475569", fontWeight: "600", marginTop: "2px" }}>{lbl}</div>
+                    <div style={{ fontSize: "17px", fontWeight: "bold", color: "#075985", fontFamily: "monospace", lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: "9px", color: "#000000", fontWeight: "600", marginTop: "2px" }}>{lbl}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", padding: "9px", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: "10px", color: "#16a34a", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
+              <div style={{ fontSize: "10px", color: "#166534", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px" }}>
                 Control de Despacho
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", borderRadius: "6px", padding: "8px 10px", marginBottom: "6px" }}>
-                <span style={{ fontSize: "10px", color: "#475569", fontWeight: "600" }}>Peso total pedido</span>
-                <span style={{ fontSize: "20px", fontWeight: "bold", color: "#15803d", fontFamily: "monospace" }}>{fmtDec(des.pesoTotalKg, 1)} kg</span>
+                <span style={{ fontSize: "10px", color: "#000000", fontWeight: "600" }}>Peso total pedido</span>
+                <span style={{ fontSize: "20px", fontWeight: "bold", color: "#14532d", fontFamily: "monospace" }}>{fmtDec(des.pesoTotalKg, 1)} kg</span>
               </div>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <tbody>
                   {(des.items || []).map(({ descripcion, pesoTotalKg }) => (
                     <tr key={descripcion}>
-                      <td style={{ fontSize: "10px", padding: "2px 0", color: "#334155" }}>{descripcion}</td>
-                      <td style={{ fontSize: "10px", padding: "2px 0", textAlign: "right", fontFamily: "monospace", color: "#15803d", fontWeight: "bold" }}>
+                      <td style={{ fontSize: "10px", padding: "2px 0", color: "#000000" }}>{descripcion}</td>
+                      <td style={{ fontSize: "10px", padding: "2px 0", textAlign: "right", fontFamily: "monospace", color: "#14532d", fontWeight: "bold" }}>
                         {fmtDec(pesoTotalKg, 1)} kg
                       </td>
                     </tr>
@@ -263,7 +265,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           {/* ── Consumo de materia prima ── */}
           <div style={{ padding: "0 20px 10px" }}>
             <SectionTitle>Consumo de Materia Prima (por abrigo)</SectionTitle>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+            <div style={{ border: "1px solid #000000", borderRadius: "8px", overflow: "hidden" }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
@@ -279,10 +281,10 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
                   {insumos.map(({ label, unit, cu, tot, formula }, i) => (
                     <tr key={label} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
                       <td style={{ ...tdStyle, fontWeight: "600" }}>{label}</td>
-                      <td style={{ ...tdStyle, textAlign: "center", color: "#475569" }}>{unit}</td>
-                      <td style={{ ...tdStyle, color: "#475569", fontSize: "10px" }}>{formula}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", color: "#000000" }}>{unit}</td>
+                      <td style={{ ...tdStyle, color: "#000000", fontSize: "10px" }}>{formula}</td>
                       <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold" }}>{cu}</td>
-                      <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1d4ed8" }}>{tot}</td>
+                      <td style={{ ...tdStyle, textAlign: "center", fontFamily: "monospace", fontWeight: "bold", color: "#1e3a8a" }}>{tot}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -293,7 +295,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           {/* ── Control de actividades ── */}
           <div style={{ padding: "0 20px 4px" }}>
             <SectionTitle size="11.5px">Control de Actividades</SectionTitle>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+            <div style={{ border: "1px solid #000000", borderRadius: "8px", overflow: "hidden" }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
@@ -320,7 +322,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           <Firmas />
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN ABRIGOS RETRÁCTILES"
-            numero={numero}
+            numero={codigo}
             fecha={fmtDate(new Date().toISOString())}
           />
         </div>

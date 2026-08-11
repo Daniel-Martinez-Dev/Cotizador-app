@@ -162,7 +162,7 @@ export default function EmpleadoInventarioList() {
                                 <span className="text-gray-400"> · {proveedorNameById[m.proveedorId] || "—"}</span>
                               )}
                               {m.tipo === "salida" && m.ordenProduccion ? (
-                                <span className="text-gray-400"> · OP #{m.ordenProduccion}</span>
+                                <span className="text-gray-400"> · {m.codigoFicha || `OP #${m.ordenProduccion}`}</span>
                               ) : null}
                               {m.nota && <div className="text-gray-400 truncate">{m.nota}</div>}
                             </div>
