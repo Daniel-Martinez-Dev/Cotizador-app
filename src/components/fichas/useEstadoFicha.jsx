@@ -2,25 +2,30 @@ import React from "react";
 import toast from "react-hot-toast";
 import { cambiarEstadoFicha, agregarNotaFicha, getFichaTipoConfig } from "../../utils/firebaseFichas";
 import { ESTADO_LABEL, ESTADO_REQUIERE_ENTREGA, normalizarEstado } from "./estadoFicha";
+import { firmaDeEtapa } from "../../utils/firmasFicha";
 import { codigoFicha as codigoDeFicha } from "../../utils/codigoFicha";
 import { crearNotificacionFichaEnProduccion } from "../../utils/firebaseNotificaciones";
 import { useAuth } from "../../context/AuthContext";
 import EntregaModal from "./EntregaModal";
+import FirmaModal from "./FirmaModal";
 
 // Cambios de estado y notas de una lista de fichas ya cargada en memoria.
-// Las cinco líneas de producto (división, sello, abrigo, puerta rápida y ficha
-// básica) hacían exactamente lo mismo copiado cinco veces; aquí vive una sola
-// versión, y de paso todas heredan el historial de notas y la entrega.
+// Las líneas de producto hacían exactamente lo mismo copiado una vez por
+// producto; aquí vive una sola versión, y de paso todas heredan el historial de
+// notas, las firmas y la entrega.
 //
 // `setFichas` recibe el setState de la lista: la ficha se actualiza en memoria
 // para no recargar la colección entera tras cada cambio.
 //
-// Devuelve también `entregaModal`, que hay que pintar en el árbol: pasar a
-// "entregada" no es un cambio de estado a secas, exige capturar fecha, placas y
-// fotos, y ese formulario se abre desde aquí venga de donde venga el cambio.
+// Devuelve también `modales`, que hay que pintar en el árbol: los dos cambios
+// de estado que cierran la ficha no son un clic a secas, exigen firma —
+// "terminada" pide quién alistó y empacó, "entregada" quién revisó y aprobó
+// más los datos del despacho— y esos formularios se abren desde aquí venga de
+// donde venga el cambio.
 export default function useEstadoFicha(tipo, fichas, setFichas) {
   const { user, profile } = useAuth();
   const tipoLabel = getFichaTipoConfig(tipo).label;
+  const [firmaAbierta, setFirmaAbierta] = React.useState(null);
   const [entregaAbierta, setEntregaAbierta] = React.useState(null);
 
   // Quién queda firmando la nota en el historial.
@@ -44,10 +49,22 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     const ficha = fichas.find((x) => x.id === id);
     const estadoAnterior = normalizarEstado(ficha?.estado);
     if (estadoAnterior === estado) return true;
+    if (!ficha) return false;
+
+    if (estado === "terminado") {
+      setFirmaAbierta({ ficha, notaInicial: nota || "" });
+      return true;
+    }
 
     if (estado === ESTADO_REQUIERE_ENTREGA) {
-      if (!ficha) return false;
-      setEntregaAbierta({ ficha, notaInicial: nota || "" });
+      // No se puede cerrar lo que nunca se alistó: si la ficha llega aquí sin
+      // esa firma (por saltarse "terminada"), se pide primero y la entrega
+      // queda encolada detrás.
+      if (!firmaDeEtapa(ficha, "alistado")) {
+        setFirmaAbierta({ ficha, notaInicial: "", entregaDespues: nota || "" });
+      } else {
+        setEntregaAbierta({ ficha, notaInicial: nota || "" });
+      }
       return true;
     }
 
@@ -93,18 +110,61 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     if (ficha) setEntregaAbierta({ ficha, notaInicial: "" });
   }, [fichas]);
 
-  const entregaModal = entregaAbierta ? (
-    <EntregaModal
-      tipo={tipo}
-      ficha={entregaAbierta.ficha}
-      notaInicial={entregaAbierta.notaInicial}
-      onClose={() => setEntregaAbierta(null)}
-      onDone={({ entrega, nota }) => {
-        anexarNota(entregaAbierta.ficha.id, nota, { estado: "entregado", entrega });
-        setEntregaAbierta(null);
-      }}
-    />
-  ) : null;
+  // Corrección de una firma ya guardada — solo la ofrece el escritorio a
+  // producción/admin. La del alistado tiene formulario propio; la de revisión
+  // vive con los datos de la entrega, así que reabre ese.
+  const editarFirma = React.useCallback((id, etapa) => {
+    const ficha = fichas.find((x) => x.id === id);
+    if (!ficha) return;
+    if (etapa === "alistado") setFirmaAbierta({ ficha, notaInicial: "" });
+    else setEntregaAbierta({ ficha, notaInicial: "" });
+  }, [fichas]);
 
-  return { cambiarEstado, agregarNota, editarEntrega, entregaModal };
+  const modales = (
+    <>
+      {firmaAbierta && (
+        <FirmaModal
+          tipo={tipo}
+          ficha={firmaAbierta.ficha}
+          notaInicial={firmaAbierta.notaInicial}
+          onClose={() => setFirmaAbierta(null)}
+          onDone={({ firma, nota }) => {
+            const { ficha, entregaDespues } = firmaAbierta;
+            const firmas = { ...(ficha.firmas || {}), alistado: firma };
+            const estado = ficha.estado === "entregado" ? ficha.estado : "terminado";
+            anexarNota(ficha.id, nota, { estado, firmas });
+            setFirmaAbierta(null);
+            // Venía de un salto directo a "entregada": sigue el formulario de
+            // entrega sobre la ficha ya firmada.
+            if (entregaDespues != null) {
+              setEntregaAbierta({
+                ficha: { ...ficha, estado, firmas },
+                notaInicial: entregaDespues,
+              });
+            }
+          }}
+        />
+      )}
+
+      {entregaAbierta && (
+        <EntregaModal
+          tipo={tipo}
+          ficha={entregaAbierta.ficha}
+          notaInicial={entregaAbierta.notaInicial}
+          onClose={() => setEntregaAbierta(null)}
+          onDone={({ entrega, firma, nota }) => {
+            const { ficha } = entregaAbierta;
+            anexarNota(ficha.id, nota, {
+              estado: "entregado",
+              entrega,
+              firmas: { ...(ficha.firmas || {}), revisado: firma },
+            });
+            setEntregaAbierta(null);
+          }}
+        />
+      )}
+    </>
+  );
+
+  return { cambiarEstado, agregarNota, editarEntrega, editarFirma, modales };
 }

@@ -8,15 +8,30 @@ service firebase.storage {
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // Registro fotográfico de la entrega de una ficha de producción. Las fotos
-    // se comprimen en el cliente (ver fotosEntrega.js); el tope y el tipo se
-    // revalidan aquí porque el cliente no es de fiar.
+    // Quién puede tocar una evidencia ya subida: admin o producción. El rol se
+    // lee del perfil en Firestore (reglas entre servicios). La planta sube
+    // fotos, nunca las quita ni las pisa — igual que en firestore.rules, donde
+    // una firma o una entrega ya guardadas son de una sola escritura.
+    function puedeCorregirEvidencia() {
+      return isStaff() && (
+        request.auth.token.email == 'gerenciacchainservices@gmail.com' ||
+        firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid))
+          .data.get('roles', []).hasAny(['admin', 'produccion'])
+      );
+    }
+
+    // Registro fotográfico de una ficha de producción (alistado, revisión,
+    // entrega). Las fotos se comprimen en el cliente (ver fotosFicha.js); el
+    // tope y el tipo se revalidan aquí porque el cliente no es de fiar.
     match /fichas/{allPaths=**} {
       allow read: if isStaff();
+      // `resource == null` es una foto nueva; sobrescribir una que ya está es
+      // modificar la evidencia, y eso ya no es de la planta.
       allow write: if isStaff()
         && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-      allow delete: if isStaff();
+        && request.resource.contentType.matches('image/.*')
+        && (resource == null || puedeCorregirEvidencia());
+      allow delete: if puedeCorregirEvidencia();
     }
 
     match /productos/{allPaths=**} {

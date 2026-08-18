@@ -12,7 +12,8 @@ describe("formatearCodigoFicha", () => {
     expect(formatearCodigoFicha({ tipo: "sello",        fecha, consecutivo: 2 })).toBe("SA100826002");
     expect(formatearCodigoFicha({ tipo: "division",     fecha, consecutivo: 3 })).toBe("DT100826003");
     expect(formatearCodigoFicha({ tipo: "puertarapida", fecha, consecutivo: 4 })).toBe("PR100826004");
-    expect(formatearCodigoFicha({ tipo: "general",      fecha, consecutivo: 5 })).toBe("OG100826005");
+    expect(formatearCodigoFicha({ tipo: "puertaseccional", fecha, consecutivo: 5 })).toBe("PS100826005");
+    expect(formatearCodigoFicha({ tipo: "general",      fecha, consecutivo: 6 })).toBe("OG100826006");
   });
 
   it("no recorta el consecutivo cuando pasa de 999", () => {

@@ -3,6 +3,7 @@ import DivisionTermicaFicha from "../components/DivisionTermicaFicha";
 import SelloAndenFicha from "../components/SelloAndenFicha";
 import AbrigoRetractilFicha from "../components/AbrigoRetractilFicha";
 import PuertaRapidaFicha from "../components/PuertaRapidaFicha";
+import PuertaSeccionalFicha from "../components/PuertaSeccionalFicha";
 import FichaBasicaFicha from "../components/FichaBasicaFicha";
 import OrdenesProduccionList from "../components/produccion/OrdenesProduccionList";
 import Tabs from "../components/ui/Tabs";
@@ -16,6 +17,7 @@ const TABS = [
   { key: "sello",           label: "Sello de Andén" },
   { key: "abrigoretractil", label: "Abrigo Retráctil" },
   { key: "puertarapida",    label: "Puertas Rápidas" },
+  { key: "puertaseccional", label: "Puertas Seccionales" },
   { key: "fichas",          label: "Fichas básicas" },
   { key: "ordenes",         label: "Órdenes" },
 ];
@@ -34,6 +36,7 @@ export default function ProduccionPage() {
         {tab === "sello"           && <SelloAndenFicha />}
         {tab === "abrigoretractil" && <AbrigoRetractilFicha />}
         {tab === "puertarapida"    && <PuertaRapidaFicha />}
+        {tab === "puertaseccional" && <PuertaSeccionalFicha />}
         {tab === "fichas"          && <FichaBasicaFicha />}
         {tab === "ordenes"         && <OrdenesProduccionList />}
       </div>

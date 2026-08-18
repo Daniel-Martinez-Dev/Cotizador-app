@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { getNextOrdenProduccionGlobal } from "./firebaseConsecutivos";
 import { formatearCodigoFicha } from "./codigoFicha";
+import { camposClienteFicha } from "./clienteVinculo";
 
 const FICHAS_COL = "fichas_abrigo_retractil";
 
@@ -32,7 +33,9 @@ export async function crearFichaAbrigoRetractil(input, calculo) {
     // aunque después se edite la ficha, el número no cambia.
     codigoFicha:       formatearCodigoFicha({ tipo: "abrigoretractil", fecha: new Date(), consecutivo: ordenProduccion }),
     numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
-    cliente:           (input.cliente           || "").trim(),
+    // Cliente: nombre + vínculo a `empresas/{id}` (la misma base del cotizador).
+    // Ver clienteVinculo.js.
+    ...camposClienteFicha(input),
     cantidad:          Number(input.cantidad     || 1),
     fechaOrden:        toIso(input.fechaOrden),
     fechaEntrega:      toIso(input.fechaEntrega),

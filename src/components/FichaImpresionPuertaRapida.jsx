@@ -7,9 +7,13 @@ import { AcabadoCard, SectionTitle, Membrete, Firmas, FichaFooter, InfoChip, Med
 import { codigoFichaOFallback } from "../utils/codigoFicha";
 
 const COLOR_HEX = {
-  NEGRO: "#1f2937", AZUL: "#1e3a8a", VERDE: "#14532d",
+  NEGRO: "#1f2937", BLANCO: "#e2e8f0", AZUL: "#1e3a8a", VERDE: "#14532d",
   NARANJA: "#9a3412", GRIS: "#6b7280", OTRO: "#5b21b6",
 };
+// La lona blanca se rellena en gris muy claro (el blanco puro desaparece contra
+// la hoja), pero su contorno y las diagonales del visor van en negro para que
+// la cortina siga leyéndose en la ficha impresa.
+const COLOR_BORDE = { BLANCO: "#1f2937" };
 
 // Pequeños helpers de cota (línea con flechas + texto), para no repetir el
 // mismo bloque de SVG en cada medida — mismo lenguaje visual que el plano de
@@ -87,36 +91,51 @@ function PlanoTecnicoPuertaRapida({
   // motor, que se fabrica aparte y no es el ancho del portarrollo.
   const anchoPortarrollo = cubreRollo || anchoVano + params.OFFSET_CUBRE_ROLLO_MM;
   const cortinaCol = COLOR_HEX[colorLona] || COLOR_HEX.OTRO;
+  const cortinaBorde = COLOR_BORDE[colorLona] || cortinaCol;
 
-  // Bandas de la cortina separadas por cortavientos. El visor NO es una banda:
-  // es una franja de vinilo transparente de alto FIJO (el rollo viene de
-  // ALTO_VISOR_MM = 600 mm y se instala completo), así que su alto no cambia
-  // con la distancia entre cortavientos. Lo que sí manda la banda es dónde
-  // apoya: por convención de fábrica arranca en el cortaviento que cierra la
-  // primera banda desde el piso, salvo con cortavientos cada 500 mm (bandas
-  // más bajas), donde sube al que cierra la segunda. Con esa distancia el
-  // visor cruza cortavientos: se dibujan encima porque van sobre la lona.
+  // La cortina se arma con TIRAS unidas por cortavientos: cada cortaviento es
+  // la costura donde termina una tira y empieza la siguiente. El visor es una
+  // tira más, solo que de vinilo transparente y de alto FIJO (el rollo viene de
+  // ALTO_VISOR_MM = 600 mm y se instala completo): no se estira ni se recorta
+  // según la distancia entre cortavientos. Por eso las costuras NO son una
+  // grilla pareja — se cuentan desde el piso: N tiras de lona de `distCortav`,
+  // la tira del visor de 600 mm, y de ahí para arriba el resto de tiras de lona
+  // otra vez cada `distCortav` (la última contra el portarrollo queda corta,
+  // como en fábrica). Así ningún cortaviento cae desfasado del visor: los dos
+  // que lo tocan son sus propias costuras.
   const distCortav = distanciaCortavientos || altoVano;
-  const bays = Math.max(1, Math.round(altoVano / distCortav));
-  const bayH = vanoH / bays;
-  const bayH_mm = altoVano / bays;
-  const defaultVisorBay = bays >= 2 ? 1 : 0;
-  const visorBayFromBottom = distCortav === 500 ? Math.min(2, bays - 1) : defaultVisorBay;
   const altoVisor_mm = Math.min(params.ALTO_VISOR_MM, altoVano);
-  // Sin cortavientos (una sola banda) no hay costura donde apoyarlo: se centra.
-  const alturaVisorBase_mm = bays >= 2 ? visorBayFromBottom * bayH_mm : (altoVano - altoVisor_mm) / 2;
-  const alturaVisor_mm = Math.max(0, Math.min(alturaVisorBase_mm, altoVano - altoVisor_mm));
+  // Tiras de lona bajo el visor: una, o dos con cortavientos cada 500 mm
+  // (tiras bajas) para que el visor quede a la altura de la vista. Se recorta
+  // si el vano no da para tantas.
+  const tirasBajoVisorObjetivo = distCortav === 500 ? 2 : 1;
+  const tirasBajoVisor = Math.min(
+    tirasBajoVisorObjetivo,
+    Math.max(0, Math.floor((altoVano - altoVisor_mm) / distCortav))
+  );
+  const alturaVisor_mm = tirasBajoVisor * distCortav;   // piso → borde inferior del visor
+  const topeVisor_mm = alturaVisor_mm + altoVisor_mm;   // piso → borde superior del visor
   const visorH = altoVisor_mm * scale;
-  const visorY = floorY - (alturaVisor_mm + altoVisor_mm) * scale;
-  // Costuras de cortavientos (Y en el lienzo), de arriba hacia abajo.
-  const cortavientosY = Array.from({ length: bays - 1 }, (_, i) => vanoY0 + (i + 1) * bayH);
-  // Cota de distancia entre cortavientos — en la banda inmediatamente debajo
-  // de donde apoya el visor, para no chocar con sus rótulos.
-  const cotaBayFromBottom = Math.max(0, visorBayFromBottom - 1);
-  const cotaCortavY0 = floorY - (cotaBayFromBottom + 1) * bayH;
-  // Con una sola banda la cota comparte espacio con el visor centrado: el
-  // rótulo se corre al cuarto superior para que no se pisen.
-  const cotaLabelF = bays === 1 ? 0.22 : 0.5;
+  const visorY = floorY - topeVisor_mm * scale;
+
+  // Costuras (mm desde el piso): las de las tiras de abajo, las dos del visor,
+  // y las de las tiras de arriba. Se descartan las que caen pegadas al
+  // portarrollo: ahí la tira sobrante se remata contra el eje, no lleva unión.
+  const costuras_mm = [];
+  for (let i = 1; i <= tirasBajoVisor; i++) costuras_mm.push(i * distCortav);
+  if (topeVisor_mm < altoVano - 1) costuras_mm.push(topeVisor_mm);
+  for (let y = topeVisor_mm + distCortav; y < altoVano - distCortav * 0.15; y += distCortav) {
+    costuras_mm.push(y);
+  }
+  const cortavientosY = costuras_mm.map((mm) => floorY - mm * scale);
+
+  // Cota de distancia entre cortavientos — sobre la primera tira de lona
+  // completa, que es la de abajo salvo que el visor arranque en el piso.
+  const cotaBase_mm = tirasBajoVisor >= 1 ? 0 : topeVisor_mm;
+  const mostrarCotaCortav = costuras_mm.length > 0 && cotaBase_mm + distCortav <= altoVano + 0.5;
+  const cotaCortavY0 = floorY - (cotaBase_mm + distCortav) * scale;
+  const cotaCortavH = distCortav * scale;
+  const zocaloH = Math.min(4, vanoH * 0.04);
 
   // Motor — bloque mecánico pegado al costado del cubremotor (misma altura,
   // no asomando por encima), del lado configurado (ladoMotor).
@@ -225,8 +244,8 @@ function PlanoTecnicoPuertaRapida({
         MOTOR POSICIÓN VERTICAL ({ladoMotor || "IZQUIERDO"})
       </text>
 
-      {/* Cortina — bandas separadas por cortavientos */}
-      <rect x={vanoX0} y={vanoY0} width={vanoW} height={vanoH} fill="url(#lonaGradPR)" stroke={cortinaCol} strokeWidth="2" />
+      {/* Cortina — tiras de lona unidas por cortavientos */}
+      <rect x={vanoX0} y={vanoY0} width={vanoW} height={vanoH} fill="url(#lonaGradPR)" stroke={cortinaBorde} strokeWidth="2" />
       {Array.from({ length: 14 }, (_, i) => vanoY0 + (i + 0.5) * (vanoH / 14)).map((y, i) => (
         <line key={i} x1={vanoX0} y1={y} x2={vanoX0 + vanoW} y2={y} stroke="#ffffff" strokeOpacity="0.07" />
       ))}
@@ -237,12 +256,16 @@ function PlanoTecnicoPuertaRapida({
         </g>
       ))}
 
-      {/* Distancia entre cortavientos — cota corta en la banda debajo del visor */}
-      <line x1={cx} y1={cotaCortavY0 + 3} x2={cx} y2={cotaCortavY0 + bayH - 3} stroke={dim} strokeWidth="1" markerStart="url(#arrPR-b)" markerEnd="url(#arrPR-a)" />
-      <rect x={cx - 24} y={cotaCortavY0 + bayH * cotaLabelF - 6} width="48" height="11" fill="white" fillOpacity="0.85" rx="2" />
-      <text x={cx} y={cotaCortavY0 + bayH * cotaLabelF + 3} fontSize="7.5" fontWeight="bold" fill={dim} textAnchor="middle" style={haloTexto}>
-        {fmtMm(distCortav)} mm
-      </text>
+      {/* Distancia entre cortavientos — cota corta sobre una tira de lona completa */}
+      {mostrarCotaCortav && (
+        <g>
+          <line x1={cx} y1={cotaCortavY0 + 3} x2={cx} y2={cotaCortavY0 + cotaCortavH - 3} stroke={dim} strokeWidth="1" markerStart="url(#arrPR-b)" markerEnd="url(#arrPR-a)" />
+          <rect x={cx - 24} y={cotaCortavY0 + cotaCortavH / 2 - 6} width="48" height="11" fill="white" fillOpacity="0.85" rx="2" />
+          <text x={cx} y={cotaCortavY0 + cotaCortavH / 2 + 3} fontSize="7.5" fontWeight="bold" fill={dim} textAnchor="middle" style={haloTexto}>
+            {fmtMm(distCortav)} mm
+          </text>
+        </g>
+      )}
 
       {/* Visor (ventana de visión) — franja de vinilo de alto fijo (600 mm) */}
       <defs>
@@ -254,13 +277,14 @@ function PlanoTecnicoPuertaRapida({
       <g clipPath="url(#visorClipPR)">
         {Array.from({ length: Math.round(vanoW / visorH) + 1 }, (_, i) => {
           const sx = vanoX0 - visorH + i * visorH * 1.4;
-          return <line key={i} x1={sx} y1={visorY + visorH} x2={sx + visorH} y2={visorY} stroke={cortinaCol} strokeWidth="0.5" strokeOpacity="0.3" />;
+          return <line key={i} x1={sx} y1={visorY + visorH} x2={sx + visorH} y2={visorY} stroke={cortinaBorde} strokeWidth="0.5" strokeOpacity="0.3" />;
         })}
         <line x1={vanoX0} y1={visorY + visorH * 0.85} x2={vanoX0 + vanoW} y2={visorY + visorH * 0.15} stroke="#ffffff" strokeOpacity="0.5" strokeWidth="1.4" />
       </g>
-      {/* Cortavientos que caen dentro del visor — van sobre la lona, así que se
-          repintan encima de la franja transparente. */}
-      {cortavientosY.filter((y) => y > visorY && y < visorY + visorH).map((y, i) => (
+      {/* Los cortavientos de los bordes del visor son sus propias costuras (unen
+          el vinilo con la lona de arriba y la de abajo): se repintan encima de
+          la franja transparente para que no queden medio tapados por ella. */}
+      {cortavientosY.filter((y) => y > visorY - 2 && y < visorY + visorH + 2).map((y, i) => (
         <g key={`cv-visor-${i}`}>
           <rect x={vanoX0} y={y - 1.6} width={vanoW} height="3.2" fill="url(#aluminioPR)" stroke={linea} strokeWidth="0.5" />
           <line x1={vanoX0} y1={y - 1.6} x2={vanoX0 + vanoW} y2={y - 1.6} stroke="#ffffff" strokeOpacity="0.5" />
@@ -273,7 +297,7 @@ function PlanoTecnicoPuertaRapida({
       </text>
 
       {/* Zócalo — barra inferior de refuerzo de la cortina */}
-      <rect x={vanoX0} y={floorY - Math.min(4, bayH * 0.12)} width={vanoW} height={Math.min(4, bayH * 0.12)} fill="#111827" />
+      <rect x={vanoX0} y={floorY - zocaloH} width={vanoW} height={zocaloH} fill="#111827" />
 
       {/* Cuadro de control — mismo costado que el motor */}
       <rect x={boxX} y={boxY} width={boxW} height={boxH} rx="1" fill="white" stroke="#92400e" strokeWidth="1" />
@@ -461,7 +485,7 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
           </div>
         )}
 
-        <Firmas />
+        <Firmas ficha={ficha} />
         <FichaFooter
           texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN PUERTAS RÁPIDAS"
           numero={codigo}

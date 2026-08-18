@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { FaHome, FaIndustry, FaBoxes, FaSignOutAlt } from "react-icons/fa";
+import { FaHome, FaIndustry, FaBoxes, FaSignOutAlt, FaArrowLeft } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import NotificationBell from "../../components/empleado/NotificationBell";
 import logo from "../../assets/imagenes/logo.png";
@@ -17,8 +17,11 @@ const TABS = [
 ];
 
 export default function EmployeeShell() {
-  const { user, signOutUser } = useAuth();
+  const { user, signOutUser, hasRole, isMainAdmin } = useAuth();
   const location = useLocation();
+  // Solo el admin ve la salida hacia la interfaz de oficina: un empleado de
+  // planta no debe tener forma de llegar allí desde este layout.
+  const isAdminUser = isMainAdmin || hasRole('admin');
 
   React.useEffect(() => {
     const root = document.documentElement;
@@ -36,6 +39,16 @@ export default function EmployeeShell() {
         <img src={logo} alt="Logo" className="h-9 w-auto select-none" />
         <span className="text-sm font-semibold truncate">Planta</span>
         <div className="ml-auto flex items-center gap-2">
+          {isAdminUser && (
+            <Link
+              to="/dashboard"
+              title="Volver a la interfaz principal (admin)"
+              className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium"
+            >
+              <FaArrowLeft className="text-xs" />
+              <span className="hidden sm:inline">Volver a admin</span>
+            </Link>
+          )}
           <NotificationBell />
           <button
             type="button"

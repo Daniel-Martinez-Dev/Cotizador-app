@@ -3,14 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, crearEmpresa, actualizarEmpresa, eliminarEmpresa, crearContacto, actualizarContacto, eliminarContacto, obtenerEmpresaPorNIT, buscarContactoPorEmail } from '../utils/firebaseCompanies';
 import { validateNIT, validateEmail, validateText } from '../utils/validateInput';
-import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaBuilding, FaUser, FaSync } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaSave, FaTimes, FaSearch, FaBuilding, FaUser, FaSync, FaLink } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import { waitForAuth, getAuthError } from '../firebase';
 import EmptyState from '../components/ui/EmptyState';
 import Button from '../components/ui/Button';
+import HistorialCliente from '../components/clientes/HistorialCliente';
+import { useAuth } from '../context/AuthContext';
+import { calcularVinculacionPendiente, aplicarVinculacion } from '../utils/firebaseClienteVinculo';
 
 export default function CompaniesPage(){
   const { empresas, setEmpresas, setEmpresaSeleccionada, setContactoSeleccionado, confirm } = useQuote();
+  const { hasRole } = useAuth();
+  const puedeVincular = hasRole('admin') || hasRole('produccion');
   const navigate = useNavigate();
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -19,6 +24,8 @@ export default function CompaniesPage(){
   const [editEmpresaId, setEditEmpresaId] = useState(null);
   const [editContactoId, setEditContactoId] = useState(null);
   const [contactosCache, setContactosCache] = useState({}); // empresaId -> contactos
+  const [historialAbierto, setHistorialAbierto] = useState(null); // empresaId
+  const [vinculando, setVinculando] = useState(false);
 
   // Formularios
   const [formEmpresa, setFormEmpresa] = useState({ nombre:'', nit:'', ciudad:'' });
@@ -43,6 +50,38 @@ export default function CompaniesPage(){
   // normaliza NIT en estado UI
   setEmpresas(lista.map(e=> ({ ...e, nit: sanitizeNIT(e.nit) })));
     } catch(e){ console.error(e); toast.error('Error cargando empresas'); } finally { setCargando(false); }
+  }
+
+  // Engancha a su empresa las fichas viejas, las que guardaron el cliente como
+  // texto suelto antes de que existiera el vínculo. Primero se calcula el plan
+  // y se muestra el conteo: vincular a la empresa equivocada es peor que dejar
+  // la ficha suelta, así que solo entran los nombres con una única coincidencia.
+  async function vincularFichasAntiguas(){
+    setVinculando(true);
+    try {
+      // Sin la lista de empresas cargada no habría con qué emparejar y el
+      // resultado sería un falso "ya está todo vinculado".
+      const lista = empresas.length > 0 ? empresas : await listarEmpresas();
+      if (lista.length === 0){ toast.error('No hay empresas para vincular'); return; }
+      if (empresas.length === 0) setEmpresas(lista);
+      const plan = await calcularVinculacionPendiente(lista);
+      if (plan.totalVincular === 0){
+        toast(plan.totalSinCoincidencia > 0
+          ? `Nada que vincular. ${plan.totalSinCoincidencia} ficha(s) tienen un cliente que no está en esta lista.`
+          : 'Todas las fichas ya están vinculadas');
+        return;
+      }
+      const ok = await confirm(
+        `Se vincularán ${plan.totalVincular} ficha(s) a su cliente.` +
+        (plan.totalSinCoincidencia > 0
+          ? ` Quedarán ${plan.totalSinCoincidencia} sin vincular porque su cliente no aparece en la lista o hay dos empresas con el mismo nombre.`
+          : '')
+      );
+      if(!ok) return;
+      const n = await aplicarVinculacion(plan);
+      toast.success(`${n} ficha(s) vinculadas`);
+    } catch(e){ console.error(e); toast.error('Error vinculando fichas'); }
+    finally { setVinculando(false); }
   }
 
   async function toggleContactos(empresa){
@@ -172,6 +211,11 @@ export default function CompaniesPage(){
         </div>
         <Button variant="accent" className="flex items-center gap-2" onClick={()=> setModoNuevaEmpresa(m=>!m)}>{modoNuevaEmpresa? <FaTimes/>:<FaPlus/>}{modoNuevaEmpresa? 'Cancelar':'Nueva Empresa'}</Button>
         <Button variant="secondary" className="flex items-center gap-2" onClick={cargarEmpresas}><FaSync className={cargando? 'animate-spin':''}/> Refrescar</Button>
+        {puedeVincular && (
+          <Button variant="secondary" className="flex items-center gap-2" onClick={vincularFichasAntiguas} disabled={vinculando}>
+            <FaLink/> {vinculando? 'Vinculando…':'Vincular fichas antiguas'}
+          </Button>
+        )}
       </div>
 
       {modoNuevaEmpresa && (
@@ -210,6 +254,7 @@ export default function CompaniesPage(){
                         {emp.ciudad && <span>{emp.ciudad}</span>}
                         <button type="button" className="text-indigo-600 hover:underline" onClick={()=>{ setEmpresaSeleccionada(emp); toast.success('Empresa seleccionada'); navigate('/cotizar'); }}>Usar en cotización</button>
                         <button type="button" className="text-indigo-600 hover:underline" onClick={()=> toggleContactos(emp)}>{contactos? 'Ocultar contactos':'Ver contactos'}</button>
+                        <button type="button" className="text-indigo-600 hover:underline" onClick={()=> setHistorialAbierto(id=> id===emp.id ? null : emp.id)}>{historialAbierto===emp.id? 'Ocultar fichas y cotizaciones':'Ver fichas y cotizaciones'}</button>
                       </div>
                     </div>
                   )}
@@ -220,6 +265,7 @@ export default function CompaniesPage(){
                   <button onClick={()=> startNuevoContacto(emp.id)} className="text-blue-600 text-sm flex items-center gap-1" title="Nuevo contacto" aria-label="Nuevo contacto"><FaUser/>+</button>
                 </div>
               </div>
+              {historialAbierto===emp.id && <HistorialCliente empresa={emp} />}
               {modoNuevoContactoEmpresa===emp.id && (
                 <form onSubmit={e=>handleCrearContacto(e, emp.id)} className="px-4 pb-4">
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs bg-gray-50 dark:bg-gris-700 p-3 rounded">

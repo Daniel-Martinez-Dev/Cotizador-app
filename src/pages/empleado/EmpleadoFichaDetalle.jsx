@@ -7,9 +7,11 @@ import { obtenerFichaProduccion, agregarNotaFicha } from "../../utils/firebaseFi
 import EstadoBadge from "../../components/fichas/EstadoBadge";
 import EntregaModal from "../../components/fichas/EntregaModal";
 import EntregaResumen from "../../components/fichas/EntregaResumen";
+import FirmasResumen from "../../components/fichas/FirmasResumen";
 import NotaSection from "../../components/empleado/NotaSection";
-import FirmaModal from "../../components/empleado/FirmaModal";
+import FirmaModal from "../../components/fichas/FirmaModal";
 import { getImpresionComponent } from "../../components/fichas/impresionPorTipo";
+import { ROL_CORRIGE_FIRMAS } from "../../utils/firmasFicha";
 import { codigoFichaOFallback } from "../../utils/codigoFicha";
 
 function fmtFecha(f) {
@@ -25,7 +27,7 @@ function fmtFecha(f) {
 
 export default function EmpleadoFichaDetalle() {
   const { tipo, id } = useParams();
-  const { user, profile } = useAuth();
+  const { user, profile, hasRole } = useAuth();
   const [ficha, setFicha] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [showImpresion, setShowImpresion] = React.useState(false);
@@ -72,7 +74,9 @@ export default function EmpleadoFichaDetalle() {
   }
 
   const ImpresionComponent = getImpresionComponent(tipo);
-  const firmas = ficha.firmas || null;
+  // Firmas y fotos ya guardadas son de solo lectura en planta: corregirlas es
+  // cosa de producción/admin desde el escritorio (ver firestore.rules).
+  const puedeCorregir = hasRole(ROL_CORRIGE_FIRMAS);
 
   return (
     <div className="pt-4 space-y-3 pb-4">
@@ -118,22 +122,13 @@ export default function EmpleadoFichaDetalle() {
         )}
       </div>
 
-      {firmas && (
-        <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4">
-          <div className="flex items-center gap-2 text-green-800 dark:text-green-300 text-xs font-semibold uppercase tracking-wide mb-2">
-            <FaCheckCircle /> Terminada
-          </div>
-          <div className="text-xs text-green-900 dark:text-green-200">
-            Fabricó: {(firmas.fabricantes || []).map((f) => f.nombre).join(", ") || "—"}
-          </div>
-          <div className="text-xs text-green-900 dark:text-green-200 mt-0.5">
-            Verificó: {firmas.verificador?.nombre || "—"}
-          </div>
-        </div>
-      )}
+      <FirmasResumen ficha={ficha} />
 
       {ficha.entrega && (
-        <EntregaResumen entrega={ficha.entrega} onEditar={() => setShowEntrega(true)} />
+        <EntregaResumen
+          entrega={ficha.entrega}
+          onEditar={puedeCorregir ? () => setShowEntrega(true) : null}
+        />
       )}
 
       {ficha.estado === "en_produccion" && (
@@ -165,8 +160,7 @@ export default function EmpleadoFichaDetalle() {
       {showFirma && (
         <FirmaModal
           tipo={tipo}
-          id={id}
-          estadoActual={ficha.estado}
+          ficha={ficha}
           onClose={() => setShowFirma(false)}
           onDone={() => { setShowFirma(false); load(); }}
         />

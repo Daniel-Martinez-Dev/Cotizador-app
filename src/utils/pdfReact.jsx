@@ -25,6 +25,7 @@ import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import logoPng from "../assets/imagenes/logo.png";
 import { compressImageToDataURL } from './pdfImageCompression';
+import { resolverVigencia, fraseOfertaValida } from './vigencia';
 
 // Desactiva la silabización automática (guiones) en todo el documento.
 // Se divide en espacios cuando el token los contiene, para preservar el ajuste de línea normal.
@@ -337,7 +338,7 @@ function SeccionHTML({ titulo, contenido, compact = false, dense = false, readab
   );
 }
 
-function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
+function PdfHeader({ tipoProducto, numeroCotizacion, fecha, vigencia }) {
   return (
     <View style={styles.header}>
       {/* Barra de acento de marca */}
@@ -364,7 +365,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha }) {
           <View style={styles.quoteMeta}>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Cotización:</Text> #{numeroCotizacion}</Text>
             <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Fecha:</Text> {fecha}</Text>
-            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> Hasta el 30 de junio del 2026</Text>
+            <Text style={styles.quoteMetaLine}><Text style={styles.quoteMetaLabel}>Vigencia:</Text> {vigencia}</Text>
             <Text style={[styles.quoteMetaLine, { marginBottom: 0 }]}><Text style={styles.quoteMetaLabel}>Asesor:</Text> Santiago Martinez</Text>
           </View>
         </View>
@@ -432,7 +433,7 @@ function ImageAside({ imagenSeleccionada, titulo }) {
   );
 }
 
-function ValidityCallout() {
+function ValidityCallout({ vigencia }) {
   return (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, marginBottom: 4 }}>
@@ -445,7 +446,7 @@ function ValidityCallout() {
           width: '56%',
         }}>
           <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-            Oferta válida hasta el 30 de junio del 2026.
+            {fraseOfertaValida(vigencia)}
           </Text>
         </View>
       </View>
@@ -519,6 +520,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
   } = cotizacion;
 
   const fecha = new Date().toLocaleDateString("es-CO");
+  const vigencia = resolverVigencia(cotizacion);
 
   const tiposProducto = tituloCotizacion || ([...new Set((productos || [])
     .map(p => p.tipo?.toUpperCase?.() || "PRODUCTO"))].join(", "));
@@ -596,7 +598,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
         </View>
 
         {/* Encabezado (solo aparece en página 1 por estar al inicio del flujo) */}
-        <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} />
+        <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} vigencia={vigencia} />
         <ClienteBlock />
 
         {/* Secciones de productos — fluyen naturalmente */}
@@ -650,7 +652,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
                 padding: 9,
               }}>
                 <Text style={{ fontSize: 8.5, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 2 }}>
-                  Oferta válida hasta el 30 de junio del 2026.
+                  {fraseOfertaValida(vigencia)}
                 </Text>
               </View>
             ),

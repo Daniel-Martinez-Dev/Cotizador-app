@@ -424,7 +424,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
             </div>
           )}
 
-          <Firmas />
+          <Firmas ficha={ficha} />
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN DIVISIONES TÉRMICAS"
             numero={codigo}

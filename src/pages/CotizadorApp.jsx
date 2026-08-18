@@ -236,6 +236,10 @@ export default function CotizadorApp(){
     setContactoNombreInput(''); setContactoEmailInput(''); setContactoTelInput('');
   } }, [resetToken]);
 
+  // Deja lista la empresa y el contacto (creándolos si hacen falta) y DEVUELVE
+  // ambos. Devolverlos es indispensable: quien llama necesita el id en el mismo
+  // ciclo para guardarlo en la cotización, y el estado de React todavía no está
+  // actualizado ahí (por eso una empresa recién creada quedaba con id nulo).
   async function ensureEmpresaContacto(){
     // Si ya hay empresa seleccionada y contacto seleccionado, no hace falta crear (salvo cambios manuales detectados)
     // Intentar localizar empresa por NIT o nombre si no seleccionada
@@ -287,6 +291,7 @@ export default function CotizadorApp(){
       contactoRef = existente;
     }
     if(contactoRef) setContactoSeleccionado(contactoRef);
+    return { empresa: empresaRef || null, contacto: contactoRef || null };
   }
 
   const handleSubmit = async ()=>{
@@ -299,9 +304,9 @@ export default function CotizadorApp(){
       return;
     }
     setCreandoEntidad(true);
-    let ensureOk = false;
+    let empresaRef = null, contactoRef = null, ensureOk = false;
     try {
-      await ensureEmpresaContacto();
+      ({ empresa: empresaRef, contacto: contactoRef } = await ensureEmpresaContacto());
       ensureOk = true;
     } catch(e){ console.error(e); toast.error('Error creando empresa/contacto'); }
     finally { setCreandoEntidad(false); }
@@ -314,17 +319,20 @@ export default function CotizadorApp(){
     const total = subtotal + iva;
     const cotizacion = {
       cliente, // alias libre
-      empresaId: empresaSeleccionada?.id || null,
-      empresaNIT: empresaSeleccionada?.nit || empresaNITInput.trim() || '',
-      empresaCiudad: empresaSeleccionada?.ciudad || empresaCiudadInput || '',
-      nombreCliente: empresaSeleccionada?.nombre || empresaNombreInput || cliente,
-      contactoId: contactoSeleccionado?.id || null,
-      clienteContacto: contactoSeleccionado?.nombre || contactoNombreInput || '',
-      clienteNIT: empresaSeleccionada?.nit || empresaNITInput || '',
-      clienteCiudad: empresaSeleccionada?.ciudad || empresaCiudadInput || '',
-      clienteEmail: contactoSeleccionado?.email || contactoEmailInput || '',
-      clienteTelefono: contactoSeleccionado?.telefono || contactoTelInput || '',
-  clienteId: null,
+      empresaId: empresaRef?.id || null,
+      empresaNIT: empresaRef?.nit || empresaNITInput.trim() || '',
+      empresaCiudad: empresaRef?.ciudad || empresaCiudadInput || '',
+      nombreCliente: empresaRef?.nombre || empresaNombreInput || cliente,
+      contactoId: contactoRef?.id || null,
+      clienteContacto: contactoRef?.nombre || contactoNombreInput || '',
+      clienteNIT: empresaRef?.nit || empresaNITInput || '',
+      clienteCiudad: empresaRef?.ciudad || empresaCiudadInput || '',
+      clienteEmail: contactoRef?.email || contactoEmailInput || '',
+      clienteTelefono: contactoRef?.telefono || contactoTelInput || '',
+      // Misma llave que guardan las fichas de fabricación en `clienteId`:
+      // apunta a `empresas/{id}`, para poder cruzar cotizaciones y fichas del
+      // mismo cliente (ver utils/clienteVinculo.js).
+      clienteId: empresaRef?.id || null,
       productos: productosCotizados,
       subtotal, iva, total,
       ajusteGeneral: { tipo: ajusteTotalTipo, porcentaje: parseFloat(ajusteTotalValor)||0 }

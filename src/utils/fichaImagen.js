@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { htmlParaImprimir } from "./impresionAhorroTinta";
 
 // Captura de la ficha como imagen para pegarla en un chat/correo.
 //
@@ -17,7 +18,10 @@ import { Share } from "@capacitor/share";
 
 export const ESCALA_HD = 2; // 1220 px de diseño → 2440 px de ancho real
 
-export async function fichaAPngBlob(origen, { anchoDiseno = 1220, escala = ESCALA_HD } = {}) {
+// `ahorroTinta` deja la ficha como se imprime (sin fondos de color, texto
+// negro); sin él sale como se ve en pantalla, que es lo que se quiere cuando la
+// imagen es para pegarla en un chat.
+export async function fichaAPngBlob(origen, { anchoDiseno = 1220, escala = ESCALA_HD, ahorroTinta = false } = {}) {
   // La tipografía heredada se copia del elemento real: dentro del foreignObject
   // no llegan las hojas de estilo de la página (Tailwind fija line-height 1.5 en
   // el documento) y, sin esto, la ficha se dibujaba ~11% más comprimida que en
@@ -31,7 +35,7 @@ export async function fichaAPngBlob(origen, { anchoDiseno = 1220, escala = ESCAL
   contenedor.setAttribute("aria-hidden", "true");
   contenedor.style.cssText =
     `position:absolute;left:-100000px;top:0;width:${anchoDiseno}px;background:#ffffff;${tipografia}`;
-  contenedor.innerHTML = origen.innerHTML;
+  contenedor.innerHTML = ahorroTinta ? htmlParaImprimir(origen) : origen.innerHTML;
   document.body.appendChild(contenedor);
 
   try {

@@ -224,11 +224,25 @@ function AppShell() {
             >Salir</button>
           </div>
         )}
-        <button
-          onClick={()=>setDark(d=>!d)}
-          className="ml-auto text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-trafico/60"
-          title="Cambiar tema"
-        >{dark ? 'Claro' : 'Oscuro'}</button>
+        <div className="ml-auto flex items-center gap-2">
+          {/* Atajo de pruebas: el admin entra a la interfaz de planta sin
+              cambiar de usuario. El regreso está en EmployeeShell. */}
+          {isAdminUser && (
+            <Link
+              to="/planta"
+              className="text-xs sm:text-sm px-3 py-1.5 rounded border border-blue-500 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-medium focus:outline-none focus:ring-2 focus:ring-trafico/60"
+              title="Ver la app como la ve un empleado de planta"
+            >
+              <span className="hidden sm:inline">Vista empleado</span>
+              <span className="sm:hidden">Planta</span>
+            </Link>
+          )}
+          <button
+            onClick={()=>setDark(d=>!d)}
+            className="text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-trafico/60"
+            title="Cambiar tema"
+          >{dark ? 'Claro' : 'Oscuro'}</button>
+        </div>
         {REQUIRE_LOGIN && (
           <div className="hidden md:flex items-center gap-2">
             <span className="text-xs text-gray-600 dark:text-gray-300 max-w-[220px] truncate" title={user?.email || ''}>{user?.email || ''}</span>

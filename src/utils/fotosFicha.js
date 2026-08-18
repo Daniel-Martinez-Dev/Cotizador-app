@@ -44,7 +44,7 @@ export function comprimirImagen(file, { maxLado = LADO_MAXIMO, calidad = CALIDAD
 
 // Sube las fotos y devuelve lo que se guarda en la ficha: la URL para mostrarla
 // y la ruta en Storage, necesaria para poder borrarla después.
-export async function subirFotosEntrega(coleccion, fichaId, archivos, onProgreso) {
+export async function subirFotosFicha(coleccion, fichaId, carpeta, archivos, onProgreso) {
   const lista = Array.from(archivos || []);
   if (lista.length === 0) return [];
   await waitForAuth();
@@ -56,7 +56,7 @@ export async function subirFotosEntrega(coleccion, fichaId, archivos, onProgreso
     if (comprimida.size > TAMANO_MAXIMO_BYTES) {
       throw new Error(`La foto "${archivo.name}" es demasiado grande`);
     }
-    const path = `fichas/${coleccion}/${fichaId}/entrega/${Date.now()}-${i}.jpg`;
+    const path = `fichas/${coleccion}/${fichaId}/${carpeta}/${Date.now()}-${i}.jpg`;
     const destino = ref(storage, path);
     await uploadBytes(destino, comprimida, { contentType: "image/jpeg" });
     subidas.push({ url: await getDownloadURL(destino), path, nombre: archivo.name });
@@ -65,8 +65,10 @@ export async function subirFotosEntrega(coleccion, fichaId, archivos, onProgreso
 }
 
 // Best-effort: si la foto ya no está en Storage no tiene sentido bloquear al
-// usuario, lo que importa es que salga de la ficha.
-export async function borrarFotoEntrega(path) {
+// usuario, lo que importa es que salga de la ficha. Solo la usa quien puede
+// corregir una evidencia ya guardada (producción/admin): para el empleado las
+// fotos quedan cerradas al confirmar.
+export async function borrarFotoFicha(path) {
   if (!path) return;
   try {
     await waitForAuth();

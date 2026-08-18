@@ -2,6 +2,7 @@ import FichaImpresionDivision from "../FichaImpresionDivision";
 import FichaImpresionSello from "../FichaImpresionSello";
 import FichaImpresionAbrigoRetractil from "../FichaImpresionAbrigoRetractil";
 import FichaImpresionPuertaRapida from "../FichaImpresionPuertaRapida";
+import FichaImpresionPuertaSeccional from "../FichaImpresionPuertaSeccional";
 import FichaImpresionGeneral from "../FichaImpresionGeneral";
 
 // Ficha imprimible que corresponde a cada tipo de orden. Las claves son las
@@ -12,6 +13,7 @@ export const IMPRESION_POR_TIPO = {
   sello:           FichaImpresionSello,
   abrigoretractil: FichaImpresionAbrigoRetractil,
   puertarapida:    FichaImpresionPuertaRapida,
+  puertaseccional: FichaImpresionPuertaSeccional,
   general:         FichaImpresionGeneral,
 };
 

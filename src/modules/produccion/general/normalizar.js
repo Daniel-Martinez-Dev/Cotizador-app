@@ -1,4 +1,5 @@
 import { UNIDAD_POR_DEFECTO } from "./catalogos";
+import { camposClienteFicha } from "../../../utils/clienteVinculo";
 
 // Normalización de la ficha básica. Es el equivalente al `calcular.js` de las
 // demás líneas: aquí no hay medidas que derivar, pero sí una lista de ítems que
@@ -41,7 +42,9 @@ export function construirFichaGeneral(input = {}) {
   const items = normalizarItems(input.items);
   return {
     numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
-    cliente:           (input.cliente || "").trim(),
+    // Cliente: nombre + vínculo a `empresas/{id}` (la misma base del
+    // cotizador). Ver utils/clienteVinculo.js.
+    ...camposClienteFicha(input),
     responsable:       (input.responsable || "").trim(),
     fechaOrden:        toIso(input.fechaOrden),
     fechaEntrega:      toIso(input.fechaEntrega),

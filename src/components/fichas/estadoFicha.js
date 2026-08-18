@@ -61,8 +61,10 @@ export const ESTADO_RESUMEN = {
   entregado:     { label: "Entregadas",    tone: "text-purple-700 dark:text-purple-300", ring: "border-purple-200 dark:border-purple-800" },
 };
 
-// "entregado" no se marca a mano como los demás: exige fecha de entrega y
-// admite placas y registro fotográfico (ver EntregaModal).
+// "entregado" no se marca a mano como los demás: exige la firma de quién
+// revisó y aprobó, la fecha de entrega, y admite placas y registro fotográfico
+// (ver EntregaModal). "terminado" exige la firma del alistado (ver FirmaModal);
+// las dos etapas viven en firmasFicha.js.
 export const ESTADO_REQUIERE_ENTREGA = "entregado";
 
 export const esEstadoValido = (estado) => ESTADOS_FICHA.includes(estado);

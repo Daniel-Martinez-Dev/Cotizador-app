@@ -101,8 +101,9 @@ async function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Ventanas internas generadas por la propia app — no navegan a ningún sitio
     // externo, así que el filtro de hosts no aplica:
-    //   · about:blank → ventana de impresión de las fichas de producción
-    //     (FichaImpresionShell hace window.open('', '_blank') y le escribe el HTML).
+    //   · about:blank → plan B de impresión de las fichas de producción: normal-
+    //     mente se imprimen desde un iframe oculto (sin abrir ninguna ventana),
+    //     pero si eso falla FichaImpresionShell cae a window.open('', '_blank').
     //   · blob:/data: → vista previa de los PDF generados en el cliente.
     // Sin esta excepción el handler las denegaba, window.open devolvía null y
     // no se podía imprimir ni ver ningún PDF desde el escritorio.

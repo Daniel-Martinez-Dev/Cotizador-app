@@ -62,7 +62,8 @@ describe("medidas de fabricación", () => {
 
 describe("visor", () => {
   // El vinilo transparente viene en rollo de 600 mm de alto y se instala
-  // completo: el alto del visor es fijo y no sigue a la banda de cortavientos.
+  // completo: el visor es una tira más de la cortina, con su cortaviento
+  // arriba y abajo, y su alto no sigue a la distancia entre cortavientos.
   const render = (distanciaCortavientos) =>
     renderToStaticMarkup(
       <FichaImpresionPuertaRapida
@@ -71,6 +72,20 @@ describe("visor", () => {
         onClose={() => {}}
       />
     );
+
+  // Devuelve la geometría del plano llevada a mm reales desde el piso.
+  const medir = (svg) => {
+    const lona = svg.match(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#lonaGradPR\)"/);
+    const floorY = Number(lona[1]) + Number(lona[2]);
+    const aMm = (y) => Math.round(((floorY - y) * FICHA.altoVano) / Number(lona[2]));
+    const visor = svg.match(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#visorGradPR\)"/);
+    // Centro de cada cortaviento (barras de 3.2 de alto, dibujadas en y-1.6);
+    // las de los bordes del visor se repintan encima, así que se deduplican.
+    const costuras = [...new Set(
+      [...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="3\.2"/g)].map((m) => Number(m[1]) + 1.6)
+    )].map(aMm).sort((a, b) => a - b);
+    return { costuras, visorPie: aMm(Number(visor[1]) + Number(visor[2])), visorTope: aMm(Number(visor[1])) };
+  };
 
   it("rotula siempre 600 mm de alto, cambie o no la distancia entre cortavientos", () => {
     for (const dist of [500, 750, 1000, 1500]) {
@@ -87,6 +102,56 @@ describe("visor", () => {
     expect(alturas).toHaveLength(1);
     const vanoH = Number(svg.match(/<rect x="[\d.]+" y="[\d.]+" width="[\d.]+" height="([\d.]+)" fill="url\(#lonaGradPR\)"/)[1]);
     expect(Number(alturas[0][1]) / vanoH).toBeCloseTo(600 / vano, 3);
+  });
+
+  it("pone un cortaviento en cada borde del visor: ninguno queda desfasado", () => {
+    for (const dist of [500, 750, 1000, 1500]) {
+      const { costuras, visorPie, visorTope } = medir(render(dist));
+      expect(costuras).toContain(visorPie);
+      expect(costuras).toContain(visorTope);
+      // Y ninguna costura parte el vinilo por la mitad.
+      expect(costuras.filter((mm) => mm > visorPie && mm < visorTope)).toHaveLength(0);
+    }
+  });
+
+  it("arma las tiras seguidas: lona hasta el visor y lona otra vez desde el visor", () => {
+    // Vano de 3250 con cortavientos cada 750: tira de lona 0–750, visor
+    // 750–1350 y de ahí para arriba lona cada 750 (la última queda corta).
+    expect(medir(render(750))).toEqual({ costuras: [750, 1350, 2100, 2850], visorPie: 750, visorTope: 1350 });
+    // Cada 500 el visor sube una tira para quedar a la altura de la vista.
+    expect(medir(render(500))).toEqual({
+      costuras: [500, 1000, 1600, 2100, 2600, 3100], visorPie: 1000, visorTope: 1600,
+    });
+  });
+
+  it("repinta los cortavientos del visor encima de la franja transparente", () => {
+    // Van sobre la lona: si se dibujaran solo debajo, el vinilo se los comería.
+    const svg = render(750);
+    const visor = svg.match(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" fill="url\(#visorGradPR\)"/);
+    const [visorY, visorH] = [Number(visor[1]), Number(visor[2])];
+    const costuras = [...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="3\.2"/g)]
+      .map((m) => Number(m[1]) + 1.6);
+    const bordesDelVisor = costuras.filter((y) => y > visorY - 2 && y < visorY + visorH + 2);
+    // Las dos costuras del visor, cada una dibujada dos veces (debajo y encima).
+    expect(bordesDelVisor).toHaveLength(4);
+    expect(new Set(bordesDelVisor).size).toBe(2);
+  });
+});
+
+describe("color de lona", () => {
+  const render = (colorLona) =>
+    renderToStaticMarkup(
+      <FichaImpresionPuertaRapida ficha={{ ...FICHA, colorLona }} numero={7} onClose={() => {}} />
+    );
+
+  it("contornea la cortina blanca en oscuro para que no desaparezca en la impresión", () => {
+    const svg = render("BLANCO");
+    expect(svg).toContain("Color lona");
+    expect(svg).toContain('fill="url(#lonaGradPR)" stroke="#1f2937"');
+  });
+
+  it("mantiene el contorno del propio color en las demás lonas", () => {
+    expect(render("AZUL")).toContain('fill="url(#lonaGradPR)" stroke="#1e3a8a"');
   });
 });
 

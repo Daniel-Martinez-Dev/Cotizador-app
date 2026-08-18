@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { generarPDFReact, entregarPDFBlob } from "../utils/pdfReact";
 import { generarSeccionesHTML, generarSeccionesPorProducto } from "../utils/htmlSections";
 import { sanitizeHtml } from "../utils/sanitizeHtml";
+import { isoHoyMasDias, textoVigenciaDesdeISO, reemplazarVigenciaEnHTML, VIGENCIA_DIAS_POR_DEFECTO } from "../utils/vigencia";
 import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
@@ -99,6 +100,20 @@ export default function PreviewPage() {
   // --- Índice del producto cuyas condiciones se usan ---
   const [condicionesProductoIndex, setCondicionesProductoIndex] = useState(0);
 
+  // --- Vigencia de la oferta ---
+  // Se inicializa una sola vez (al abrir la vista previa) para que guardar
+  // datos del cliente u otros cambios de quoteData no la reviertan.
+  const [vigenciaFecha, setVigenciaFecha] = useState(
+    () => quoteData?.vigenciaFecha || isoHoyMasDias(VIGENCIA_DIAS_POR_DEFECTO)
+  );
+  const [vigenciaTextoLibre, setVigenciaTextoLibre] = useState(() => quoteData?.vigenciaTextoLibre || "");
+  const [usarVigenciaLibre, setUsarVigenciaLibre] = useState(() => Boolean(quoteData?.vigenciaTextoLibre));
+  const vigenciaFinal = useMemo(() => {
+    const libre = vigenciaTextoLibre.trim();
+    if (usarVigenciaLibre && libre) return libre.replace(/\.\s*$/, "");
+    return textoVigenciaDesdeISO(vigenciaFecha) || textoVigenciaDesdeISO(isoHoyMasDias(VIGENCIA_DIAS_POR_DEFECTO));
+  }, [usarVigenciaLibre, vigenciaTextoLibre, vigenciaFecha]);
+
   // --- Imágenes por producto ---
   // [{principal: key|null, adicionales: [key]}]
   const [imagenesPerProducto, setImagenesPerProducto] = useState([]);
@@ -135,7 +150,7 @@ export default function PreviewPage() {
         especificacionesHTML: sanitizeHtml(s.especificacionesHTML || ""),
       })));
 
-      const compartidas = generarSeccionesHTML(quoteData, 0, productosOverride);
+      const compartidas = generarSeccionesHTML({ ...quoteData, vigencia: vigenciaFinal }, 0, productosOverride);
       setEdicionesCompartidas({
         condicionesHTML: sanitizeHtml(compartidas.condicionesHTML || ""),
         terminosHTML: sanitizeHtml(compartidas.terminosHTML || ""),
@@ -151,7 +166,7 @@ export default function PreviewPage() {
   useEffect(() => {
     if (!quoteData?.productos) return;
     try {
-      const compartidas = generarSeccionesHTML(quoteData, condicionesProductoIndex, productosOverride);
+      const compartidas = generarSeccionesHTML({ ...quoteData, vigencia: vigenciaFinal }, condicionesProductoIndex, productosOverride);
       setEdicionesCompartidas(prev => ({
         ...prev,
         condicionesHTML: sanitizeHtml(compartidas.condicionesHTML || ""),
@@ -160,6 +175,17 @@ export default function PreviewPage() {
       console.error("Error regenerando condiciones:", e);
     }
   }, [condicionesProductoIndex]);
+
+  // --- Propagar la vigencia a las condiciones ya escritas/editadas ---
+  // Reescribe solo la línea "Vigencia de la oferta" para no perder los demás
+  // ajustes que el usuario haya hecho en el editor.
+  useEffect(() => {
+    setEdicionesCompartidas(prev => {
+      const actualizado = reemplazarVigenciaEnHTML(prev.condicionesHTML || "", vigenciaFinal);
+      if (actualizado === prev.condicionesHTML) return prev;
+      return { ...prev, condicionesHTML: actualizado };
+    });
+  }, [vigenciaFinal]);
 
   // --- Inicializar imágenes por producto ---
   useEffect(() => {
@@ -550,7 +576,7 @@ export default function PreviewPage() {
   // para que la próxima descarga/impresión refleje los cambios.
   useEffect(() => {
     pdfCacheRef.current = null;
-  }, [edicionesPorProducto, edicionesCompartidas, imagenesPerProducto, tituloCotizacion]);
+  }, [edicionesPorProducto, edicionesCompartidas, imagenesPerProducto, tituloCotizacion, vigenciaFinal]);
 
   const handleGenerarPDF = async (mode = 'download') => {
     if (generandoPDF) return;
@@ -572,7 +598,7 @@ export default function PreviewPage() {
       }));
 
       // Tabla siempre regenerada desde quoteData (no editable)
-      const { tablaHTML } = generarSeccionesHTML(quoteData, condicionesProductoIndex, productosOverride);
+      const { tablaHTML } = generarSeccionesHTML({ ...quoteData, vigencia: vigenciaFinal }, condicionesProductoIndex, productosOverride);
 
       const safeCompartidas = {
         tablaHTML,
@@ -587,6 +613,9 @@ export default function PreviewPage() {
           seccionesPorProducto: safePorProducto,
           imagenesSeleccionadasPorProducto: imagenesPerProducto,
           tituloCotizacion: tituloCotizacion.trim() || generarTituloCompacto(quoteData.productos),
+          vigencia: vigenciaFinal,
+          vigenciaFecha: usarVigenciaLibre && vigenciaTextoLibre.trim() ? "" : vigenciaFecha,
+          vigenciaTextoLibre: usarVigenciaLibre ? vigenciaTextoLibre.trim() : "",
         },
         estaEditando,
         { mode, onBlobReady: (r) => { pdfCacheRef.current = r; } }
@@ -708,6 +737,69 @@ export default function PreviewPage() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Vigencia de la oferta */}
+          <div className="bg-white shadow-md rounded-2xl p-6 border border-gray-200 space-y-4 force-light">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-semibold text-gray-800">Vigencia de la Oferta</h2>
+              <span className="text-xs text-gray-500">Se aplica al encabezado, la tabla de precios y las condiciones</span>
+            </div>
+
+            {!usarVigenciaLibre ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label htmlFor="vigencia-fecha" className="text-xs font-semibold text-gray-800">Válida hasta</label>
+                  <input
+                    id="vigencia-fecha"
+                    type="date"
+                    value={vigenciaFecha}
+                    min={isoHoyMasDias(0)}
+                    onChange={(e) => { setHayEdicionesSinGuardar(true); setVigenciaFecha(e.target.value); }}
+                    className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[15, 30, 45, 60].map((dias) => {
+                    const activo = vigenciaFecha === isoHoyMasDias(dias);
+                    return (
+                      <button
+                        key={dias}
+                        type="button"
+                        onClick={() => { setHayEdicionesSinGuardar(true); setVigenciaFecha(isoHoyMasDias(dias)); }}
+                        className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${activo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`}
+                      >
+                        {dias} días
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={vigenciaTextoLibre}
+                onChange={(e) => { setHayEdicionesSinGuardar(true); setVigenciaTextoLibre(e.target.value); }}
+                placeholder="Ej: 30 días calendario a partir de la fecha de esta oferta"
+                maxLength={160}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            )}
+
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={usarVigenciaLibre}
+                onChange={(e) => { setHayEdicionesSinGuardar(true); setUsarVigenciaLibre(e.target.checked); }}
+              />
+              Usar texto personalizado en lugar de una fecha
+            </label>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2">
+              <p className="text-xs text-gray-600">
+                En el PDF aparecerá: <strong className="text-gray-800">Vigencia: {vigenciaFinal}</strong>
+              </p>
+            </div>
           </div>
 
           {/* Cliente */}

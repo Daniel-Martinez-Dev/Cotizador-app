@@ -1,5 +1,6 @@
 import React from "react";
 import { fmtMm } from "../../utils/fichaFormat";
+import { ETAPAS, ETAPAS_FIRMA, fechaFirmaTexto, firmasDeFicha, nombresFirma } from "../../utils/firmasFicha";
 
 // Sub-componentes de diseño compartidos por las fichas de impresión (todos con
 // inline-styles para imprimir). Definen el lenguaje visual común: tarjeta de
@@ -154,9 +155,17 @@ export function Membrete({ logoSrc, tituloFicha, numero, numeroLabel = "N.° fic
 }
 
 // Bloque de firmas y trazabilidad — obligatorio al pie de TODAS las fichas /
-// órdenes de producción. Salvo "Ficha elaborada por" (dato fijo del ingeniero
-// que la genera), todos los campos se diligencian a mano sobre la orden ya
-// impresa: por eso las líneas llevan alto suficiente para escribir encima.
+// órdenes de producción.
+//
+// Las dos filas de responsables ya no se diligencian a mano: las cierra la app
+// al cambiar de estado (alistado y empacado → "Terminada", revisado y aprobado
+// → "Entregada", ver firmasFicha.js) y aquí salen impresos los nombres con su
+// fecha. La línea se conserva encima de cada nombre para que la persona firme
+// sobre ella: la ficha vale como constancia física.
+//
+// Mientras una etapa no se haya firmado se imprimen los espacios en blanco de
+// siempre, para no dejar sin formato las fichas que se imprimen antes de
+// cerrarse.
 const ELABORADA_POR = "ING. DANIEL F. MARTÍNEZ";
 
 const rotuloFirma = {
@@ -164,34 +173,63 @@ const rotuloFirma = {
   textTransform: "uppercase", letterSpacing: "0.6px",
 };
 
-function CampoFirma({ caption }) {
+// Un espacio de firma: lo escrito encima de la línea (cuando ya se registró) y
+// el rótulo debajo — el nombre de quien firma, o "Firma N" si está en blanco.
+function CampoFirma({ caption, valor, resaltado }) {
   return (
     <div>
-      <div style={{ borderBottom: "1px solid #000000", height: "24px" }} />
-      <div style={{ ...rotuloFirma, fontSize: "8.5px", color: "#000000", marginTop: "2px" }}>{caption}</div>
-    </div>
-  );
-}
-
-// Una fila de responsables: N espacios de firma + la fecha en que la ejecutaron.
-function FilaFirmas({ titulo, firmas }) {
-  return (
-    <div style={{ padding: "5px 12px 6px", borderBottom: "1px solid #000000" }}>
-      <div style={rotuloFirma}>{titulo}</div>
       <div style={{
-        display: "grid", gridTemplateColumns: `repeat(${firmas}, 1fr) 0.9fr`,
-        gap: "14px", marginTop: "3px",
+        borderBottom: "1px solid #000000", height: "24px",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        fontSize: "10px", fontWeight: "bold", color: "#000000",
+        paddingBottom: "2px", whiteSpace: "nowrap", overflow: "hidden",
       }}>
-        {Array.from({ length: firmas }, (_, i) => (
-          <CampoFirma key={i} caption={`Firma ${i + 1}`} />
-        ))}
-        <CampoFirma caption="Fecha" />
+        {valor || ""}
+      </div>
+      <div style={{
+        ...rotuloFirma,
+        fontSize: "8.5px",
+        color: "#000000",
+        marginTop: "2px",
+        fontWeight: resaltado ? "bold" : "normal",
+        wordBreak: "break-word",
+      }}>
+        {caption}
       </div>
     </div>
   );
 }
 
-export function Firmas({ padX = "20px" }) {
+// Una fila de responsables: un espacio por persona que firmó (o los espacios en
+// blanco del formato si todavía no se cierra) + la fecha.
+function FilaFirmas({ titulo, espacios, firma }) {
+  const nombres = nombresFirma(firma);
+  const firmado = nombres.length > 0;
+  const celdas = firmado ? nombres : Array.from({ length: espacios }, () => "");
+
+  return (
+    <div style={{ padding: "5px 12px 6px", borderBottom: "1px solid #000000" }}>
+      <div style={rotuloFirma}>{titulo}</div>
+      <div style={{
+        display: "grid", gridTemplateColumns: `repeat(${celdas.length}, 1fr) 0.9fr`,
+        gap: "14px", marginTop: "3px",
+      }}>
+        {celdas.map((nombre, i) => (
+          <CampoFirma
+            key={i}
+            caption={firmado ? nombre : `Firma ${i + 1}`}
+            resaltado={firmado}
+          />
+        ))}
+        <CampoFirma caption="Fecha" valor={firmado ? fechaFirmaTexto(firma.fecha) : ""} />
+      </div>
+    </div>
+  );
+}
+
+export function Firmas({ ficha, padX = "20px" }) {
+  const firmas = firmasDeFicha(ficha);
+
   return (
     <div style={{ padding: `4px ${padX} 10px` }}>
       <div style={{ border: "1px solid #000000", borderRadius: "8px", overflow: "hidden" }}>
@@ -205,8 +243,14 @@ export function Firmas({ padX = "20px" }) {
           </span>
         </div>
 
-        <FilaFirmas titulo="Pedido alistado y empacado por" firmas={3} />
-        <FilaFirmas titulo="Revisado y aprobado por" firmas={2} />
+        {ETAPAS.map((etapa) => (
+          <FilaFirmas
+            key={etapa}
+            titulo={ETAPAS_FIRMA[etapa].titulo}
+            espacios={ETAPAS_FIRMA[etapa].espacios}
+            firma={firmas[etapa]}
+          />
+        ))}
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", padding: "6px 12px 7px" }}>
           <span style={{ ...rotuloFirma, whiteSpace: "nowrap", paddingBottom: "3px" }}>Fecha y hora de despacho</span>

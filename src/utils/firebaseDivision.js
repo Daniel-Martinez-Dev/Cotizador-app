@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { getNextOrdenProduccionGlobal } from "./firebaseConsecutivos";
 import { formatearCodigoFicha } from "./codigoFicha";
+import { camposClienteFicha } from "./clienteVinculo";
 
 const FICHAS_COL     = "division_fichas";
 const INSUMOS_COL    = "division_insumos";
@@ -35,7 +36,9 @@ export async function crearFichaDivision(input, calculo) {
     codigoFicha:   formatearCodigoFicha({ tipo: "division", fecha: new Date(), consecutivo: ordenProduccion }),
     numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
     numeroFicha:   (input.numeroFicha || "").trim(),
-    cliente:       (input.cliente || "").trim(),
+    // Cliente: nombre + vínculo a `empresas/{id}` (la misma base del cotizador).
+    // Ver clienteVinculo.js.
+    ...camposClienteFicha(input),
     cantidad:      Number(input.cantidad || 1),
     fechaOrden:    toIso(input.fechaOrden),
     fechaEntrega:  toIso(input.fechaEntrega),

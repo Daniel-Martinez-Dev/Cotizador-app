@@ -70,17 +70,50 @@ service cloud.firestore {
     }
 
     // Un empleado solo puede tocar notas/estado/firmas/entrega/updatedAt en una
-    // ficha. Los dos estados que puede fijar exigen su respaldo: "terminado"
-    // necesita las firmas (fabricante(s) + verificador) y "entregado" necesita
-    // la fecha de entrega. No puede devolver una ficha a borrador ni a producción.
+    // ficha, y nunca devolverla a borrador ni a producción.
+    //
+    // Los dos estados que cierran la ficha exigen su firma: "terminado" la de
+    // quién alistó y empacó, "entregado" la de quién revisó y aprobó más la
+    // fecha de entrega (ver firmasFicha.js).
+    //
+    // Y lo firmado no se toca: una firma o una entrega ya guardadas son de una
+    // sola escritura para la planta — ni se modifican ni se borran, tampoco su
+    // registro fotográfico. Corregirlas es cosa de producción/admin.
+
+    function firmasPrevias() {
+      return resource.data.get('firmas', {});
+    }
+
+    function firmasNuevas() {
+      return request.resource.data.get('firmas', {});
+    }
+
+    // La etapa se puede crear, nunca cambiar.
+    function firmaEtapaInmutable(etapa) {
+      return firmasPrevias().get(etapa, null) == null ||
+        firmasNuevas().get(etapa, null) == firmasPrevias().get(etapa, null);
+    }
+
+    function firmaEtapaPresente(etapa) {
+      return firmasNuevas().get(etapa, {}).get('personas', []).size() > 0;
+    }
+
+    function entregaInmutable() {
+      return !('entrega' in resource.data) ||
+        request.resource.data.entrega == resource.data.entrega;
+    }
+
     function fichaUpdateEmpleadoOk() {
       let diffKeys = request.resource.data.diff(resource.data).affectedKeys();
       return diffKeys.hasOnly(['notas', 'estado', 'firmas', 'entrega', 'updatedAt']) &&
+        firmaEtapaInmutable('alistado') &&
+        firmaEtapaInmutable('revisado') &&
+        entregaInmutable() &&
         (!diffKeys.hasAny(['estado']) ||
           (request.resource.data.estado == 'terminado' &&
-            request.resource.data.firmas.fabricantes.size() > 0 &&
-            request.resource.data.firmas.verificador != null) ||
+            firmaEtapaPresente('alistado')) ||
           (request.resource.data.estado == 'entregado' &&
+            firmaEtapaPresente('revisado') &&
             request.resource.data.entrega.fecha is string &&
             request.resource.data.entrega.fecha.size() > 0));
     }
@@ -158,8 +191,9 @@ service cloud.firestore {
     }
 
     // ─── Fichas de fabricación (División, Sello, Abrigo Retráctil, Puertas
-    // Rápidas): "produccion"/admin tienen acceso total; "empleado" (planta)
-    // solo puede leer y actualizar notas/estado/firmas (ver fichaUpdateEmpleadoOk).
+    // Rápidas, Puertas Seccionales): "produccion"/admin tienen acceso total;
+    // "empleado" (planta) solo puede leer y actualizar notas/estado/firmas, y
+    // lo que firma queda cerrado para él (ver fichaUpdateEmpleadoOk).
     match /division_fichas/{docId} {
       allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
@@ -179,6 +213,12 @@ service cloud.firestore {
     }
 
     match /fichas_puertas_rapidas/{docId} {
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+    }
+
+    match /fichas_puertas_seccionales/{docId} {
       allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());

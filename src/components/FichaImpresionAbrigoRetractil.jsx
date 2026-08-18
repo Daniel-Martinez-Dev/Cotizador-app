@@ -93,17 +93,6 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
     { label: "Tuercas y arandelas ¼\"",        unit: "und", cu: fmtDec(mp.tuercasArandelas_und, 1), tot: fmtN(mpt.tuercasArandelas_und), formula: "20 + 2/cantidad" },
   ];
 
-  // ── Actividades placeholder ───────────────────────────────────────────────
-  const actividades = [
-    "Corte de lona",
-    "Sellado de lona",
-    "Corte de banda PVC",
-    "Pintado de banda PVC",
-    "Corte de tubería",
-    "Armado estructura",
-    "Alistamiento",
-  ];
-
   return (
     <FichaImpresionShell
       productLabel="Abrigo Retráctil"
@@ -292,34 +281,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
             </div>
           </div>
 
-          {/* ── Control de actividades ── */}
-          <div style={{ padding: "0 20px 4px" }}>
-            <SectionTitle size="11.5px">Control de Actividades</SectionTitle>
-            <div style={{ border: "1px solid #000000", borderRadius: "8px", overflow: "hidden" }}>
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                <thead>
-                  <tr>
-                    {["ACTIVIDAD", "AUXILIAR RESPONSABLE", "FECHA INICIO", "FECHA FIN", "OBSERVACIONES"].map((h) => (
-                      <th key={h} style={{ ...thStyle, fontSize: "10.5px" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {actividades.map((act, i) => (
-                    <tr key={act} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
-                      <td style={{ ...tdStyle, fontWeight: "600" }}>{act}</td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
-                      <td style={tdStyle}></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <Firmas />
+          <Firmas ficha={ficha} />
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — FICHA DE FABRICACIÓN ABRIGOS RETRÁCTILES"
             numero={codigo}

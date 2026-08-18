@@ -13,6 +13,7 @@ export const PREFIJO_POR_TIPO = {
   sello:           "SA",
   division:        "DT",
   puertarapida:    "PR",
+  puertaseccional: "PS",
   general:         "OG", // Orden General — ficha básica, sin ficha de fabricación
 };
 

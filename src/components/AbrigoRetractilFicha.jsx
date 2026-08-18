@@ -20,6 +20,8 @@ import EstadoResumen from "./fichas/EstadoResumen";
 import { useQuote } from "../context/QuoteContext";
 import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
+import ClienteSelector from "./fichas/ClienteSelector";
+import { clienteDeFicha } from "../utils/clienteVinculo";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -33,6 +35,11 @@ const INITIAL_FORM = {
   codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
   numeroOrdenCompra: "",
   cliente:           "",
+  // Vínculo con la base de clientes del cotizador (empresas/{id}).
+  // Ver utils/clienteVinculo.js.
+  clienteId:         null,
+  clienteNit:        "",
+  clienteCiudad:     "",
   cantidad:          1,
   fechaOrden:        hoy(),
   fechaEntrega:      "",
@@ -60,7 +67,7 @@ export default function AbrigoRetractilFicha() {
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
 
-  const { cambiarEstado, agregarNota, editarEntrega, entregaModal } = useEstadoFicha("abrigoretractil", fichas, setFichas);
+  const { cambiarEstado, agregarNota, editarEntrega, editarFirma, modales } = useEstadoFicha("abrigoretractil", fichas, setFichas);
 
   // ── Cálculo reactivo ─────────────────────────────────────────────────────
 
@@ -108,6 +115,10 @@ export default function AbrigoRetractilFicha() {
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const set    = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
+  // quedar con el id de un cliente y el nombre de otro.
+  const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
   const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: Number(e.target.value) }));
   const setBool = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value === "true" }));
 
@@ -153,7 +164,7 @@ export default function AbrigoRetractilFicha() {
     setForm({
       codigoFicha:       codigoDeFicha(f, "abrigoretractil"),
       numeroOrdenCompra: f.numeroOrdenCompra || "",
-      cliente:           f.cliente || "",
+      ...clienteDeFicha(f),
       cantidad:          f.cantidad ?? 1,
       fechaOrden:        f.fechaOrden || hoy(),
       fechaEntrega:      f.fechaEntrega || "",
@@ -225,9 +236,12 @@ export default function AbrigoRetractilFicha() {
                   onChange={setNum("cantidad")} className={inputCls} />
               </div>
               <div className="col-span-2">
-                <label className={labelCls}>Cliente</label>
-                <input value={form.cliente} onChange={set("cliente")}
-                  className={inputCls} placeholder="Nombre del cliente" />
+                <ClienteSelector
+                  value={form}
+                  onChange={setCliente}
+                  inputCls={inputCls}
+                  labelCls={labelCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>Fecha orden</label>
@@ -547,6 +561,7 @@ export default function AbrigoRetractilFicha() {
                               onCambiarEstado={cambiarEstado}
                               onAgregarNota={agregarNota}
                               onEditarEntrega={editarEntrega}
+                              onEditarFirma={editarFirma}
                               onVerFicha={() => setPrintFicha({ ficha: f, numero })}
                               onEditar={() => handleEditar(f)}
                               onEliminar={() => handleEliminar(f)}
@@ -571,13 +586,13 @@ export default function AbrigoRetractilFicha() {
         />
       )}
 
-      {entregaModal}
+      {modales}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onVerFicha, onEditar, onEliminar }) {
+function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
   const med  = f.medidas               || {};
   const mp   = f.materiaPrimaPorAbrigo || {};
   const mpt  = f.materiaPrimaTotal     || {};
@@ -658,12 +673,11 @@ function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgre
       </div>
 
       <EstadoControl
-        estado={f.estado}
-        notas={f.notas}
-        entrega={f.entrega}
+        ficha={f}
         onCambiarEstado={(estado, nota) => onCambiarEstado(f.id, estado, nota)}
         onAgregarNota={(texto) => onAgregarNota(f.id, texto)}
         onEditarEntrega={() => onEditarEntrega(f.id)}
+        onEditarFirma={(etapa) => onEditarFirma(f.id, etapa)}
       />
     </div>
   );

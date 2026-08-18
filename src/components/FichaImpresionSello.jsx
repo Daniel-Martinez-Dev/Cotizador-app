@@ -265,7 +265,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             </div>
           </div>
 
-          <Firmas padX="22px" />
+          <Firmas ficha={ficha} padX="22px" />
 
           <FichaFooter
             texto="COLD CHAIN SERVICES S.A.S. — DEPARTAMENTO DE INGENIERÍA"

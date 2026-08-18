@@ -3,6 +3,7 @@
 import { formatearPesos } from "./formatos";
 import { EXTRAS_POR_DEFECTO } from "../data/precios"; // legacy fallback
 import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtrasPorTipo } from '../data/catalogoProductos';
+import { resolverVigencia } from './vigencia';
 
 export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0, productosOverride = {}) {
   const descripcionHTML = generarDescripcion(cotizacion, productosOverride);
@@ -264,6 +265,8 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
   const primerTipo = cot.productos?.[indiceProducto]?.tipo || cot.productos?.[0]?.tipo || "";
   const condicionesDB = productosOverride[primerTipo]?.condicionesComerciales;
   if (condicionesDB) return condicionesDB;
+  // Vigencia editable desde la vista previa; misma cadena que el encabezado y la tabla.
+  const vigencia = `${resolverVigencia(cot)}.`;
   // Formato inline: "<strong>Label:</strong> body" en un solo párrafo, compacto y resistente a Quill.
   const liCond = (arr) => arr.map(txt => `<p>${txt}</p>`).join('');
   // Condiciones específicas para Sello de Andén
@@ -271,7 +274,7 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
     return liCond([
       '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
       '<strong>Tiempo de entrega:</strong> 10 días hábiles a partir del anticipo confirmado.',
-      '<strong>Vigencia de la oferta:</strong> Hasta el 30 de junio del 2026.',
+      `<strong>Vigencia de la oferta:</strong> ${vigencia}`,
       '<strong>Garantía:</strong> 12 meses contra defectos de fabricación.',
       '<strong>Incluye:</strong> Sello de andén según dimensiones, postes laterales, cortina y/o travesaño, y platinas de anclaje.',
       '<strong>No incluye (en caso de contratar instalación):</strong> Obra civil, adecuaciones del vano, topes de caucho, ni acompañamiento SYSO (estos se cotizan aparte en caso de ser requeridos).',
@@ -291,7 +294,7 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
     return liCond([
       '<strong>Forma de pago:</strong> 50% de anticipo con la orden y 50% antes del despacho.',
       `<strong>Tiempo de entrega:</strong> ${tiempoEntrega}`,
-      '<strong>Vigencia de la oferta:</strong> Hasta el 30 de junio del 2026.',
+      `<strong>Vigencia de la oferta:</strong> ${vigencia}`,
       `<strong>Garantía:</strong> 12 meses contra defectos de fabricación. No cubre desgaste por uso, cortes en lona, exposición a químicos no compatibles, golpes o falta de mantenimiento.${garantiaInflable}`,
       '<strong>Incluye:</strong> Abrigo retráctil según modelo, estructura metálica, lona perimetral y bandas frontales.',
       '<strong>No incluye (en caso de contratar instalación):</strong> Obras civiles, canalizaciones, refuerzos de muro, sistemas eléctricos, ni acompañamiento SYSO, el cual deberá cotizarse por separado en caso de ser requerido.',
@@ -304,7 +307,7 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
   (Boolean(cot.incluyeInstalacion) ? '<strong>ALCANCE:</strong> Esta oferta incluye <strong>SUMINISTRO e INSTALACIÓN</strong> según condiciones indicadas. El cliente debe garantizar condiciones de obra y energía adecuadas. El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro.' : '<strong>ALCANCE:</strong> Esta oferta corresponde exclusivamente a <strong>SUMINISTRO</strong> (NO incluye instalación). El cliente es responsable del retiro de los productos en planta (Subachoque, Cundinamarca) y de enviar oportunamente la información de la persona/empresa que realizará el retiro. Si se requiere instalación, deberá solicitarse y cotizarse por separado.'),
       `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo con la orden y 50% antes del despacho / instalación.'}`,
       `<strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || '15 días hábiles contados a partir de anticipo efectivo y confirmación de planos firmados.'}`,
-      `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || 'Hasta el 30 de junio del 2026.'}`,
+      `<strong>Vigencia de la oferta:</strong> ${vigencia}`,
       `<strong>Garantía:</strong> ${cot.garantia || '12 meses contra defectos de fabricación (motor y componentes electrónicos). Leer Términos y Condiciones.'}`,
       '<strong>Incluye:</strong> Puerta rápida enrollable según especificaciones, estructura autoportante, motor y tablero de control, elementos de seguridad y acceso descritos, manual básico de operación.',
       '<strong>No incluye:</strong> Acometida eléctrica hasta el punto de conexión, canalizaciones, adecuaciones civiles del vano, obras de refuerzo, sistemas de puesta a tierra, dispositivos adicionales no especificados.',
@@ -327,7 +330,7 @@ export function generarCondicionesComerciales(cot, indiceProducto = 0, productos
     alcance,
     `<strong>Forma de pago:</strong> ${cot.formaPago || '50% de anticipo contra orden de compra y 50% para retiro en planta.'}`,
     `<strong>Tiempo de entrega:</strong> ${cot.tiempoEntrega || '15 días hábiles contados a partir de anticipo efectivo.'}`,
-    `<strong>Vigencia de la oferta:</strong> ${cot.vigencia || 'Hasta el 30 de junio del 2026.'}`,
+    `<strong>Vigencia de la oferta:</strong> ${vigencia}`,
     `<strong>Garantía:</strong> ${cot.garantia || '12 meses contra defectos de fabricación.'}`
   ];
   return liCond(itemsGenericos);

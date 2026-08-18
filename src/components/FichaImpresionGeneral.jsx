@@ -130,7 +130,7 @@ export default function FichaImpresionGeneral({ ficha, numero, onClose }) {
           </div>
         </div>
 
-        <Firmas />
+        <Firmas ficha={ficha} />
         <FichaFooter
           texto="COLD CHAIN SERVICES S.A.S. — ORDEN DE PRODUCCIÓN / DESPACHO"
           numero={codigo}

@@ -14,6 +14,8 @@ import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoControl from "./fichas/EstadoControl";
 import useEstadoFicha from "./fichas/useEstadoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
+import ClienteSelector from "./fichas/ClienteSelector";
+import { clienteDeFicha } from "../utils/clienteVinculo";
 import Combobox from "./ui/Combobox";
 import { useQuote } from "../context/QuoteContext";
 import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
@@ -45,6 +47,11 @@ const INITIAL_FORM = {
   codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
   numeroOrdenCompra: "",
   cliente:           "",
+  // Vínculo con la base de clientes del cotizador (empresas/{id}).
+  // Ver utils/clienteVinculo.js.
+  clienteId:         null,
+  clienteNit:        "",
+  clienteCiudad:     "",
   responsable:       "",
   fechaOrden:        hoy(),
   fechaEntrega:      "",
@@ -65,7 +72,7 @@ export default function FichaBasicaFicha() {
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
 
-  const { cambiarEstado, agregarNota, editarEntrega, entregaModal } = useEstadoFicha("general", fichas, setFichas);
+  const { cambiarEstado, agregarNota, editarEntrega, editarFirma, modales } = useEstadoFicha("general", fichas, setFichas);
 
   const loadFichas = React.useCallback(async () => {
     setLoading(true);
@@ -84,6 +91,10 @@ export default function FichaBasicaFicha() {
   // ── Handlers de formulario ────────────────────────────────────────────────
 
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
+  // quedar con el id de un cliente y el nombre de otro.
+  const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
 
   const setItem = (idx, campo, valor) =>
     setForm((p) => ({
@@ -135,7 +146,7 @@ export default function FichaBasicaFicha() {
     setForm({
       codigoFicha:       codigoDeFicha(f, "general"),
       numeroOrdenCompra: f.numeroOrdenCompra || "",
-      cliente:           f.cliente || "",
+      ...clienteDeFicha(f),
       responsable:       f.responsable || "",
       fechaOrden:        f.fechaOrden || hoy(),
       fechaEntrega:      f.fechaEntrega || "",
@@ -197,9 +208,12 @@ export default function FichaBasicaFicha() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className={labelCls}>Cliente</label>
-              <input value={form.cliente} onChange={set("cliente")}
-                className={inputCls} placeholder="Nombre del cliente" />
+              <ClienteSelector
+                value={form}
+                onChange={setCliente}
+                inputCls={inputCls}
+                labelCls={labelCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Fecha orden</label>
@@ -424,6 +438,7 @@ export default function FichaBasicaFicha() {
                               onCambiarEstado={cambiarEstado}
                               onAgregarNota={agregarNota}
                               onEditarEntrega={editarEntrega}
+                              onEditarFirma={editarFirma}
                               onVerFicha={() => setPrintFicha(f)}
                               onEditar={() => handleEditar(f)}
                               onEliminar={() => handleEliminar(f)}
@@ -448,13 +463,13 @@ export default function FichaBasicaFicha() {
         />
       )}
 
-      {entregaModal}
+      {modales}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaBasicaDetalle({ ficha: f, onCambiarEstado, onAgregarNota, onEditarEntrega, onVerFicha, onEditar, onEliminar }) {
+function FichaBasicaDetalle({ ficha: f, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
   const items = Array.isArray(f.items) ? f.items : [];
 
   return (
@@ -518,12 +533,11 @@ function FichaBasicaDetalle({ ficha: f, onCambiarEstado, onAgregarNota, onEditar
       )}
 
       <EstadoControl
-        estado={f.estado}
-        notas={f.notas}
-        entrega={f.entrega}
+        ficha={f}
         onCambiarEstado={(estado, nota) => onCambiarEstado(f.id, estado, nota)}
         onAgregarNota={(texto) => onAgregarNota(f.id, texto)}
         onEditarEntrega={() => onEditarEntrega(f.id)}
+        onEditarFirma={(etapa) => onEditarFirma(f.id, etapa)}
       />
     </div>
   );

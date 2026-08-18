@@ -1,23 +1,31 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { FaPlus, FaRegStickyNote, FaTimes, FaCheck, FaTruck, FaPen } from "react-icons/fa";
+import { FaPlus, FaRegStickyNote, FaTimes, FaCheck, FaTruck, FaPen, FaSignature } from "react-icons/fa";
 import {
   ESTADOS_FICHA, ESTADO_LABEL, ESTADO_LABEL_CORTO, ESTADO_ICON,
   ESTADO_ACTIVO_CLS, ESTADO_REQUIERE_ENTREGA, normalizarEstado,
 } from "./estadoFicha";
 import { ordenarNotasDesc } from "./notasFicha";
+import { ROL_CORRIGE_FIRMAS } from "../../utils/firmasFicha";
+import { useAuth } from "../../context/AuthContext";
 import NotaItem from "./NotaItem";
 import EntregaResumen from "./EntregaResumen";
+import FirmasResumen from "./FirmasResumen";
 
-// Control de estado de una ficha: un segmentado con los tres estados (se ve de
-// un golpe dónde está y se salta a cualquiera con un clic), el cambio con nota
-// opcional, y la línea de tiempo con todo lo que ha pasado con la ficha.
-// Reemplaza a la antigua tira de botones "Pasar a producción / Marcar
-// terminada / Volver a borrador".
+// Control de estado de una ficha: un segmentado con los cuatro estados (se ve
+// de un golpe dónde está y se salta a cualquiera con un clic), el cambio con
+// nota opcional, las firmas ya guardadas y la línea de tiempo con todo lo que
+// ha pasado con la ficha.
+//
+// Los dos últimos estados no se fijan desde aquí: "Terminada" abre el
+// formulario de firma del alistado y "Entregada" el de revisión + despacho
+// (ver useEstadoFicha).
 
 const NOTAS_VISIBLES = 3;
 
-export default function EstadoControl({ estado, notas, entrega, onCambiarEstado, onAgregarNota, onEditarEntrega }) {
+export default function EstadoControl({ ficha, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma }) {
+  const { hasRole } = useAuth();
+  const { estado, notas, entrega } = ficha;
   const actual = normalizarEstado(estado);
   const [pendiente, setPendiente] = React.useState(null);
   const [notaCambio, setNotaCambio] = React.useState("");
@@ -28,6 +36,8 @@ export default function EstadoControl({ estado, notas, entrega, onCambiarEstado,
   const historial = React.useMemo(() => ordenarNotasDesc(notas), [notas]);
   const visibles = verTodas ? historial : historial.slice(0, NOTAS_VISIBLES);
   const esEntrega = pendiente === ESTADO_REQUIERE_ENTREGA;
+  // Corregir una firma ya guardada es cosa de producción/admin.
+  const puedeCorregirFirmas = hasRole(ROL_CORRIGE_FIRMAS) && onEditarFirma;
 
   const cancelarCambio = () => { setPendiente(null); setNotaCambio(""); };
 
@@ -93,13 +103,15 @@ export default function EstadoControl({ estado, notas, entrega, onCambiarEstado,
         </div>
       </div>
 
-      {/* Confirmación del cambio, con nota opcional. "Entregada" no se confirma
-          aquí: abre el formulario de entrega, y la nota escrita viaja con él. */}
+      {/* Confirmación del cambio, con nota opcional. Los dos estados que cierran
+          la ficha no se confirman aquí: abren su formulario de firma —alistado
+          o revisión + entrega— y la nota escrita viaja con él. */}
       {pendiente && (
         <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/20 p-3 space-y-2">
           <div className="text-xs text-gray-700 dark:text-gray-200">
             Cambiar de <strong>{ESTADO_LABEL[actual]}</strong> a <strong>{ESTADO_LABEL[pendiente]}</strong>
-            {esEntrega && " — se pedirán fecha, placas y fotos"}
+            {pendiente === "terminado" && " — se pedirá quién alistó y empacó"}
+            {esEntrega && " — se pedirá quién revisó y aprobó, más fecha, placas y fotos"}
           </div>
           <textarea
             value={notaCambio}
@@ -124,11 +136,19 @@ export default function EstadoControl({ estado, notas, entrega, onCambiarEstado,
               }`}>
               {esEntrega
                 ? <><FaTruck className="text-[10px]" /> Registrar entrega</>
-                : <><FaCheck className="text-[10px]" /> Confirmar cambio</>}
+                : pendiente === "terminado"
+                  ? <><FaSignature className="text-[10px]" /> Firmar alistado</>
+                  : <><FaCheck className="text-[10px]" /> Confirmar cambio</>}
             </button>
           </div>
         </div>
       )}
+
+      {/* Firmas del formato: quién alistó y empacó, quién revisó y aprobó */}
+      <FirmasResumen
+        ficha={ficha}
+        onEditarFirma={puedeCorregirFirmas ? onEditarFirma : null}
+      />
 
       {/* Constancia de la entrega, cuando ya se registró */}
       {actual === ESTADO_REQUIERE_ENTREGA && (

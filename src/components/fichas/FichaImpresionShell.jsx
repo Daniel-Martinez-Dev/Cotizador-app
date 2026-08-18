@@ -1,10 +1,13 @@
 import React from "react";
 import toast from "react-hot-toast";
+import { Capacitor } from "@capacitor/core";
 import {
   FaPrint, FaTimes, FaFileAlt, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
   FaRegCopy, FaCheck,
 } from "react-icons/fa";
 import { fichaAPngBlob, copiarImagenFicha } from "../../utils/fichaImagen";
+import { htmlParaImprimir } from "../../utils/impresionAhorroTinta";
+import { compartirFichaParaImprimir, esCancelacion } from "../../utils/fichaImpresionMovil";
 
 // Modal + lógica de impresión compartida por las fichas de impresión
 // (Abrigo, Sello, División Térmica, Puerta Rápida). El contenido imprimible
@@ -77,42 +80,39 @@ export default function FichaImpresionShell({
 
   const aplicarZoom = (nuevo) => setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, nuevo)));
 
+  // Nombre con el que sale esta ficha en cualquier archivo (imagen o PDF).
+  const nombreBase = () => `Ficha_${String(numero || "").replace(/[^\w-]/g, "") || "produccion"}`;
+
   // ── Impresión ────────────────────────────────────────────────────────────
+  // Lo que se manda al papel NO es lo mismo que se ve en pantalla: pasa por el
+  // modo ahorro de tinta (utils/impresionAhorroTinta.js), que quita los fondos
+  // de color y deja el texto en negro. En el visor la ficha conserva sus bandas.
   const buildHtml = () => `<!DOCTYPE html><html><head>
       <meta charset="utf-8"/>
       <title>Ficha ${productLabel} ${numero} — ${cliente || ""}</title>
       <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
-        body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #111; }
+        body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #000; }
         table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #999; padding: 4px 7px; font-size: 12px; vertical-align: middle; }
+        td, th { border: 1px solid #333; padding: 4px 7px; font-size: 12px; vertical-align: middle; }
         @media print { body { margin: 5mm; } @page { size: letter landscape; margin: 0; } }
       </style>
-    </head><body><div id="print-content">${printRef.current.innerHTML}</div></body></html>`;
+    </head><body><div id="print-content">${htmlParaImprimir(printRef.current)}</div></body></html>`;
 
   // Encoge el contenido (si hace falta) para que cualquier ficha, sin importar
   // cuántas filas/insumos tenga, entre siempre en una sola página carta (Letter)
   // horizontal — el tamaño real en el que se imprime. Si este cálculo usara
   // A4 (más ancho que carta) y el driver de impresión luego reescala a carta,
   // el contenido se encoge dos veces y el texto sale más pequeño de lo previsto.
-  const fitToOnePageAndPrint = (targetWin) => {
-    try {
-      const el = targetWin.document.getElementById("print-content");
-      if (el) {
-        const mmToPx = 96 / 25.4;
-        const pageW = (279.4 - 10) * mmToPx; // Carta (Letter) horizontal menos márgenes de 5mm
-        const pageH = (215.9 - 10) * mmToPx;
-        const escala = Math.min(1, pageW / el.scrollWidth, pageH / el.scrollHeight);
-        if (escala < 1) el.style.zoom = escala;
-      }
-      targetWin.focus();
-      targetWin.print();
-    } catch (e) {
-      console.error("No se pudo imprimir la ficha", e);
-    } finally {
-      setPrinting(false);
-    }
+  const ajustarAUnaPagina = (targetWin) => {
+    const el = targetWin.document.getElementById("print-content");
+    if (!el) return;
+    const mmToPx = 96 / 25.4;
+    const pageW = (279.4 - 10) * mmToPx; // Carta (Letter) horizontal menos márgenes de 5mm
+    const pageH = (215.9 - 10) * mmToPx;
+    const escala = Math.min(1, pageW / el.scrollWidth, pageH / el.scrollHeight);
+    if (escala < 1) el.style.zoom = escala;
   };
 
   const cuandoCargue = (targetWin, accion) => {
@@ -123,9 +123,10 @@ export default function FichaImpresionShell({
     }
   };
 
-  // Plan B cuando no hay ventana emergente disponible (bloqueador del
-  // navegador, WebView del celular, o un handler de Electron que la deniega):
-  // se imprime desde un iframe fuera de pantalla — mismo HTML, mismo escalado.
+  // Se imprime desde un iframe fuera de pantalla: así no se abre ninguna
+  // ventana ni pestaña de "vista previa" que después haya que cerrar a mano
+  // —el diálogo de impresión sale sobre la app misma— y de paso no depende del
+  // bloqueador de ventanas emergentes.
   const imprimirConIframe = (html) => {
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
@@ -134,48 +135,123 @@ export default function FichaImpresionShell({
     iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${designWidth}px;height:900px;border:0;`;
     document.body.appendChild(iframe);
 
-    const limpiar = () => setTimeout(() => iframe.remove(), 2000);
+    let retirado = false;
+    const retirar = () => {
+      if (retirado) return;
+      retirado = true;
+      iframe.remove();
+    };
+
     try {
-      const doc = iframe.contentWindow.document;
+      const win = iframe.contentWindow;
+      const doc = win.document;
       doc.open();
       doc.write(html);
       doc.close();
-      cuandoCargue(iframe.contentWindow, () => {
-        fitToOnePageAndPrint(iframe.contentWindow);
-        limpiar();
+      cuandoCargue(win, () => {
+        try {
+          // El iframe se retira cuando el diálogo termina. Nunca antes: si se
+          // quita el documento mientras el diálogo sigue abierto, el trabajo de
+          // impresión se cancela solo.
+          win.addEventListener("afterprint", retirar, { once: true });
+          ajustarAUnaPagina(win);
+          win.focus();
+          win.print();
+        } catch (e) {
+          console.error("No se pudo imprimir la ficha", e);
+          retirar();
+          imprimirConVentana(html);
+          return;
+        } finally {
+          setPrinting(false);
+        }
+        // Red de seguridad por si el navegador no avisa que terminó: el iframe
+        // es invisible, así que sobra con retirarlo un rato después.
+        setTimeout(retirar, 60000);
       });
     } catch (e) {
       console.error("No se pudo preparar la impresión", e);
-      iframe.remove();
+      retirar();
       setPrinting(false);
-      alert("No se pudo abrir la impresión de la ficha. Intenta de nuevo o usa Ctrl/Cmd + P.");
+      imprimirConVentana(html);
     }
   };
 
-  const handlePrint = () => {
-    if (!printRef.current) return;
-    setPrinting(true);
-    const html = buildHtml();
-
+  // Plan B si el navegador no deja imprimir desde el iframe: ventana aparte,
+  // que ahora se cierra sola en cuanto se cierra el diálogo de impresión
+  // (antes quedaba abierta y tocaba cerrarla a mano).
+  const imprimirConVentana = (html) => {
     let win = null;
     try {
       win = window.open("", "_blank", `width=${windowSize.width},height=${windowSize.height}`);
     } catch { win = null; }
 
     if (!win) {
-      imprimirConIframe(html);
+      setPrinting(false);
+      toast.error("El navegador bloqueó la impresión. Permite las ventanas emergentes o usa Ctrl/Cmd + P.");
       return;
     }
+
+    const cerrar = () => { try { if (!win.closed) win.close(); } catch { /* noop */ } };
 
     try {
       win.document.write(html);
       win.document.close();
-      cuandoCargue(win, () => fitToOnePageAndPrint(win));
+      cuandoCargue(win, () => {
+        try {
+          win.addEventListener("afterprint", cerrar, { once: true });
+          ajustarAUnaPagina(win);
+          win.focus();
+          win.print();
+          // En Chrome, Edge y Electron print() no devuelve el control hasta que
+          // se cierra el diálogo: al llegar aquí ya se imprimió (o se canceló).
+          cerrar();
+        } catch (e) {
+          console.error("No se pudo imprimir la ficha", e);
+          cerrar();
+        } finally {
+          setPrinting(false);
+        }
+      });
     } catch (e) {
       console.error("No se pudo escribir la ventana de impresión", e);
-      try { win.close(); } catch { /* noop */ }
-      imprimirConIframe(html);
+      cerrar();
+      setPrinting(false);
+      toast.error("No se pudo abrir la impresión de la ficha. Intenta de nuevo o usa Ctrl/Cmd + P.");
     }
+  };
+
+  // En la app del celular no hay diálogo de impresión al que llamar (ver
+  // utils/fichaImpresionMovil.js): la ficha se arma como PDF de una hoja y se
+  // entrega al servicio de impresión / compartir de Android.
+  const imprimirEnCelular = async () => {
+    // Armar el PDF de la ficha toma un par de segundos en el teléfono: sin el
+    // aviso parece que el botón no hizo nada.
+    const aviso = toast.loading("Preparando la ficha para imprimir…");
+    try {
+      await compartirFichaParaImprimir(printRef.current, {
+        anchoDiseno: designWidth,
+        nombreArchivo: `${nombreBase()}.pdf`,
+      });
+    } catch (e) {
+      if (!esCancelacion(e)) {
+        console.error("No se pudo preparar la ficha para imprimir", e);
+        toast.error("No se pudo preparar la ficha para imprimir");
+      }
+    } finally {
+      toast.dismiss(aviso);
+      setPrinting(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if (!printRef.current || printing) return;
+    setPrinting(true);
+    if (Capacitor.isNativePlatform()) {
+      imprimirEnCelular();
+      return;
+    }
+    imprimirConIframe(buildHtml());
   };
 
   // ── Copiar la ficha como imagen ──────────────────────────────────────────
@@ -187,7 +263,7 @@ export default function FichaImpresionShell({
   const handleCopiarImagen = async () => {
     if (!printRef.current || copiando) return;
     setCopiando(true);
-    const nombreArchivo = `Ficha_${String(numero || "").replace(/[^\w-]/g, "") || "produccion"}.png`;
+    const nombreArchivo = `${nombreBase()}.png`;
     try {
       const blobPromise = fichaAPngBlob(printRef.current, { anchoDiseno: designWidth });
       const resultado = await copiarImagenFicha(blobPromise, nombreArchivo);

@@ -1,5 +1,12 @@
 // src/utils/firebaseClients.js
-// CRUD utilidades para la colección "clientes" en Firestore
+// CRUD utilidades para la colección "clientes" en Firestore.
+//
+// OJO: esta colección quedó obsoleta. La base de clientes de la aplicación es
+// `empresas` (+ su subcolección `contactos`, ver firebaseCompanies.js): es la
+// que usan el cotizador y las fichas de fabricación, y a la que apunta el
+// `clienteId` de una ficha (ver clienteVinculo.js). Su única pantalla,
+// ClientsPage.jsx, ya no está enrutada en App.jsx. No escribir clientes nuevos
+// aquí: quedarían fuera de la relación cliente ↔ cotización ↔ ficha.
 import { db } from "../firebase";
 import {
   collection,
