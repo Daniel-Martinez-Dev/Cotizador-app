@@ -2,21 +2,39 @@ import React from "react";
 import toast from "react-hot-toast";
 import { FaPlus, FaTimes, FaUserEdit } from "react-icons/fa";
 import { listAllUsers } from "../../utils/firebaseUsers";
-import { normalizarPersonasFirma } from "../../utils/firmasFicha";
+import { useAuth } from "../../context/AuthContext";
+import { claveNombre, normalizarPersonasFirma } from "../../utils/firmasFicha";
 
 // Quiénes firman una etapa de la ficha. Firma más de una persona casi siempre
 // —alistar y empacar un pedido es trabajo de varios— así que es selección
 // múltiple, no un desplegable.
 //
-// La lista sale del directorio de usuarios, pero en planta trabaja gente sin
-// cuenta en la app: por eso además se puede escribir un nombre a mano. Esos
-// quedan guardados con uid vacío (ver normalizarPersonasFirma); lo que importa
-// es el nombre, que es lo que se imprime en la ficha.
+// Quién puede poner el nombre de quién:
+//
+//   · Los empleados de planta salen todos en la lista y cualquiera puede
+//     firmar por otro — el turno trabaja junto y lo registra uno solo.
+//   · El nombre de alguien de producción o administración NO lo pone nadie más:
+//     solo aparece para su propio dueño, con su sesión abierta. Por eso quien
+//     registra se ve a sí mismo aunque no sea de planta, y a nadie más de fuera
+//     de planta.
+//   · En planta también trabaja gente sin cuenta en la app, así que además se
+//     puede escribir un nombre a mano. Esos quedan con uid vacío (ver
+//     normalizarPersonasFirma) — pero escribir el nombre de un usuario de
+//     producción tampoco vale: se rechaza al agregarlo.
 
 const nombreDe = (u) => u.displayName || u.email || u.id;
 
+const esEmpleado = (u) => Array.isArray(u.roles) && u.roles.includes("empleado");
+
+const claveDe = (p) => p.uid || p.nombre;
+
 export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
+  const { user } = useAuth();
   const [staff, setStaff] = React.useState([]);
+  // Nombres del resto del staff (producción/administración, sin contar al
+  // propio usuario): no se pueden firmar por ellos, ni marcándolos ni
+  // escribiéndolos.
+  const [ajenos, setAjenos] = React.useState([]);
   const [cargando, setCargando] = React.useState(true);
   const [nombreLibre, setNombreLibre] = React.useState("");
 
@@ -26,27 +44,43 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
       try {
         const todos = await listAllUsers();
         if (!activo) return;
-        setStaff(
-          todos
-            .filter((u) => u.status === "active")
-            .sort((a, b) => nombreDe(a).localeCompare(nombreDe(b)))
+        const activos = todos.filter((u) => u.status === "active");
+        const planta = activos.filter(esEmpleado);
+        const yo = activos.find((u) => u.id === user?.uid);
+        // Quien registra sin ser de planta se agrega a la lista: es el único
+        // que puede firmar con su nombre.
+        const firmables = yo && !esEmpleado(yo) ? [...planta, yo] : planta;
+        setStaff(firmables.sort((a, b) => nombreDe(a).localeCompare(nombreDe(b))));
+        setAjenos(
+          activos
+            .filter((u) => !esEmpleado(u) && u.id !== user?.uid)
+            .map((u) => nombreDe(u))
         );
       } catch (e) {
         console.error(e);
         // No bloquea: si el directorio no carga, los nombres se escriben a mano.
-        toast.error("No se pudo cargar la lista de usuarios");
+        toast.error("No se pudo cargar la lista de empleados");
       } finally {
         if (activo) setCargando(false);
       }
     })();
     return () => { activo = false; };
-  }, []);
+  }, [user?.uid]);
 
   const seleccionados = React.useMemo(
     () => new Set(personas.filter((p) => p.uid).map((p) => p.uid)),
     [personas]
   );
-  const libres = personas.filter((p) => !p.uid);
+
+  // Firmantes sin casilla en la lista: los escritos a mano y los que vienen de
+  // una firma anterior con alguien que hoy no aparece —otro de producción, o un
+  // empleado dado de baja—. Se pintan como fichas aparte para que nadie cuente
+  // como firmante sin verse en pantalla.
+  const sinCasilla = React.useMemo(() => {
+    if (cargando) return personas.filter((p) => !p.uid);
+    const enLista = new Set(staff.map((u) => u.id));
+    return personas.filter((p) => !p.uid || !enLista.has(p.uid));
+  }, [personas, staff, cargando]);
 
   const alternarUsuario = (u) => {
     const uid = u.id;
@@ -60,6 +94,14 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
   const agregarLibre = () => {
     const limpio = nombreLibre.trim();
     if (!limpio) return;
+
+    // Escribir a mano el nombre de alguien de producción es firmar por él.
+    const ajeno = ajenos.find((n) => claveNombre(n) === claveNombre(limpio));
+    if (ajeno) {
+      toast.error(`${ajeno} tiene que firmar desde su propia cuenta`);
+      return;
+    }
+
     const siguiente = normalizarPersonasFirma([...personas, { uid: "", nombre: limpio }]);
     if (siguiente.length === personas.length) {
       toast("Esa persona ya está en la lista");
@@ -69,7 +111,7 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
     setNombreLibre("");
   };
 
-  const quitarLibre = (nombre) => onChange(personas.filter((p) => p.uid || p.nombre !== nombre));
+  const quitar = (persona) => onChange(personas.filter((p) => claveDe(p) !== claveDe(persona)));
 
   return (
     <div className="space-y-2">
@@ -96,27 +138,32 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
                   className="h-4 w-4 shrink-0"
                 />
                 <span className="truncate">{nombreDe(u)}</span>
+                {u.id === user?.uid && !esEmpleado(u) && (
+                  <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-gray-400">Tú</span>
+                )}
               </label>
             );
           })}
           {staff.length === 0 && (
-            <div className="text-xs text-gray-400 py-2">No hay usuarios activos en el directorio.</div>
+            <div className="text-xs text-gray-400 py-2">
+              No hay empleados de planta registrados. Escribe los nombres abajo.
+            </div>
           )}
         </div>
       )}
 
-      {libres.length > 0 && (
+      {sinCasilla.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {libres.map((p) => (
+          {sinCasilla.map((p) => (
             <span
-              key={p.nombre}
+              key={claveDe(p)}
               className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-gray-100 dark:bg-gris-700 text-xs"
             >
               <FaUserEdit className="text-[10px] opacity-60" />
               {p.nombre}
               <button
                 type="button"
-                onClick={() => quitarLibre(p.nombre)}
+                onClick={() => quitar(p)}
                 disabled={disabled}
                 title={`Quitar a ${p.nombre}`}
                 className="h-4 w-4 rounded-full bg-gray-300 dark:bg-gris-500 text-white flex items-center justify-center disabled:opacity-40"

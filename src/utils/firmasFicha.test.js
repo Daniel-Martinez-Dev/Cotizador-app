@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ETAPAS_FIRMA,
+  claveNombre,
   fechaFirmaTexto,
   hoyISO,
   firmaDeEtapa,
@@ -43,6 +44,23 @@ describe("normalizarPersonasFirma", () => {
   it("aguanta lo que no es una lista", () => {
     expect(normalizarPersonasFirma(undefined)).toEqual([]);
     expect(normalizarPersonasFirma(null)).toEqual([]);
+  });
+});
+
+describe("claveNombre", () => {
+  // Con esta clave se reconoce a un usuario de producción cuyo nombre alguien
+  // intenta escribir a mano para firmar por él (ver PersonasFirmaPicker).
+  it("iguala el mismo nombre escrito de cualquier forma", () => {
+    expect(claveNombre("  Ana   GÓMEZ ")).toBe(claveNombre("ana gomez"));
+  });
+
+  it("no confunde a dos personas distintas", () => {
+    expect(claveNombre("Ana Gómez")).not.toBe(claveNombre("Ana Gómez Ruiz"));
+  });
+
+  it("aguanta lo que no es texto", () => {
+    expect(claveNombre(null)).toBe("");
+    expect(claveNombre(undefined)).toBe("");
   });
 });
 

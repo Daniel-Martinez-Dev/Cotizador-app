@@ -94,8 +94,12 @@ export function normalizarPersonasFirma(lista) {
     });
 }
 
-function claveNombre(nombre) {
-  return nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+// Nombre reducido a lo comparable: sin tildes, sin mayúsculas, sin dobles
+// espacios. Sirve para no repetir un firmante y para reconocer a alguien del
+// directorio cuando su nombre se escribió a mano.
+export function claveNombre(nombre) {
+  return (nombre || "").toString().trim().replace(/\s+/g, " ")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 export function normalizarFotos(fotos) {

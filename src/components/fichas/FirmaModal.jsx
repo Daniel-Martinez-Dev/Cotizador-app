@@ -17,16 +17,20 @@ const inputCls = "mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 dark:b
 const labelCls = "text-xs font-medium text-gray-600 dark:text-gray-300";
 
 export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onDone }) {
-  const { user, profile, hasRole } = useAuth();
+  const { user, profile, roles, hasRole } = useAuth();
   const previa = firmaDeEtapa(ficha, "alistado");
   // Quitar una foto ya guardada es corregir evidencia: producción/admin.
   const puedeCorregir = hasRole(ROL_CORRIGE_FIRMAS);
 
   const yo = profile?.displayName || user?.displayName || user?.email || "";
-  // Quien registra suele ser uno de los que alistó: viene marcado y se
-  // desmarca si no fue así.
+  // En planta quien registra suele ser uno de los que alistó, así que viene
+  // marcado y se desmarca si no fue así. Desde el escritorio no: quien pasa la
+  // ficha a terminada no es quien la empacó, y darlo por hecho metería una
+  // firma falsa en la ficha impresa. Se compara contra los roles del perfil
+  // —no contra hasRole— porque a un admin le devuelve true cualquier rol.
+  const alistaEnPlanta = (roles || []).includes("empleado");
   const [personas, setPersonas] = React.useState(() => (
-    previa?.personas || (user?.uid && yo ? [{ uid: user.uid, nombre: yo }] : [])
+    previa?.personas || (alistaEnPlanta && user?.uid && yo ? [{ uid: user.uid, nombre: yo }] : [])
   ));
   const [fecha, setFecha] = React.useState(previa?.fecha || hoyISO());
   const [nota, setNota] = React.useState(notaInicial);

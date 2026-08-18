@@ -29,8 +29,9 @@ function formatPlatinas(f) {
 // calcularMedidas en utils/divisionTermica.js: anchoPanel = (anchoVehiculo+40)/2),
 // cada uno con un núcleo de icopor más pequeño que el panel que lo contiene.
 // Además del corte, se marca la ubicación real de logo/placa (panel izq.),
-// ventana con marco (panel der.), reatas de amarre (siempre presentes, ver
-// insumo REATAS en calcularConsumo) y la franja de piso con pernos —
+// ventana con marco (panel der. siempre; también panel izq. cuando son 2
+// agujeros), reatas de amarre (siempre presentes, ver insumo REATAS en
+// calcularConsumo) y la franja de piso con pernos —
 // replicando la distribución de una división física (ver planos de referencia).
 const AGUJEROS_POR_OPCION = {
   "SIN AGUJERO": 0,
@@ -74,14 +75,17 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
   const nAgujeros = AGUJEROS_POR_OPCION[agujero] ?? 0;
   const medidaEspecial = agujero === "AGUJERO DIF MEDIDA";
 
-  // ── Tag logo/placa (panel izquierdo, área superior) ──
-  const tagW = Math.min(pw * 0.62, 56);
-  const tagH = tieneLogo && tienePlaca ? 20 : 12;
-  const tagX = x0 + pw * 0.6 - tagW / 2;
-  const tagY = y0 + fh * 0.08;
+  // ── Franja de piso con pernos — base de cada panel ──
+  const pisoH = fh * 0.085;
+  const pisoY = y0 + fh - pisoH;
+  const pernosPorPanel = 4;
+  const pernoMargin = pw * 0.26;
+  const pernoStep = pernosPorPanel > 1 ? (pw - pernoMargin * 2) / (pernosPorPanel - 1) : 0;
+  const pernosX = (panelX0) => Array.from({ length: pernosPorPanel }, (_, i) => panelX0 + pernoMargin + i * pernoStep);
 
-  // ── Ventana (panel derecho, área superior) — con marco cuando hay 1 agujero ──
-  const ventCx = x0 + pw + pw * 0.5;
+  // ── Ventana con marco — área superior, centrada en su panel ──
+  // Con 1 agujero va sólo la del panel derecho (la que siempre existe); con 2
+  // agujeros va una por panel, la izquierda ubicada igual dentro de su panel.
   const frameW = pw * 0.6;
   const frameTop = y0 + fh * 0.17;
   const frameH = fh * 0.32;
@@ -89,20 +93,32 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
   const crossbarY = frameTop + frameH * 0.58;
   const ventR = Math.max(4, Math.min(frameW - postW * 2, frameH * 0.58 * 2) * 0.42);
   const ventCy = frameTop + (crossbarY - frameTop) / 2;
+  const ventanaIzq = nAgujeros === 2;
+  const ventanasConMarco = [
+    ...(ventanaIzq ? [x0 + pw * 0.5] : []),
+    ...(nAgujeros === 1 || nAgujeros === 2 ? [x0 + pw + pw * 0.5] : []),
+  ];
 
-  // Circulitos simples cuando hay 2 o 4 agujeros (sin marco — no cabe bien, y se
-  // agrupan más arriba/adentro para no invadir la zona de las reatas).
+  // Circulitos simples cuando hay 4 agujeros (sin marco — no caben, y se agrupan
+  // más arriba/adentro para no invadir la zona de las reatas).
   const ventCxSimple = x0 + pw + pw * 0.58;
   const ventCySimple = y0 + fh * 0.27;
   const ventRSimple = Math.min(ventR, fh * 0.05);
   const ventOffset = ventRSimple * 1.35;
-  const ventanasSimples =
-    nAgujeros === 2 ? [[ventCxSimple - ventOffset, ventCySimple], [ventCxSimple + ventOffset, ventCySimple]] :
-    nAgujeros === 4 ? [
-      [ventCxSimple - ventOffset, ventCySimple - ventOffset], [ventCxSimple + ventOffset, ventCySimple - ventOffset],
-      [ventCxSimple - ventOffset, ventCySimple + ventOffset], [ventCxSimple + ventOffset, ventCySimple + ventOffset],
-    ] : [];
-  const ventanasSimplesTopY = ventCySimple - (nAgujeros === 4 ? ventOffset : 0) - ventRSimple;
+  const ventanasSimples = nAgujeros === 4 ? [
+    [ventCxSimple - ventOffset, ventCySimple - ventOffset], [ventCxSimple + ventOffset, ventCySimple - ventOffset],
+    [ventCxSimple - ventOffset, ventCySimple + ventOffset], [ventCxSimple + ventOffset, ventCySimple + ventOffset],
+  ] : [];
+  const ventanasSimplesTopY = ventCySimple - ventOffset - ventRSimple;
+
+  // ── Tag logo/placa (panel izquierdo) ──
+  // Si el panel izquierdo lleva ventana, el tag baja para no chocar con ella.
+  const tagW = Math.min(pw * 0.62, 56);
+  const tagH = tieneLogo && tienePlaca ? 20 : 12;
+  const tagX = x0 + pw * 0.6 - tagW / 2;
+  const tagY = ventanaIzq
+    ? Math.min(frameTop + frameH + 6, pisoY - tagH - 4)
+    : y0 + fh * 0.08;
 
   // ── Reatas de amarre — siempre presentes (insumo fijo), cerca de bordes y unión ──
   const reataW = Math.max(4, pw * 0.065);
@@ -117,14 +133,6 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
   ];
   const reataLabelX = x0 + pw * 0.5;
   const reataLabelY = y0 + fh * 0.74;
-
-  // ── Franja de piso con pernos — base de cada panel ──
-  const pisoH = fh * 0.085;
-  const pisoY = y0 + fh - pisoH;
-  const pernosPorPanel = 4;
-  const pernoMargin = pw * 0.26;
-  const pernoStep = pernosPorPanel > 1 ? (pw - pernoMargin * 2) / (pernosPorPanel - 1) : 0;
-  const pernosX = (panelX0) => Array.from({ length: pernosPorPanel }, (_, i) => panelX0 + pernoMargin + i * pernoStep);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", maxWidth: "640px", margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
@@ -182,9 +190,9 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
         </g>
       )}
 
-      {/* Ventana — panel derecho */}
-      {nAgujeros === 1 && (
-        <g>
+      {/* Ventana(s) con marco — una por panel con agujero */}
+      {ventanasConMarco.map((ventCx, i) => (
+        <g key={`vent${i}`}>
           <rect x={ventCx - frameW / 2} y={frameTop} width={postW} height={frameH} fill="white" stroke={nucleo} strokeWidth="1" />
           <rect x={ventCx + frameW / 2 - postW} y={frameTop} width={postW} height={frameH} fill="white" stroke={nucleo} strokeWidth="1" />
           <rect x={ventCx - frameW / 2 + postW} y={crossbarY} width={frameW - postW * 2} height={frameTop + frameH - crossbarY} fill="none" stroke={nucleo} strokeWidth="0.75" />
@@ -194,7 +202,7 @@ function PlanoTecnicoDivision({ anchoVehiculo, altoVehiculo, panel, icopor, logo
             VENTANA{medidaEspecial ? " (medida dif.)" : ""}
           </text>
         </g>
-      )}
+      ))}
       {ventanasSimples.map(([vx, vy], i) => (
         <circle key={i} cx={vx} cy={vy} r={ventRSimple} fill="white" stroke={nucleo} strokeWidth="1.2" />
       ))}
