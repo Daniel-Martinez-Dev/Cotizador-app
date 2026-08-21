@@ -15,10 +15,22 @@ const HOSTING_URL = 'https://cotizadorccs-38398.web.app';
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const VERSION = pkg.version;
 
+// Empaqueta el contenido de dist/ en un zip. Los archivos quedan en la raíz del
+// zip (no dentro de una carpeta "dist"), que es como el actualizador OTA espera
+// encontrarlos.
+//
+// Hay dos caminos porque las dos máquinas desde las que se publica son
+// distintas: el PC de la oficina (Windows) y el portátil (Mac).
 function crearZip(distDir, zipPath) {
   if (existsSync(zipPath)) unlinkSync(zipPath);
+  if (process.platform === 'win32') crearZipWindows(distDir, zipPath);
+  else crearZipUnix(distDir, zipPath);
+}
 
-  // Copiar dist/ a carpeta temporal fuera de OneDrive para evitar bloqueos de archivos
+// En Windows se copia dist/ a una carpeta temporal antes de comprimir: el
+// proyecto vive en OneDrive y Compress-Archive falla si OneDrive tiene algún
+// archivo tomado mientras sincroniza.
+function crearZipWindows(distDir, zipPath) {
   const tmpDir = join(tmpdir(), `cotizador-deploy-${Date.now()}`);
   // robocopy devuelve códigos 0-7 en éxito — capturar el error solo si código >= 8
   try {
@@ -34,6 +46,17 @@ function crearZip(distDir, zipPath) {
 
   // Limpiar temporal
   try { execSync(`rmdir /S /Q "${tmpDir}"`, { stdio: 'pipe' }); } catch {}
+}
+
+// En Mac/Linux se comprime directamente desde dist/ con `zip`, que viene con el
+// sistema. Se excluye updates/ por si quedó de una publicación anterior: el
+// bundle no puede contener una copia de sí mismo.
+function crearZipUnix(distDir, zipPath) {
+  try {
+    execSync(`zip -r -q "${zipPath}" . -x "updates/*"`, { cwd: distDir, stdio: 'pipe' });
+  } catch (e) {
+    throw new Error(`No se pudo comprimir dist/: ${e.stderr?.toString() || e.message}`);
+  }
 }
 
 async function main() {
