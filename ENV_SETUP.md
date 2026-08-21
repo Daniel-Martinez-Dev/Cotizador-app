@@ -17,35 +17,47 @@ cp .env.example .env
 
 ```javascript
 const firebaseConfig = {
-  apiKey: "AIzaSyBFIrsU54TWKOXZCLAn5eUyAib3McHhBeY",        ← Copia esto
-  authDomain: "cotizadorccs-38398.firebaseapp.com",         ← Y esto
-  projectId: "cotizadorccs-38398",                          ← Y esto
-  storageBucket: "cotizadorccs-38398.firebasestorage.app",  ← Etc...
-  messagingSenderId: "635864265146",
-  appId: "1:635864265146:web:81160bb537d67792f06d83",
-  measurementId: "G-LSJQ1Q47ZV"
+  apiKey: "AIza...",                    ← Copia esto
+  authDomain: "....firebaseapp.com",    ← Y esto
+  projectId: "...",                     ← Y esto
+  storageBucket: "....firebasestorage.app",
+  messagingSenderId: "...",
+  appId: "1:...:web:...",
+  measurementId: "G-..."
 };
 ```
+
+Los valores reales se copian de la consola, no de este documento: aquí no se
+escriben para que el repositorio no los cargue.
 
 ### 3. Rellena tu `.env` local
 Abre `.env` (que acabas de crear) y completa así:
 
 ```env
-# Firebase (client config)
-VITE_FIREBASE_API_KEY=AIzaSyBFIrsU54TWKOXZCLAn5eUyAib3McHhBeY
-VITE_FIREBASE_AUTH_DOMAIN=cotizadorccs-38398.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=cotizadorccs-38398
-VITE_FIREBASE_STORAGE_BUCKET=cotizadorccs-38398.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=635864265146
-VITE_FIREBASE_APP_ID=1:635864265146:web:81160bb537d67792f06d83
-VITE_FIREBASE_MEASUREMENT_ID=G-LSJQ1Q47ZV
+# Firebase (client config) — pega aquí los valores de tu consola
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_MEASUREMENT_ID=
 
-# Auth / feature flags (deja así por defecto)
-VITE_REQUIRE_LOGIN=false
-VITE_ANON_AUTH=true
+# Auth — así va la app interna: login obligatorio y sin sesiones anónimas.
+# Solo el cotizador público se compila al revés, y para eso está el script
+# "build:public", que pone los flags él mismo. No los cambies a mano aquí.
+VITE_REQUIRE_LOGIN=true
+VITE_ANON_AUTH=false
 VITE_BOOTSTRAP_ADMIN_EMAIL=
+VITE_ADMIN_EMAIL=
 VITE_ENABLE_PRODUCCION=true
 VITE_ENABLE_INVENTARIO=true
+
+# Cloudinary — sin esto no se pueden subir imágenes (fotos de producto, foto de
+# perfil y registro fotográfico de las fichas). El preset debe ser "unsigned";
+# el API Secret de Cloudinary NUNCA va aquí.
+VITE_CLOUDINARY_CLOUD_NAME=
+VITE_CLOUDINARY_UPLOAD_PRESET=
 ```
 
 ### 4. Reinicia tu servidor Vite
@@ -62,6 +74,14 @@ El error desaparecerá una vez tengas `.env` completo.
 ✅ `.env` está en `.gitignore` (no será commitado)
 ✅ `.env.example` no tiene valores (está en Git como referencia)
 ✅ Nunca compartas tu `.env` con nadie
+✅ El API Secret de Cloudinary no se usa en la app y no debe estar en el `.env`
+
+Sobre la llave de Firebase: no es un secreto. Identifica el proyecto y viaja en
+el JavaScript de cualquier app web de Firebase, así que quien abra la app puede
+leerla. Lo que protege los datos son las reglas de Firestore y el login
+obligatorio, no ocultarla. Aun así no se escribe en el repositorio, y conviene
+restringirla por dominio desde Google Cloud Console (APIs y servicios →
+Credenciales → restricción por referente HTTP).
 
 ---
 
