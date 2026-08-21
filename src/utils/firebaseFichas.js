@@ -252,9 +252,7 @@ export async function registrarEntregaFicha(tipo, id, {
     fecha: fechaLimpia,
     placas: (placas || "").toString().trim().toUpperCase(),
     recibidoPor: (recibidoPor || "").toString().trim(),
-    fotos: (Array.isArray(fotos) ? fotos : [])
-      .filter((f) => f?.url && f?.path)
-      .map((f) => ({ url: f.url, path: f.path, nombre: f.nombre || "" })),
+    fotos: normalizarFotos(fotos),
     registradoPor: { uid: autorUid || "", nombre: autorNombre || "" },
     registradoEn: Timestamp.now(),
   };

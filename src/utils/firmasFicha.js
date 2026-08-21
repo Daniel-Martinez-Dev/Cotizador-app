@@ -116,10 +116,18 @@ export function claveNombre(nombre) {
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+// Lo único imprescindible de una foto es su URL: es lo que se muestra. El
+// `publicId` es su identificador en Cloudinary y se guarda para poder dar con
+// el archivo desde la consola —borrarlo exige firma y no se hace desde la app
+// (ver cloudinary.js)—, así que se acarrea solo cuando viene.
 export function normalizarFotos(fotos) {
   return (Array.isArray(fotos) ? fotos : [])
-    .filter((f) => f?.url && f?.path)
-    .map((f) => ({ url: f.url, path: f.path, nombre: f.nombre || "" }));
+    .filter((f) => f?.url)
+    .map((f) => {
+      const foto = { url: f.url, nombre: f.nombre || "" };
+      if (f.publicId) foto.publicId = f.publicId;
+      return foto;
+    });
 }
 
 // Un bloque de firma ya guardado, listo para pintar. Devuelve null cuando la

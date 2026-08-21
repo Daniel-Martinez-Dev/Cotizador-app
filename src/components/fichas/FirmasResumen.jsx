@@ -87,7 +87,7 @@ function BloqueFirma({ etapa, firma, onEditar }) {
       {firma.fotos.length > 0 && (
         <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 mt-2">
           {firma.fotos.map((f) => (
-            <a key={f.path} href={f.url} target="_blank" rel="noreferrer"
+            <a key={f.url} href={f.url} target="_blank" rel="noreferrer"
               className="block aspect-square rounded-md overflow-hidden border border-gray-200 dark:border-gris-600"
               title={f.nombre || "Evidencia del alistado"}>
               <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />

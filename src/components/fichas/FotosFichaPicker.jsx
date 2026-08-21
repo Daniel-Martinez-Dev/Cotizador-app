@@ -66,7 +66,7 @@ export default function FotosFichaPicker({
         <div className="grid grid-cols-4 gap-2 mb-2">
           {existentes.map((f, i) => (
             <Miniatura
-              key={f.path}
+              key={f.url}
               src={f.url}
               onQuitar={onQuitarExistente ? () => onQuitarExistente(i) : null}
               disabled={disabled}

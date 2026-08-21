@@ -11,6 +11,7 @@ import {
   getConfigProducto,
 } from '../data/catalogoProductos';
 import { generarCondicionesComerciales } from './htmlSections';
+import { cloudinaryConfigurado, subirImagenCloudinary } from './cloudinary';
 
 const COLECCION = 'productos';
 
@@ -55,17 +56,12 @@ export async function guardarProducto(id, data) {
 }
 
 // Sube un archivo a Cloudinary. Retorna la URL pública.
-export async function subirFotoProducto(_productoId, file) {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !uploadPreset) throw new Error('Credenciales de Cloudinary no configuradas (VITE_CLOUDINARY_CLOUD_NAME / VITE_CLOUDINARY_UPLOAD_PRESET)');
-  const form = new FormData();
-  form.append('file', file);
-  form.append('upload_preset', uploadPreset);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`Cloudinary error ${res.status}: ${json?.error?.message || JSON.stringify(json)}`);
-  return json.secure_url;
+export async function subirFotoProducto(productoId, file) {
+  const { url } = await subirImagenCloudinary(file, {
+    carpeta: `productos/${productoId || 'sin-id'}`,
+    nombre: file?.name || 'producto.jpg',
+  });
+  return url;
 }
 
 // Construye la lista de extras por producto (propios + universales sin duplicar)
@@ -151,9 +147,9 @@ function buildSeedDoc(etiqueta, orden) {
 // Sube las imágenes locales de un producto a Cloudinary y actualiza Firestore.
 // imageUrls: array de URLs (import de Vite). onProgress(actual, total) opcional.
 export async function migrarImagenesProducto(productoId, imageUrls, onProgress) {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !uploadPreset) throw new Error('Credenciales de Cloudinary no configuradas');
+  // Se comprueba antes de empezar: la migración sube decenas de imágenes y no
+  // tiene sentido descubrir a media tanda que faltan las credenciales.
+  if (!cloudinaryConfigurado()) throw new Error('Credenciales de Cloudinary no configuradas');
 
   const urls = [];
   for (let i = 0; i < imageUrls.length; i++) {

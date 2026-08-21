@@ -7,6 +7,7 @@ import {
   firmaDeEtapa,
   firmasDeFicha,
   nombresFirma,
+  normalizarFotos,
   normalizarPersonasFirma,
   resumenFirma,
 } from "./firmasFicha";
@@ -44,6 +45,35 @@ describe("normalizarPersonasFirma", () => {
   it("aguanta lo que no es una lista", () => {
     expect(normalizarPersonasFirma(undefined)).toEqual([]);
     expect(normalizarPersonasFirma(null)).toEqual([]);
+  });
+});
+
+// Las fotos se subían a Firebase Storage y se guardaban con su `path` para
+// poder borrarlas. Ahora van a Cloudinary, que no permite borrar desde el
+// cliente, y traen `publicId` en vez de `path`. El filtro exigía `path`: si se
+// hubiera quedado así, cada foto nueva se habría descartado al guardarla sin
+// que nada fallara.
+describe("normalizarFotos", () => {
+  it("conserva la foto con su identificador de Cloudinary", () => {
+    expect(normalizarFotos([
+      { url: "https://res.cloudinary.com/x/1.jpg", publicId: "fichas/a/1", nombre: "IMG_1.jpg" },
+    ])).toEqual([
+      { url: "https://res.cloudinary.com/x/1.jpg", publicId: "fichas/a/1", nombre: "IMG_1.jpg" },
+    ]);
+  });
+
+  it("no descarta una foto que solo trae URL", () => {
+    expect(normalizarFotos([{ url: "https://x/1.jpg" }]))
+      .toEqual([{ url: "https://x/1.jpg", nombre: "" }]);
+  });
+
+  it("descarta lo que no tiene URL, que es lo único imprescindible", () => {
+    expect(normalizarFotos([{ nombre: "sin url" }, { url: "" }, null])).toEqual([]);
+  });
+
+  it("aguanta lo que no es una lista", () => {
+    expect(normalizarFotos(undefined)).toEqual([]);
+    expect(normalizarFotos(null)).toEqual([]);
   });
 });
 

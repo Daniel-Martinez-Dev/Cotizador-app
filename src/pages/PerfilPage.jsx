@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import FirmaPad from "../components/perfil/FirmaPad";
 import AvatarPerfil from "../components/perfil/AvatarPerfil";
 import { authErrorMsg } from "../utils/authErrores";
-import { borrarFotoPerfil, subirFotoPerfil } from "../utils/fotoPerfil";
+import { subirFotoPerfil } from "../utils/fotoPerfil";
 
 // "Mi perfil" — lo que cada persona puede cambiar de su propia cuenta: foto,
 // nombre, contraseña y firma.
@@ -93,14 +93,10 @@ export default function PerfilPage() {
     if (!archivo) return;
     if (!archivo.type?.startsWith("image/")) return toast.error("Elige una imagen");
 
-    const anterior = profile?.fotoPath || "";
     setSubiendoFoto(true);
     try {
-      const { url, path } = await subirFotoPerfil(user.uid, archivo);
-      await actualizarMiPerfil({ fotoURL: url, fotoPath: path });
-      // La anterior se borra solo cuando la nueva ya quedó guardada: al revés,
-      // un fallo a mitad de camino dejaría al usuario sin ninguna.
-      if (anterior) await borrarFotoPerfil(anterior);
+      const { url, publicId } = await subirFotoPerfil(user.uid, archivo);
+      await actualizarMiPerfil({ fotoURL: url, fotoPath: publicId });
       toast.success("Foto actualizada");
     } catch (err) {
       console.error(err);
@@ -110,12 +106,12 @@ export default function PerfilPage() {
     }
   };
 
+  // Quita la foto del perfil. El archivo sigue en Cloudinary —no se puede
+  // borrar sin firma— pero deja de mostrarse en toda la app.
   const quitarFoto = async () => {
-    const anterior = profile?.fotoPath || "";
     setSubiendoFoto(true);
     try {
       await actualizarMiPerfil({ fotoURL: "", fotoPath: "" });
-      if (anterior) await borrarFotoPerfil(anterior);
       toast.success("Foto quitada");
     } catch (e) {
       console.error(e);

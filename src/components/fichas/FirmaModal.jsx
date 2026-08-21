@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { FaTimes, FaCheckCircle, FaLock } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { getFichaTipoConfig, registrarFirmaAlistado } from "../../utils/firebaseFichas";
-import { subirFotosFicha, borrarFotoFicha } from "../../utils/fotosFicha";
+import { subirFotosFicha } from "../../utils/fotosFicha";
 import { ETAPAS_FIRMA, ROL_CORRIGE_FIRMAS, firmaDeEtapa, hoyISO } from "../../utils/firmasFicha";
 import PersonasFirmaPicker from "./PersonasFirmaPicker";
 import FotosFichaPicker from "./FotosFichaPicker";
@@ -42,10 +42,11 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
   const [guardando, setGuardando] = React.useState(false);
   const [progreso, setProgreso] = React.useState(null);
 
-  const quitarExistente = async (idx) => {
-    const foto = existentes[idx];
+  // Quitar una foto la saca de la ficha al guardar; el archivo se queda en
+  // Cloudinary, que no permite borrar sin firma (ver cloudinary.js). Para la
+  // ficha —que es lo que se consulta y se imprime— el efecto es el mismo.
+  const quitarExistente = (idx) => {
     setExistentes((prev) => prev.filter((_, i) => i !== idx));
-    await borrarFotoFicha(foto.path);
   };
 
   const confirmar = async () => {

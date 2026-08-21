@@ -1,3 +1,12 @@
+// ⚠️ INACTIVO — Firebase Storage no está habilitado en este proyecto y la app
+// no lo usa: todas las imágenes (productos, foto de perfil y registro
+// fotográfico de las fichas) van a Cloudinary. Ver src/utils/cloudinary.js.
+//
+// Este archivo se conserva por si algún día se activa Storage. Para volver a
+// usarlo hacen falta tres cosas: habilitar Storage en la consola de Firebase
+// (puede exigir plan Blaze), devolver el bloque "storage" a firebase.json, y
+// desplegar con `firebase deploy --only storage`.
+
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
