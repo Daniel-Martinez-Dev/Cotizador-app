@@ -24,7 +24,13 @@ import {
   actualizarMovimientoInventario,
   eliminarMovimientoInventario,
   obtenerProveedorPorId,
+  asignarCodigosMaterialFaltantes,
+  buscarItemPorCodigo,
 } from "../utils/firebaseInventory";
+import EscanerCodigoModal from "../components/inventario/EscanerCodigoModal";
+import EtiquetasMaterialModal from "../components/inventario/EtiquetasMaterialModal";
+import CodigoBarrasMaterial from "../components/inventario/CodigoBarrasMaterial";
+import { buscarItemPorCodigoEnLista, itemNecesitaCodigos } from "../utils/codigoMaterial";
 
 export default function InventarioPage() {
   const { confirm } = useQuote();
@@ -51,7 +57,7 @@ export default function InventarioPage() {
     materiaPrimaItemIds: [], // inventario_items ids
   });
   const [editingProveedorId, setEditingProveedorId] = React.useState("");
-  const [itemForm, setItemForm] = React.useState({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
+  const [itemForm, setItemForm] = React.useState({ sku: "", codigoBarras: "", codigoSecuencia: 0, nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
   const [editingItemId, setEditingItemId] = React.useState("");
   const [productoSearch, setProductoSearch] = React.useState("");
   const [provMateriaSearch, setProvMateriaSearch] = React.useState("");
@@ -67,7 +73,7 @@ export default function InventarioPage() {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [itemsSearch, setItemsSearch] = React.useState("");
-  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "" });
+  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "" });
   const [movimientosOpenItemId, setMovimientosOpenItemId] = React.useState("");
   const [movimientosLoadingItemId, setMovimientosLoadingItemId] = React.useState("");
   const [movimientosCache, setMovimientosCache] = React.useState({}); // itemId -> movimientos[]
@@ -85,6 +91,11 @@ export default function InventarioPage() {
   const [movGeneralLoading, setMovGeneralLoading] = React.useState(false);
   const [movGeneralSearch, setMovGeneralSearch] = React.useState("");
   const [movGeneral, setMovGeneral] = React.useState([]);
+  const [escanerAbierto, setEscanerAbierto] = React.useState(false);
+  const [escanerError, setEscanerError] = React.useState("");
+  const [buscandoCodigo, setBuscandoCodigo] = React.useState(false);
+  const [showEtiquetas, setShowEtiquetas] = React.useState(false);
+  const [generandoCodigos, setGenerandoCodigos] = React.useState(false);
   const [editingMovId, setEditingMovId] = React.useState("");
   const [editingMovForm, setEditingMovForm] = React.useState({ tipo: "ingreso", cantidad: 1, nota: "" });
 
@@ -201,7 +212,7 @@ export default function InventarioPage() {
   };
 
   const resetItemForm = () => {
-    setItemForm({ sku: "", nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
+    setItemForm({ sku: "", codigoBarras: "", codigoSecuencia: 0, nombre: "", productoTipos: [], categoria: "", unidad: "", stockActual: "", stockMinimo: "", ubicacion: "", costoUnitario: "", proveedorId: "", proveedorIds: [], fotoDataUrl: "", fotoFileName: "", fotoMimeType: "" });
     setEditingItemId("");
     setProductoSearch("");
     setProveedorSearch("");
@@ -335,6 +346,8 @@ export default function InventarioPage() {
 
       const payload = {
         sku: itemForm.sku,
+        codigoBarras: itemForm.codigoBarras,
+        codigoSecuencia: itemForm.codigoSecuencia,
         nombre: itemForm.nombre,
         productoTipos: itemForm.productoTipos,
         categoria: itemForm.categoria,
@@ -380,6 +393,8 @@ export default function InventarioPage() {
 
     setItemForm({
       sku: item.sku || "",
+      codigoBarras: item.codigoBarras || "",
+      codigoSecuencia: Number(item.codigoSecuencia || 0),
       nombre: item.nombre || "",
       productoTipos,
       categoria: item.categoria || "",
@@ -667,6 +682,7 @@ export default function InventarioPage() {
       const blob = [
         i.nombre,
         i.sku,
+        i.codigoBarras,
         i.categoria,
         i.unidad,
         i.ubicacion,
@@ -685,6 +701,11 @@ export default function InventarioPage() {
       return minimo > 0 && actual < minimo;
     });
   }, [items]);
+
+  const itemsSinCodigo = React.useMemo(
+    () => (Array.isArray(items) ? items : []).filter(itemNecesitaCodigos).length,
+    [items]
+  );
 
   const sortedItems = React.useMemo(() => {
     const list = Array.isArray(filteredItems) ? filteredItems.slice() : [];
@@ -765,7 +786,7 @@ export default function InventarioPage() {
     });
   }, [selectedProveedor, items]);
 
-  const startMovimiento = (item, tipo) => {
+  const startMovimiento = (item, tipo, codigoLeido = "") => {
     const ids = Array.isArray(item.proveedorIds)
       ? item.proveedorIds
       : (item.proveedorId ? [item.proveedorId] : []);
@@ -776,13 +797,71 @@ export default function InventarioPage() {
       nota: "",
       proveedorId: ids[0] || "",
       costoUnitario: tipo === "ingreso" ? String(Number(item.costoUnitario ?? "")) : "",
+      codigoLeido,
     });
     setShowMovimientoModal(true);
   };
 
   const cancelMovimiento = () => {
-    setMov({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "" });
+    setMov({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "" });
     setShowMovimientoModal(false);
+  };
+
+  // Un código leído se busca primero en la lista ya cargada y, si no está ahí
+  // (el listado se corta en 200 materiales), se pregunta al servidor.
+  const manejarCodigoEscaneado = async (codigo) => {
+    setEscanerError("");
+    let item = buscarItemPorCodigoEnLista(items, codigo);
+    if (!item) {
+      setBuscandoCodigo(true);
+      try {
+        item = await buscarItemPorCodigo(codigo);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setBuscandoCodigo(false);
+      }
+    }
+    if (!item) {
+      setEscanerError(`Ningún material tiene el código ${codigo}.`);
+      return;
+    }
+    // El material queda seleccionado y con su ficha abierta: desde ahí se
+    // registra el ingreso o la salida, que es lo que el lector no puede decidir.
+    setEscanerAbierto(false);
+    setActiveTab("materiales");
+    setSelectedProveedorId("");
+    setSelectedItemId(item.id);
+    ensureMovimientosForItem(item.id);
+    toast.success(`Material: ${item.nombre || codigo}`);
+  };
+
+  // Etiquetado inicial del inventario: el catálogo existía desde antes de que
+  // hubiera códigos, así que hay que poder marcar de golpe todo lo que aún no
+  // los tiene. Los que ya están etiquetados no se tocan, para no invalidar
+  // etiquetas ya pegadas en la bodega.
+  const generarCodigosFaltantes = async () => {
+    const pendientes = items.filter(itemNecesitaCodigos);
+    if (pendientes.length === 0) {
+      toast.success("Todos los materiales ya tienen SKU y código de barras");
+      return;
+    }
+    const ok = await confirm(
+      `Se asignará SKU y código de barras a ${pendientes.length} material(es) que aún no lo tienen. Los que ya están etiquetados no cambian. ¿Continuar?`
+    );
+    if (!ok) return;
+
+    setGenerandoCodigos(true);
+    try {
+      const { actualizados } = await asignarCodigosMaterialFaltantes(items);
+      toast.success(`${actualizados} material(es) etiquetado(s)`);
+      await load();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.message || "No se pudieron generar los códigos");
+    } finally {
+      setGenerandoCodigos(false);
+    }
   };
 
   const submitMovimiento = async (e) => {
@@ -802,6 +881,7 @@ export default function InventarioPage() {
         nota: mov.nota,
         proveedorId: mov.tipo === "ingreso" ? mov.proveedorId : "",
         costoUnitario: mov.tipo === "ingreso" ? Number(mov.costoUnitario || 0) : 0,
+        codigoLeido: mov.codigoLeido,
       });
       toast.success(mov.tipo === 'salida' ? 'Salida registrada' : 'Ingreso registrado');
       // refrescar historial si está abierto
@@ -874,10 +954,41 @@ export default function InventarioPage() {
           <Button
             variant="secondary"
             size="sm"
+            onClick={() => { setEscanerError(""); setEscanerAbierto(true); }}
+          >
+            Escanear código
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => { resetProveedorForm(); setShowProveedorModal(true); setActiveTab("proveedores"); }}
           >
             Nuevo proveedor
           </Button>
+          {activeTab === "materiales" && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={generarCodigosFaltantes}
+                disabled={generandoCodigos || loading}
+              >
+                {generandoCodigos
+                  ? "Generando…"
+                  : itemsSinCodigo > 0
+                    ? `Generar códigos (${itemsSinCodigo})`
+                    : "Generar códigos"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowEtiquetas(true)}
+                disabled={loading}
+              >
+                Imprimir etiquetas
+              </Button>
+            </>
+          )}
           {activeTab === "movimientos" && (
             <Button
               variant="secondary"
@@ -889,6 +1000,18 @@ export default function InventarioPage() {
           )}
         </div>
       </div>
+
+      {itemsSinCodigo > 0 && !loading && (
+        <div className="mt-4 rounded-lg border border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20 px-4 py-3">
+          <div className="text-sm font-medium text-sky-900 dark:text-sky-100">
+            {itemsSinCodigo} material(es) sin código de barras
+          </div>
+          <div className="text-xs text-sky-800 dark:text-sky-200 mt-1">
+            Sin código no se pueden identificar con el lector al registrar entradas
+            y salidas. Usa <strong>Generar códigos</strong> y luego imprime las etiquetas.
+          </div>
+        </div>
+      )}
 
       {lowStockItems.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
@@ -1495,7 +1618,26 @@ export default function InventarioPage() {
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">SKU</label>
               <input value={itemForm.sku} onChange={(e)=>setItemForm(p=>({...p, sku:e.target.value}))}
-                className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700" />
+                className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700"
+                placeholder="Se genera solo al guardar" />
+              <div className="text-[11px] opacity-70 mt-1">
+                Si lo dejas vacío se asigna automáticamente junto con el código de barras.
+              </div>
+            </div>
+            {/* El código de barras no se edita a mano: sale del consecutivo de
+                materiales y lleva dígito verificador. Se muestra para poder
+                cotejarlo contra la etiqueta pegada en la estantería. */}
+            <div>
+              <label className="text-xs text-gray-600 dark:text-gray-300">Código de barras</label>
+              {itemForm.codigoBarras ? (
+                <div className="mt-1 rounded border border-gray-300 dark:border-gris-600 bg-white p-2">
+                  <CodigoBarrasMaterial codigo={itemForm.codigoBarras} modulo={2} altoBarras={44} />
+                </div>
+              ) : (
+                <div className="mt-1 px-3 py-2 rounded border border-dashed border-gray-300 dark:border-gris-600 text-xs opacity-70">
+                  Se genera automáticamente al guardar el material.
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-600 dark:text-gray-300">Categoría</label>
@@ -1635,6 +1777,24 @@ export default function InventarioPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {escanerAbierto && (
+        <EscanerCodigoModal
+          titulo="Buscar material por código"
+          descripcion="Escanea la etiqueta o dispara el lector para abrir la ficha del material."
+          error={escanerError}
+          ocupado={buscandoCodigo}
+          onDetect={manejarCodigoEscaneado}
+          onClose={() => { setEscanerAbierto(false); setEscanerError(""); }}
+        />
+      )}
+
+      {showEtiquetas && (
+        <EtiquetasMaterialModal
+          items={sortedItems}
+          onClose={() => setShowEtiquetas(false)}
+        />
       )}
     </div>
   );

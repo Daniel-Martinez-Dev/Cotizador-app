@@ -14,13 +14,18 @@ const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+  // La cámara queda habilitada solo para la propia app: es lo que usa el
+  // lector de códigos de barras del inventario (ver utils/escanerCodigo.js).
+  // Con `camera=()` el navegador bloquea getUserMedia y el escáner nunca abre.
+  'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https: https://lh3.googleusercontent.com https://res.cloudinary.com",
+    // mediastream: es el vídeo en vivo de la cámara del escáner de códigos.
+    "media-src 'self' data: blob: mediastream:",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' data: blob: https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://api.cloudinary.com",
     "frame-src https://accounts.google.com https://*.firebaseapp.com",

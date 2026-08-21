@@ -21,8 +21,14 @@ import { claveNombre, normalizarPersonasFirma } from "../../utils/firmasFicha";
 //     puede escribir un nombre a mano. Esos quedan con uid vacío (ver
 //     normalizarPersonasFirma) — pero escribir el nombre de un usuario de
 //     producción tampoco vale: se rechaza al agregarlo.
+//
+// Al marcar a alguien se copia también la firma que dibujó en su perfil (ver
+// PerfilPage), que es la que sale impresa sobre su línea en la ficha. Quien no
+// la tenga dibujada firma a mano sobre el papel, como siempre.
 
 const nombreDe = (u) => u.displayName || u.email || u.id;
+
+const firmanteDe = (u) => ({ uid: u.id, nombre: nombreDe(u), firma: u.firmaDataUrl || "" });
 
 const esEmpleado = (u) => Array.isArray(u.roles) && u.roles.includes("empleado");
 
@@ -87,7 +93,7 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
     onChange(
       seleccionados.has(uid)
         ? personas.filter((p) => p.uid !== uid)
-        : normalizarPersonasFirma([...personas, { uid, nombre: nombreDe(u) }])
+        : normalizarPersonasFirma([...personas, firmanteDe(u)])
     );
   };
 
@@ -138,6 +144,14 @@ export default function PersonasFirmaPicker({ personas, onChange, disabled }) {
                   className="h-4 w-4 shrink-0"
                 />
                 <span className="truncate">{nombreDe(u)}</span>
+                {u.firmaDataUrl && (
+                  <img
+                    src={u.firmaDataUrl}
+                    alt=""
+                    title="Firma esta ficha con su firma dibujada"
+                    className="ml-auto h-5 w-auto max-w-[70px] object-contain shrink-0 dark:invert"
+                  />
+                )}
                 {u.id === user?.uid && !esEmpleado(u) && (
                   <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-gray-400">Tú</span>
                 )}

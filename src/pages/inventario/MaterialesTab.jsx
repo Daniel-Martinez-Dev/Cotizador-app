@@ -5,6 +5,7 @@ import Badge from "../../components/ui/Badge";
 import { listarMovimientosPorItem } from "../../utils/firebaseInventory";
 import { dataUrlSizeLabel } from "../../utils/imageCompress";
 import { toggleSort, sortArrow, formatCOP, formatMovimientoFecha } from "./inventarioUtils";
+import CodigoBarrasMaterial from "../../components/inventario/CodigoBarrasMaterial";
 
 // Pestaña "Materiales": listado + ficha de detalle del item seleccionado.
 // El estado (items, selección, caché de movimientos) vive en InventarioPage;
@@ -249,6 +250,9 @@ export default function MaterialesTab({
                         <div className="text-xs opacity-70 mt-1">
                           SKU: {selectedItem.sku || '—'}{selectedItem.categoria ? ` · Cat: ${selectedItem.categoria}` : ''}{selectedItem.ubicacion ? ` · Ubic: ${selectedItem.ubicacion}` : ''}
                         </div>
+                        <div className="text-xs opacity-70 font-mono">
+                          Código: {selectedItem.codigoBarras || '— sin asignar'}
+                        </div>
                       </div>
 
                       <div className="p-4 overflow-y-auto max-h-[calc(100vh-10rem)] overscroll-contain">
@@ -288,6 +292,14 @@ export default function MaterialesTab({
                             </div>
                             <div className="text-xs opacity-70 mt-1">Productos: {Array.isArray(selectedItem.productoTipos) ? (selectedItem.productoTipos.filter(Boolean).join(' · ') || '—') : (selectedItem.productoTipo || '—')}</div>
                           </div>
+                        </div>
+
+                        {/* La etiqueta tal como debe verse pegada en la
+                            estantería: sirve para cotejar a ojo que la que está
+                            puesta es la de este material. */}
+                        <div className="mt-3 rounded border border-gray-200 dark:border-gris-700 bg-white p-3 inline-block">
+                          <div className="text-[11px] text-gray-600 mb-1">Etiqueta del material</div>
+                          <CodigoBarrasMaterial codigo={selectedItem.codigoBarras} modulo={2} altoBarras={50} />
                         </div>
 
                         {selectedItem.fotoDataUrl ? (

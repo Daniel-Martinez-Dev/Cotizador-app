@@ -23,6 +23,9 @@ const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 1.5;
 
+const clampZoom = (v) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v));
+const separacion = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
 export default function FichaImpresionShell({
   productLabel,
   numero,
@@ -78,7 +81,161 @@ export default function FichaImpresionShell({
   const scale = zoom ?? fitScale;
   const necesitaZoom = fitScale < 0.995; // pantalla más angosta que la ficha
 
-  const aplicarZoom = (nuevo) => setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, nuevo)));
+  const aplicarZoom = (nuevo) => setZoom(clampZoom(nuevo));
+
+  // ── Zoom con los dedos ───────────────────────────────────────────────────
+  // El WebView de Android trae desactivado el pinch-to-zoom nativo (Capacitor
+  // lo controla con android.zoomEnabled, que por defecto es false), así que en
+  // el celular la ficha solo se podía acercar con los botones de la barra. El
+  // visor atiende el gesto por su cuenta: se acerca únicamente la ficha —la
+  // barra de acciones no se deforma— y funciona igual en Android, en el
+  // navegador y en el escritorio (Ctrl/⌘ + rueda o pellizco en el trackpad).
+  const scaleRef = React.useRef(1);
+  const contentWidthRef = React.useRef(designWidth);
+  const pendingScrollRef = React.useRef(null);
+  const [mostrarPista, setMostrarPista] = React.useState(true);
+
+  // El scroll se ajusta después de pintar: `scale` es estado, así que en el
+  // momento del gesto el contenedor todavía tiene el tamaño anterior.
+  React.useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const pendiente = pendingScrollRef.current;
+    if (viewport && pendiente) {
+      pendingScrollRef.current = null;
+      viewport.scrollLeft = pendiente.left;
+      viewport.scrollTop = pendiente.top;
+    }
+    scaleRef.current = scale;
+    contentWidthRef.current = contentSize.width;
+  });
+
+  React.useEffect(() => {
+    if (!mostrarPista) return undefined;
+    const t = setTimeout(() => setMostrarPista(false), 5000);
+    return () => clearTimeout(t);
+  }, [mostrarPista]);
+
+  React.useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    // Cuando la ficha es más angosta que el visor queda centrada por el
+    // `margin: 0 auto`; ese margen entra en la conversión pantalla ↔ contenido.
+    const margenH = (escala) => Math.max(0, (viewport.clientWidth - contentWidthRef.current * escala) / 2);
+
+    const relativoAlVisor = (x, y) => {
+      const rect = viewport.getBoundingClientRect();
+      return { x: x - rect.left, y: y - rect.top };
+    };
+
+    const puntoMedio = (t0, t1) => relativoAlVisor((t0.clientX + t1.clientX) / 2, (t0.clientY + t1.clientY) / 2);
+
+    // Punto de la ficha (en sus propias coordenadas) que hay bajo un punto de la pantalla.
+    const enContenido = (punto, escala) => ({
+      x: (viewport.scrollLeft + punto.x - margenH(escala)) / escala,
+      y: (viewport.scrollTop + punto.y) / escala,
+    });
+
+    // Deja quieto en pantalla el punto que el usuario tiene entre los dedos;
+    // sin esto la ficha "se escapa" del encuadre al acercar.
+    const anclar = (punto, escalaNueva, foco) => {
+      pendingScrollRef.current = {
+        left: foco.x * escalaNueva - punto.x + margenH(escalaNueva),
+        top: foco.y * escalaNueva - punto.y,
+      };
+    };
+
+    const zoomHacia = (punto, escalaNueva) => {
+      const actual = scaleRef.current;
+      if (Math.abs(escalaNueva - actual) < 0.0005) return;
+      anclar(punto, escalaNueva, enContenido(punto, actual));
+      setMostrarPista(false);
+      setZoom(escalaNueva);
+    };
+
+    let pinch = null;
+    let tapInicio = null;
+    let tapPrevio = null;
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        tapInicio = null;
+        const punto = puntoMedio(e.touches[0], e.touches[1]);
+        pinch = {
+          dist: separacion(e.touches[0], e.touches[1]),
+          escala: scaleRef.current,
+          foco: enContenido(punto, scaleRef.current),
+        };
+        return;
+      }
+      pinch = null;
+      tapInicio = e.touches.length === 1
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }
+        : null;
+    };
+
+    const onTouchMove = (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      // Sin esto el WebView se queda con el gesto y lo trata como desplazamiento.
+      e.preventDefault();
+      const dist = separacion(e.touches[0], e.touches[1]);
+      if (!pinch.dist || !dist) return;
+      const escalaNueva = clampZoom(pinch.escala * (dist / pinch.dist));
+      const punto = puntoMedio(e.touches[0], e.touches[1]);
+      anclar(punto, escalaNueva, pinch.foco);
+      setMostrarPista(false);
+      setZoom(escalaNueva);
+    };
+
+    // Doble toque: alterna entre ajustar al ancho y tamaño real (1:1), que es
+    // como se lee la letra pequeña de las medidas sin tener que pellizcar.
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) pinch = null;
+      if (e.touches.length > 0 || e.changedTouches.length !== 1) return;
+
+      const t = e.changedTouches[0];
+      const ahora = Date.now();
+      const fueTap = tapInicio
+        && ahora - tapInicio.t < 300
+        && Math.hypot(t.clientX - tapInicio.x, t.clientY - tapInicio.y) < 14;
+      tapInicio = null;
+      if (!fueTap) { tapPrevio = null; return; }
+
+      const esDoble = tapPrevio
+        && ahora - tapPrevio.t < 320
+        && Math.hypot(t.clientX - tapPrevio.x, t.clientY - tapPrevio.y) < 40;
+      if (!esDoble) {
+        tapPrevio = { x: t.clientX, y: t.clientY, t: ahora };
+        return;
+      }
+
+      tapPrevio = null;
+      e.preventDefault();
+      setMostrarPista(false);
+      if (scaleRef.current < 0.995) zoomHacia(relativoAlVisor(t.clientX, t.clientY), 1);
+      else setZoom(null); // volver a ajustar al ancho
+    };
+
+    // Trackpad y rueda del mouse: el pellizco del trackpad llega como ctrl+wheel.
+    const onWheel = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomHacia(relativoAlVisor(e.clientX, e.clientY), clampZoom(scaleRef.current * Math.exp(-e.deltaY / 220)));
+    };
+
+    viewport.addEventListener("touchstart", onTouchStart, { passive: false });
+    viewport.addEventListener("touchmove", onTouchMove, { passive: false });
+    viewport.addEventListener("touchend", onTouchEnd, { passive: false });
+    viewport.addEventListener("touchcancel", onTouchEnd, { passive: false });
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener("touchstart", onTouchStart);
+      viewport.removeEventListener("touchmove", onTouchMove);
+      viewport.removeEventListener("touchend", onTouchEnd);
+      viewport.removeEventListener("touchcancel", onTouchEnd);
+      viewport.removeEventListener("wheel", onWheel);
+    };
+  }, []);
 
   // Nombre con el que sale esta ficha en cualquier archivo (imagen o PDF).
   const nombreBase = () => `Ficha_${String(numero || "").replace(/[^\w-]/g, "") || "produccion"}`;
@@ -288,7 +445,7 @@ export default function FichaImpresionShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-center sm:items-start sm:overflow-auto sm:py-6 sm:px-4 animate-fade-in"
+      className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur-sm flex justify-center sm:items-start sm:overflow-auto sm:py-6 sm:px-4 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label={`Ficha ${productLabel} ${numero}`}
@@ -350,7 +507,11 @@ export default function FichaImpresionShell({
           </div>
 
           {/* ── Visor: contenido a tamaño de diseño, escalado al espacio disponible ── */}
-          <div ref={viewportRef} className="flex-1 min-h-0 overflow-auto bg-gray-100 sm:bg-white">
+          <div
+            ref={viewportRef}
+            className="flex-1 min-h-0 overflow-auto bg-gray-100 sm:bg-white"
+            style={{ touchAction: "pan-x pan-y" }}
+          >
             <div
               style={{
                 width: contentSize.width * scale,
@@ -379,6 +540,16 @@ export default function FichaImpresionShell({
             </div>
           </div>
         </div>
+
+        {/* El gesto no se ve: sin este aviso los operarios daban por hecho que
+            la ficha del celular no se podía acercar. */}
+        {necesitaZoom && mostrarPista && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4 print:hidden">
+            <span className="rounded-full bg-black/75 text-white text-[11px] font-medium px-3 py-1.5 shadow-lg animate-fade-in">
+              Pellizca para acercar · doble toque para verla 1:1
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

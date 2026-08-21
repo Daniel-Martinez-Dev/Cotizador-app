@@ -107,6 +107,40 @@ export async function upsertUserProfileByEmail(email, payload) {
   return true;
 }
 
+// ─── Perfil propio ───────────────────────────────────────────────────────────
+
+// Lo único que una persona puede cambiarse a sí misma desde "Mi perfil". La
+// lista es blanca a propósito: `usuarios/{uid}` es también donde viven `roles`
+// y `status`, y el perfil no puede ser la puerta por la que alguien se asigna
+// un rol. Las reglas de Firestore lo cierran del lado del servidor; esto evita
+// además mandar campos de más por error.
+const CAMPOS_PERFIL_PROPIO = [
+  "displayName",
+  "firstName",
+  "lastName",
+  "fotoURL",
+  "fotoPath",
+  "firmaDataUrl",
+];
+
+// El correo no se toca: es la credencial con la que se inicia sesión y la llave
+// del pre-registro por email (usuarios_email).
+export async function actualizarPerfilPropio(uid, campos) {
+  if (!uid) throw new Error("UID requerido");
+  await waitForAuth();
+
+  const payload = {};
+  for (const campo of CAMPOS_PERFIL_PROPIO) {
+    if (campo in campos) payload[campo] = campos[campo];
+  }
+  if (Object.keys(payload).length === 0) return null;
+
+  const ref = doc(db, USERS_COL, uid);
+  await updateDoc(ref, { ...payload, updatedAt: serverTimestamp() });
+  const snap = await getDoc(ref);
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 // ─── Gestión de usuarios (solo admin) ────────────────────────────────────────
 
 /** Aprueba un usuario pendiente y le asigna roles. */

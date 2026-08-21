@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { priceMatrices, CLIENTE_FACTORES, EXTRAS_POR_DEFECTO, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana } from '../data/precios';
-import { getPrecioProducto, getExtrasPorTipo, validarRangoProducto, getConfigProducto } from '../data/catalogoProductos';
+import { getPrecioProducto, validarRangoProducto, getConfigProducto } from '../data/catalogoProductos';
 import { PRODUCTOS_ACTIVOS } from '../data/catalogoProductos';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, crearContacto, buscarContactoPorEmail } from '../utils/firebaseCompanies';
@@ -9,15 +9,10 @@ import { waitForAuth, getAuthError } from '../firebase';
 import toast from 'react-hot-toast';
 import { numeroALetras } from '../utils/numeroALetras';
 import Combobox from '../components/ui/Combobox';
+import { calcularSubtotalExtras as sumarExtras, calcularTotales } from '../utils/totales';
 
 // Utilidades
 const redondear5000 = v => Math.round(v / 5000) * 5000;
-const aplicarAjuste = (v, tipo, p) => {
-  if (!p || p === 0) return v;
-  if (tipo === 'Descuento') return Math.round(v * (1 - p / 100));
-  if (tipo === 'Incremento') return Math.round(v * (1 + p / 100));
-  return v;
-};
 // Pista de cliente: mostrar variación vs Cliente Final (baseline)
 const obtenerPistaCliente = (clienteTipo) => {
   const base = CLIENTE_FACTORES['Cliente Final Contado'] || 1;
@@ -193,7 +188,9 @@ export default function CotizadorApp(){
 
   // Precios
   const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); const r=getPrecioProducto(p,{ matricesOverride, productosOverride }); return r.ajustado; };
-  const calcularSubtotalExtras = (p)=>{ const {tipo, cliente, extras=[], extrasCantidades={}, extrasPersonalizados=[], extrasPersonalizadosCant={}}=p; let subtotal=0; const lista=getExtrasPorTipo(tipo, extrasOverride); for(const nombre of extras){ const ex=lista.find(e=> e.nombre===nombre); if(ex){ const cant=parseInt(extrasCantidades[nombre])||1; subtotal += cant * (ex.precioDistribuidor || ex.precioCliente ? (cliente==='Distribuidor' ? (ex.precioDistribuidor||0) : (ex.precioCliente||0)) : (ex.precio||0)); } } for(const idx in extrasPersonalizados){ const ex=extrasPersonalizados[idx]; const cant=parseInt(extrasPersonalizadosCant[idx])||1; subtotal += cant*(ex.precio||0);} return redondear5000(subtotal); };
+  // Suma exacta de los extras: el redondeo a 5.000 es regla de precio del
+  // producto, no de los extras, que se imprimen uno a uno en la tabla.
+  const calcularSubtotalExtras = (p)=> sumarExtras(p, extrasOverride);
 
   // Estados para entradas libres (combobox)
   const [empresaNombreInput, setEmpresaNombreInput] = useState('');
@@ -313,10 +310,8 @@ export default function CotizadorApp(){
     if (!ensureOk) return;
 
     const productosCotizados = productos.map((p,i)=> ({...p, precioCalculado: calcularPrecio(p,i), subtotalExtras: calcularSubtotalExtras(p)}));
-    let subtotal = productosCotizados.reduce((s,p)=> s + (p.precioCalculado||0)*(parseInt(p.cantidad)||1) + (p.subtotalExtras||0), 0);
-    subtotal = redondear5000(aplicarAjuste(subtotal, ajusteTotalTipo, parseFloat(ajusteTotalValor)));
-    const iva = Math.round(subtotal*0.19);
-    const total = subtotal + iva;
+    const ajusteGeneral = { tipo: ajusteTotalTipo, porcentaje: parseFloat(ajusteTotalValor)||0 };
+    const { subtotal, iva, total } = calcularTotales(productosCotizados, ajusteGeneral, { extrasOverride });
     const cotizacion = {
       cliente, // alias libre
       empresaId: empresaRef?.id || null,
@@ -335,7 +330,7 @@ export default function CotizadorApp(){
       clienteId: empresaRef?.id || null,
       productos: productosCotizados,
       subtotal, iva, total,
-      ajusteGeneral: { tipo: ajusteTotalTipo, porcentaje: parseFloat(ajusteTotalValor)||0 }
+      ajusteGeneral
     };
     setQuoteData(prev=> ({...prev, ...cotizacion}));
     navigate('/preview');
@@ -356,10 +351,12 @@ export default function CotizadorApp(){
   })), [contactosEmpresa]);
 
   // Preview en vivo
-  const previewBruto = redondear5000(productos.reduce((s,p,i)=> s + calcularPrecio(p,i)*(parseInt(p.cantidad)||1) + calcularSubtotalExtras(p),0));
-  const previewAjustado = redondear5000(aplicarAjuste(previewBruto, ajusteTotalTipo, parseFloat(ajusteTotalValor)||0));
-  const previewIVA = Math.round(previewAjustado*0.19);
-  const previewTotal = previewAjustado + previewIVA;
+  // Mismo cálculo que al guardar, para que el panel y el PDF nunca difieran.
+  const { bruto: previewBruto, subtotal: previewAjustado, iva: previewIVA, total: previewTotal } =
+    calcularTotales(productos, { tipo: ajusteTotalTipo, porcentaje: parseFloat(ajusteTotalValor)||0 }, {
+      extrasOverride,
+      precioUnitario: (p,i)=> calcularPrecio(p,i),
+    });
 
   return (
     <div className="max-w-7xl mx-auto p-4 lg:p-6 pb-24 md:pb-6 text-gray-900 dark:text-gray-100">

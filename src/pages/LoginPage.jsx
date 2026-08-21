@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
+import { authErrorMsg } from "../utils/authErrores";
 import logo from "../assets/imagenes/logo.png";
 
 const inputClass =
@@ -9,29 +10,6 @@ const inputClass =
 
 const btnPrimary =
   "w-full px-4 py-2 rounded bg-trafico text-black font-medium hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-trafico/60 transition-opacity";
-
-function authErrorMsg(code) {
-  switch (code) {
-    case "auth/email-already-in-use":
-      return "Este correo ya está registrado.";
-    case "auth/weak-password":
-      return "La contraseña debe tener al menos 6 caracteres.";
-    case "auth/invalid-email":
-      return "El correo electrónico no es válido.";
-    case "auth/user-not-found":
-    case "auth/wrong-password":
-    case "auth/invalid-credential":
-      return "Correo o contraseña incorrectos.";
-    case "auth/too-many-requests":
-      return "Demasiados intentos fallidos. Intenta más tarde.";
-    case "auth/user-disabled":
-      return "Esta cuenta ha sido deshabilitada.";
-    case "auth/network-request-failed":
-      return "Error de conexión. Revisa tu internet.";
-    default:
-      return "Ocurrió un error. Intenta de nuevo.";
-  }
-}
 
 export default function LoginPage() {
   const { signInWithEmail, signUpWithEmail, resetPassword, loading, isLoggedIn } =

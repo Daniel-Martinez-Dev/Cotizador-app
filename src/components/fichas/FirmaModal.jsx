@@ -30,7 +30,10 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
   // —no contra hasRole— porque a un admin le devuelve true cualquier rol.
   const alistaEnPlanta = (roles || []).includes("empleado");
   const [personas, setPersonas] = React.useState(() => (
-    previa?.personas || (alistaEnPlanta && user?.uid && yo ? [{ uid: user.uid, nombre: yo }] : [])
+    previa?.personas
+    || (alistaEnPlanta && user?.uid && yo
+      ? [{ uid: user.uid, nombre: yo, firma: profile?.firmaDataUrl || "" }]
+      : [])
   ));
   const [fecha, setFecha] = React.useState(previa?.fecha || hoyISO());
   const [nota, setNota] = React.useState(notaInicial);

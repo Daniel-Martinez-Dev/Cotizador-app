@@ -10,6 +10,7 @@ import InventarioPage from "./pages/InventarioPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import UsuariosPage from "./pages/UsuariosPage";
+import PerfilPage from "./pages/PerfilPage";
 import EmployeeShell from "./pages/empleado/EmployeeShell";
 import EmpleadoHome from "./pages/empleado/EmpleadoHome";
 import EmpleadoProduccionList from "./pages/empleado/EmpleadoProduccionList";
@@ -18,31 +19,29 @@ import EmpleadoInventarioList from "./pages/empleado/EmpleadoInventarioList";
 import { QuoteProvider, useQuote } from "./context/QuoteContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AvatarPerfil from "./components/perfil/AvatarPerfil";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import { Toaster } from 'react-hot-toast';
 import logo from "./assets/imagenes/logo.png";
 import menuIcon from "./assets/imagenes/menu-icon.png";
 import { ADMIN_EMAIL, ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
+import { ROLES_ALMACEN, ROLES_PLANTA, soloRolesDePlanta } from "./utils/roles";
 // Carga catálogo central (side-effect) para futuras referencias globales
 import './data/catalogoProductos';
 
-// Un usuario con SOLO el rol "empleado" (sin admin/produccion/inventario/
-// vendedor) nunca debe llegar a montar AppShell — ni un instante, para que
-// no se alcance a ver el header/nav de oficina — así que la decisión se toma
-// antes de renderizarlo, no dentro de sus rutas hijas.
+// Quien solo tiene roles de planta (empleado, almacenista) nunca debe llegar a
+// montar AppShell — ni un instante, para que no se alcance a ver el header/nav
+// de oficina — así que la decisión se toma antes de renderizarlo, no dentro de
+// sus rutas hijas.
 function RootGate() {
-  const { hasRole, isMainAdmin } = useAuth();
-  const isAdminUser = isMainAdmin || hasRole('admin');
-  const isPureEmpleado = hasRole('empleado') && !isAdminUser &&
-    !hasRole('produccion') && !hasRole('inventario') && !hasRole('vendedor');
-
-  if (isPureEmpleado) return <Navigate to="/planta" replace />;
+  const { roles, isMainAdmin } = useAuth();
+  if (!isMainAdmin && soloRolesDePlanta(roles)) return <Navigate to="/planta" replace />;
   return <AppShell />;
 }
 
 function AppShell() {
   const { quoteData, setQuoteData, setResetToken, setEmpresaSeleccionada, setContactoSeleccionado } = useQuote();
-  const { user, signOutUser, hasRole, isMainAdmin } = useAuth();
+  const { user, profile, signOutUser, hasRole, isMainAdmin } = useAuth();
   const isAdminUser = isMainAdmin || hasRole('admin');
   const canProduccion = ENABLE_PRODUCCION && (isAdminUser || hasRole('produccion'));
   const canInventario = ENABLE_INVENTARIO && (isAdminUser || hasRole('inventario'));
@@ -149,6 +148,7 @@ function AppShell() {
       { to: '/historial', label: 'Historial', show: true },
       { to: '/empresas', label: 'Empresas', show: true },
       { to: '/usuarios', label: 'Usuarios', show: isAdminUser },
+      { to: '/perfil', label: 'Mi perfil', show: true },
     ].filter(l => l.show);
     return (
       <>
@@ -237,6 +237,13 @@ function AppShell() {
               <span className="sm:hidden">Planta</span>
             </Link>
           )}
+          <Link
+            to="/perfil"
+            title="Mi perfil"
+            className="hidden sm:inline-flex items-center rounded-full focus:outline-none focus:ring-2 focus:ring-trafico/60"
+          >
+            <AvatarPerfil perfil={profile} email={user?.email} size={34} />
+          </Link>
           <button
             onClick={()=>setDark(d=>!d)}
             className="text-xs sm:text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-gray-50 dark:bg-gris-800 hover:bg-gray-100 dark:hover:bg-gris-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-trafico/60"
@@ -308,6 +315,7 @@ export default function App(){
                 <Route path="/historial" element={<HistorialPage />} />
                 <Route path="/productos" element={<ProductsPage />} />
                 <Route path="/empresas" element={<CompaniesPage />} />
+                <Route path="/perfil" element={<PerfilPage />} />
 
                 <Route element={<ProtectedRoute requireRole="admin" />}>
                   <Route path="/usuarios" element={<UsuariosPage />} />
@@ -316,12 +324,18 @@ export default function App(){
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
 
-              <Route element={<ProtectedRoute requireRole="empleado" />}>
+              <Route element={<ProtectedRoute requireAnyRole={ROLES_PLANTA} />}>
                 <Route path="/planta" element={<EmployeeShell />}>
                   <Route index element={<EmpleadoHome />} />
                   <Route path="produccion" element={<EmpleadoProduccionList />} />
                   <Route path="produccion/:tipo/:id" element={<EmpleadoFichaDetalle />} />
-                  <Route path="inventario" element={<EmpleadoInventarioList />} />
+                  {/* El cuarto de materia prima es solo del almacenista: un
+                      empleado de planta que escriba la URL a mano rebota a su
+                      inicio, no a la interfaz de oficina. */}
+                  <Route element={<ProtectedRoute requireAnyRole={ROLES_ALMACEN} redirectTo="/planta" />}>
+                    <Route path="inventario" element={<EmpleadoInventarioList />} />
+                  </Route>
+                  <Route path="perfil" element={<PerfilPage />} />
                   <Route path="*" element={<Navigate to="/planta" replace />} />
                 </Route>
               </Route>
