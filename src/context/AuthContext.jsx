@@ -3,12 +3,16 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  reauthenticateWithCredential,
+  updatePassword,
   updateProfile,
   onAuthStateChanged,
   signOut,
+  EmailAuthProvider,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import {
+  actualizarPerfilPropio,
   ensureUserProfileForLogin,
   getUserProfileForUid,
   upsertUserProfile,
@@ -105,6 +109,34 @@ export function AuthProvider({ children }) {
     await sendPasswordResetEmail(auth, email.trim().toLowerCase());
   };
 
+  // ─── Mi perfil ─────────────────────────────────────────────────────────────
+
+  // Guarda los datos que la persona edita de sí misma (ver PerfilPage). El
+  // nombre se escribe también en la cuenta de Auth porque
+  // `ensureUserProfileForLogin` le da prioridad al displayName del token: si
+  // solo se cambiara en Firestore, el próximo inicio de sesión lo revertiría.
+  const actualizarMiPerfil = async (campos) => {
+    const actual = auth.currentUser;
+    if (!actual) throw new Error("No hay sesión activa");
+    if (campos.displayName && campos.displayName !== actual.displayName) {
+      await updateProfile(actual, { displayName: campos.displayName });
+    }
+    const actualizado = await actualizarPerfilPropio(actual.uid, campos);
+    if (actualizado) setProfile(actualizado);
+    return actualizado;
+  };
+
+  // Firebase exige credenciales recientes para cambiar la contraseña, así que
+  // se pide la actual y se reautentica con ella. De paso es la comprobación de
+  // que quien está frente al equipo es el dueño de la sesión.
+  const cambiarPassword = async (passwordActual, passwordNuevo) => {
+    const actual = auth.currentUser;
+    if (!actual?.email) throw new Error("No hay sesión activa");
+    const credencial = EmailAuthProvider.credential(actual.email, passwordActual);
+    await reauthenticateWithCredential(actual, credencial);
+    await updatePassword(actual, passwordNuevo);
+  };
+
   const refreshProfile = async () => {
     if (!user?.uid) return null;
     const p = await getUserProfileForUid(user.uid);
@@ -132,6 +164,8 @@ export function AuthProvider({ children }) {
       resetPassword,
       signOutUser,
       refreshProfile,
+      actualizarMiPerfil,
+      cambiarPassword,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, profile, roles, loading, requireLogin, isLoggedIn, isPending, isMainAdmin]

@@ -1,9 +1,9 @@
 // src/utils/htmlSections.js
 
 import { formatearPesos } from "./formatos";
-import { EXTRAS_POR_DEFECTO } from "../data/precios"; // legacy fallback
-import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML, getExtrasPorTipo } from '../data/catalogoProductos';
+import { getDescripcionGeneral, getLineaTabla, getEspecificacionesHTML } from '../data/catalogoProductos';
 import { resolverVigencia } from './vigencia';
+import { getExtrasDetalle, calcularSubtotalBruto, cantidadProducto, precioUnitarioProducto } from './totales';
 
 export function generarSeccionesHTML(cotizacion, condicionesProductoIndex = 0, productosOverride = {}) {
   const descripcionHTML = generarDescripcion(cotizacion, productosOverride);
@@ -86,8 +86,8 @@ function generarTablaPrecios(cot, productosOverride = {}) {
   Object.entries(productosOverride).forEach(([k, v]) => { if (v?.extras?.length) extrasOverridePorTipo[k] = v.extras; });
 
   cot.productos.forEach((prod) => {
-    const cantidad = parseInt(prod.cantidad) || 1;
-    const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
+    const cantidad = cantidadProducto(prod);
+    const precio = precioUnitarioProducto(prod);
     const subtotal = cantidad * precio;
 
     // Descripción detallada solicitada por tipo con salto de línea antes de las medidas
@@ -129,102 +129,37 @@ function generarTablaPrecios(cot, productosOverride = {}) {
       </tr>
     `;
 
-    // === Mostrar solo si es un DESCUENTO ===
-    if (prod.ajuste && prod.ajuste.tipo === "Descuento") {
-      const porcentaje = parseFloat(prod.ajuste.porcentaje) || 0;
-      const valorDescuento = subtotal * (porcentaje / 100);
-
+    // === Extras: catálogo, automáticos y personalizados ===
+    // Mismo desglose que usa el subtotal (utils/totales), para que la columna
+    // impresa sume exactamente el subtotal de abajo.
+    getExtrasDetalle(prod, extrasOverridePorTipo, cot.cliente).forEach((ex) => {
+      const cantidadTexto = Number.isInteger(ex.cantidad) ? ex.cantidad : ex.cantidad.toFixed(2);
       html += `
-        <tr style="background-color:#FEF2F2; color: #B91C1C;">
-          <td colspan="3" style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">- Descuento del ${porcentaje}%</td>
-          <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">- ${formatearPesos(valorDescuento)}</td>
+        <tr style="background-color:#F5F7FB;">
+          <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ ${ex.nombre}</td>
+          <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidadTexto}</td>
+          <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(ex.precioUnit)}</td>
+          <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(ex.total)}</td>
         </tr>
       `;
-    }
-
-  // === Extras por defecto ===
-    const listaExtras = getExtrasPorTipo(prod.tipo, extrasOverridePorTipo) || EXTRAS_POR_DEFECTO[prod.tipo] || [];
-    if (Array.isArray(prod.extras)) {
-      prod.extras.forEach((nombreExtra) => {
-        const encontrado = listaExtras.find((e) => e.nombre === nombreExtra);
-        if (encontrado) {
-          const cantidadExtra = parseInt(prod.extrasCantidades?.[nombreExtra]) || 1;
-          let precioExtra = 0;
-          if (encontrado.precioDistribuidor != null && encontrado.precioCliente != null) {
-            precioExtra = cot.cliente === "Distribuidor" ? encontrado.precioDistribuidor : encontrado.precioCliente;
-          } else {
-            precioExtra = encontrado.precio;
-          }
-          const totalExtra = precioExtra * cantidadExtra;
-
-          if (!isNaN(precioExtra)) {
-            html += `
-              <tr style="background-color:#F5F7FB;">
-                <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ ${nombreExtra}</td>
-                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidadExtra}</td>
-                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(precioExtra)}</td>
-                <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
-              </tr>
-            `;
-          }
-        }
-      });
-    }
-
-    // Extra automático para Cortina Thermofilm: MAX BULLET
-    if(prod.tipo === 'Cortina Thermofilm' && prod.ancho){
-      const anchoM = parseFloat(prod.ancho)/1000;
-      const altoM = parseFloat(prod.alto)/1000;
-      if(!isNaN(anchoM)){
-        const bullets = ((anchoM + 0.10) / 0.6); // valor decimal exacto
-        const precioUnitBullet = 35000;
-        const totalBullets = precioUnitBullet * bullets;
-        html += `
-          <tr style="background-color:#F5F7FB;">
-            <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ MAX BULLET PLÁSTICO PARA MONTAJE (60cm de largo)</td>
-            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${bullets.toFixed(2)}</td>
-            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(precioUnitBullet)}</td>
-            <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalBullets)}</td>
-          </tr>`;
-      }
-    }
-
-    // === Extras personalizados ===
-    if (Array.isArray(prod.extrasPersonalizados)) {
-      prod.extrasPersonalizados.forEach((extra, idx) => {
-        const cantidadExtra = parseInt(prod.extrasPersonalizadosCant?.[idx]) || 1;
-        const totalExtra = extra.precio * cantidadExtra;
-
-        if (extra?.nombre && !isNaN(extra.precio)) {
-          // Mismo estilo que los otros extras y sin la etiqueta "(Personalizado)"
-          html += `
-            <tr style="background-color:#F5F7FB;">
-              <td style="border: 1px solid #D1D9E4; padding: 8px; padding-left: 24px;">↳ ${extra.nombre}</td>
-              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:center;">${cantidadExtra}</td>
-              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(extra.precio)}</td>
-              <td style="border: 1px solid #D1D9E4; padding: 8px; text-align:right;">${formatearPesos(totalExtra)}</td>
-            </tr>
-          `;
-        }
-      });
-    }
+    });
   });
 
   // === Mostrar descuento general si existe ===
   if (cot.ajusteGeneral && cot.ajusteGeneral.tipo === "Descuento") {
     const porcentaje = parseFloat(cot.ajusteGeneral.porcentaje) || 0;
     // No mostrar si el porcentaje es 0
-    if (porcentaje <= 0) {
-      // continuar sin agregar la fila
-    } else {
-    const subtotalBruto = cot.productos.reduce((acc, prod) => {
-      const cantidad = parseInt(prod.cantidad) || 1;
-      const precio = prod.precioUnitario || prod.precioCalculado || prod.precioEditado || prod.precioManual || 0;
-      return acc + cantidad * precio;
-    }, 0);
-    const valorDescuento = subtotalBruto * (porcentaje / 100);
-    // Estilos verdes para indicar un beneficio positivo para el cliente
-    html += `
+    if (porcentaje > 0) {
+      // El descuento es la diferencia exacta entre lo impreso arriba y el
+      // subtotal de abajo: se calcula sobre productos + extras, igual que en
+      // utils/totales, y así la columna cuadra peso a peso.
+      const bruto = calcularSubtotalBruto(cot.productos || [], {
+        extrasOverride: extrasOverridePorTipo,
+        tipoClienteFallback: cot.cliente,
+      });
+      const valorDescuento = Math.round(bruto) - (cot.subtotal || 0);
+      // Estilos verdes para indicar un beneficio positivo para el cliente
+      html += `
       <tr style="background-color:#F0FDF4; color:#15803D;">
         <td colspan="3" style="border: 1px solid #D1D9E4; padding: 8px; text-align:right; font-weight:600;">
           Descuento general del ${porcentaje}%

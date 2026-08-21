@@ -1,6 +1,6 @@
 import React from "react";
 import { fmtMm } from "../../utils/fichaFormat";
-import { ETAPAS, ETAPAS_FIRMA, fechaFirmaTexto, firmasDeFicha, nombresFirma } from "../../utils/firmasFicha";
+import { ETAPAS, ETAPAS_FIRMA, fechaFirmaTexto, firmasDeFicha } from "../../utils/firmasFicha";
 
 // Sub-componentes de diseño compartidos por las fichas de impresión (todos con
 // inline-styles para imprimir). Definen el lenguaje visual común: tarjeta de
@@ -173,9 +173,18 @@ const rotuloFirma = {
   textTransform: "uppercase", letterSpacing: "0.6px",
 };
 
-// Un espacio de firma: lo escrito encima de la línea (cuando ya se registró) y
+// Un espacio de firma: lo que va encima de la línea (cuando ya se registró) y
 // el rótulo debajo — el nombre de quien firma, o "Firma N" si está en blanco.
-function CampoFirma({ caption, valor, resaltado }) {
+//
+// Encima de la línea va la firma que la persona dibujó en su perfil, si la
+// tiene. Quien no la tiene deja la línea libre para firmar a mano sobre el
+// papel, que es como se venía haciendo: el nombre impreso debajo vale igual.
+//
+// La firma es un data URI, no un enlace: la ficha se rasteriza metiendo su HTML
+// dentro de un <svg><foreignObject> (ver fichaImagen.js) y ahí dentro una imagen
+// externa no llega a cargar, así que saldría en blanco en el PDF y en la imagen
+// que se comparte.
+function CampoFirma({ caption, valor, firma, resaltado }) {
   return (
     <div>
       <div style={{
@@ -184,7 +193,9 @@ function CampoFirma({ caption, valor, resaltado }) {
         fontSize: "10px", fontWeight: "bold", color: "#000000",
         paddingBottom: "2px", whiteSpace: "nowrap", overflow: "hidden",
       }}>
-        {valor || ""}
+        {firma
+          ? <img src={firma} alt="" style={{ maxHeight: "22px", maxWidth: "100%", objectFit: "contain" }} />
+          : valor || ""}
       </div>
       <div style={{
         ...rotuloFirma,
@@ -203,9 +214,9 @@ function CampoFirma({ caption, valor, resaltado }) {
 // Una fila de responsables: un espacio por persona que firmó (o los espacios en
 // blanco del formato si todavía no se cierra) + la fecha.
 function FilaFirmas({ titulo, espacios, firma }) {
-  const nombres = nombresFirma(firma);
-  const firmado = nombres.length > 0;
-  const celdas = firmado ? nombres : Array.from({ length: espacios }, () => "");
+  const personas = firma?.personas || [];
+  const firmado = personas.length > 0;
+  const celdas = firmado ? personas : Array.from({ length: espacios }, () => null);
 
   return (
     <div style={{ padding: "5px 12px 6px", borderBottom: "1px solid #000000" }}>
@@ -214,10 +225,11 @@ function FilaFirmas({ titulo, espacios, firma }) {
         display: "grid", gridTemplateColumns: `repeat(${celdas.length}, 1fr) 0.9fr`,
         gap: "14px", marginTop: "3px",
       }}>
-        {celdas.map((nombre, i) => (
+        {celdas.map((persona, i) => (
           <CampoFirma
             key={i}
-            caption={firmado ? nombre : `Firma ${i + 1}`}
+            caption={firmado ? persona.nombre : `Firma ${i + 1}`}
+            firma={persona?.firma}
             resaltado={firmado}
           />
         ))}

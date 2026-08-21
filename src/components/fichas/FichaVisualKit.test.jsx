@@ -62,6 +62,25 @@ describe("bloque de firmas de la ficha impresa", () => {
     expect(html).toContain("Ana Gómez");
   });
 
+  // La firma dibujada en el perfil se copia dentro de la ficha al firmarla, y
+  // va como data URI porque la ficha se rasteriza dentro de un foreignObject,
+  // donde una imagen con URL externa no cargaría.
+  it("imprime la firma dibujada de quien la tiene", () => {
+    const png = "data:image/png;base64,AAAA";
+    const html = render({
+      firmas: { alistado: { ...alistado, personas: [{ uid: "u1", nombre: "Juan Pérez", firma: png }] } },
+    });
+    expect(html).toContain(png);
+    // El nombre sigue saliendo debajo de la línea: la firma no lo reemplaza.
+    expect(html).toContain("Juan Pérez");
+  });
+
+  it("deja la línea libre para firmar a mano a quien no dibujó su firma", () => {
+    const html = render({ firmas: { alistado, revisado } });
+    expect(html).not.toContain("<img");
+    expect(html).toContain("Carlos Ruiz");
+  });
+
   it("no mete grises claros ni fondos de color en los campos de firma", () => {
     const html = render({ firmas: { alistado, revisado } });
     expect(html).toContain("ING. DANIEL F. MARTÍNEZ");

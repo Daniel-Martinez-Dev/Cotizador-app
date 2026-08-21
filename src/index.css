@@ -41,3 +41,8 @@ select option, select optgroup { background-color: #ffffff; color: #111827; }
 .animate-fadeIn { animation: fade-in 0.18s ease-out; }
 
 
+
+/* Filas de chips con scroll horizontal (panel de planta): ocultar la barra sin
+   perder el desplazamiento táctil. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

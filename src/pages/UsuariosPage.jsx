@@ -10,16 +10,7 @@ import {
 } from "../utils/firebaseUsers";
 import { useQuote } from "../context/QuoteContext";
 import Tabs from "../components/ui/Tabs";
-
-const ALL_ROLES = ["admin", "vendedor", "produccion", "inventario", "empleado"];
-
-const ROLE_LABELS = {
-  admin: "Admin",
-  vendedor: "Vendedor",
-  produccion: "Producción",
-  inventario: "Inventario",
-  empleado: "Empleado (planta)",
-};
+import { ROLES as ALL_ROLES, ROL_LABEL as ROLE_LABELS } from "../utils/roles";
 
 const STATUS_BADGE = {
   active:   "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",

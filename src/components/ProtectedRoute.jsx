@@ -27,10 +27,14 @@ function PendingScreen({ onSignOut }) {
 }
 
 /**
- * @param {string} [requireRole]   rol requerido en el perfil
- * @param {string} [requireEmail]  email exacto requerido (comparación case-insensitive)
+ * @param {string}   [requireRole]     rol requerido en el perfil
+ * @param {string[]} [requireAnyRole]  basta con tener uno de estos roles
+ * @param {string}   [requireEmail]    email exacto requerido (comparación case-insensitive)
+ * @param {string}   [redirectTo]      a dónde rebota quien no cumple. El
+ *   default sirve para la oficina; las rutas de planta tienen que pasar
+ *   "/planta" o mandarían al operario a una interfaz que no le corresponde.
  */
-export default function ProtectedRoute({ requireRole, requireEmail }) {
+export default function ProtectedRoute({ requireRole, requireAnyRole, requireEmail, redirectTo = "/dashboard" }) {
   const { loading, isLoggedIn, isPending, hasRole, user, signOutUser } = useAuth();
   const location = useLocation();
 
@@ -51,14 +55,15 @@ export default function ProtectedRoute({ requireRole, requireEmail }) {
     return <PendingScreen onSignOut={signOutUser} />;
   }
 
-  if (requireRole && !hasRole(requireRole)) {
-    return <Navigate to="/dashboard" replace state={{ denied: requireRole }} />;
+  const rolesAdmitidos = requireAnyRole || (requireRole ? [requireRole] : null);
+  if (rolesAdmitidos && !rolesAdmitidos.some((r) => hasRole(r))) {
+    return <Navigate to={redirectTo} replace state={{ denied: rolesAdmitidos.join(",") }} />;
   }
 
   if (requireEmail) {
     const userEmail = (user?.email ?? "").toLowerCase();
     if (userEmail !== requireEmail.toLowerCase()) {
-      return <Navigate to="/dashboard" replace state={{ denied: "email" }} />;
+      return <Navigate to={redirectTo} replace state={{ denied: "email" }} />;
     }
   }
 

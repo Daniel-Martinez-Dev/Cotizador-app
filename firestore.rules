@@ -63,10 +63,32 @@ service cloud.firestore {
       return isAdmin() || (isStaff() && isActive());
     }
 
-    // ─── Rol "empleado" (planta): acceso restringido a fichas + materia prima ──
+    // ─── Roles de planta ───────────────────────────────────────────────────────
+    // "empleado": el operario. Ve las fichas, las firma y las cierra. Desde la
+    // separación del almacén ya NO toca materia prima.
+    // "almacenista": la tablet del cuarto de almacén. Es el único perfil de
+    // planta que mueve inventario, y además administra el catálogo de
+    // materiales y proveedores (crear y editar; borrar sigue siendo de
+    // inventario/admin, porque un material borrado se lleva su historial).
 
     function isEmpleadoRole() {
       return isActiveStaff() && hasRole('empleado');
+    }
+
+    function isAlmacenistaRole() {
+      return isActiveStaff() && hasRole('almacenista');
+    }
+
+    // Quien trabaja desde la interfaz de planta, sea operario o almacenista:
+    // ambos necesitan las fichas (el almacenista, para amarrar cada salida de
+    // material a una orden de producción).
+    function isPlantaRole() {
+      return isEmpleadoRole() || isAlmacenistaRole();
+    }
+
+    // Quien puede mover el cuarto de materia prima.
+    function isAlmacenStaff() {
+      return isAdmin() || (isActiveStaff() && hasRole('inventario')) || isAlmacenistaRole();
     }
 
     // Un empleado solo puede tocar notas/estado/firmas/entrega/updatedAt en una
@@ -195,41 +217,41 @@ service cloud.firestore {
     // "empleado" (planta) solo puede leer y actualizar notas/estado/firmas, y
     // lo que firma queda cerrado para él (ver fichaUpdateEmpleadoOk).
     match /division_fichas/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_sellos/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_abrigo_retractil/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_puertas_rapidas/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_puertas_seccionales/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     // Fichas básicas: órdenes sin ficha de fabricación (repuestos, semáforos,
     // lámparas, topes, rampas…). Mismos permisos que las demás fichas.
     match /fichas_generales/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isEmpleadoRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isEmpleadoRole() && fichaUpdateEmpleadoOk());
+      allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     // ─── Notificaciones (avisos de "ficha pasó a producción", etc.) ────────────
@@ -263,36 +285,39 @@ service cloud.firestore {
       allow read, write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
-    // "empleado" (planta) puede ver materiales y registrar movimientos de
-    // stock, pero el update solo puede tocar los campos de stock/movimiento
-    // — nunca costoUnitario ni el resto de datos del item.
+    // El cuarto de materia prima es del almacenista (y de inventario/admin desde
+    // la oficina). El rol "empleado" ya no entra: la sección no le aparece en la
+    // app y aquí tampoco tiene lectura.
     match /inventario_items/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('inventario')) || isEmpleadoRole();
-      allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
-      allow update: if isAdmin() || (isActiveStaff() && hasRole('inventario')) || (
-        isEmpleadoRole() &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['stockActual', 'lastMovimientoId', 'lastMovimientoAt', 'updatedAt'])
-      );
+      allow read: if isAlmacenStaff();
+      // Crear y editar sí; borrar no: el material borrado se lleva por delante
+      // el historial de movimientos que lo referencia.
+      allow create, update: if isAlmacenStaff();
+      allow delete: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
     match /inventario_proveedores/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('inventario')) || isEmpleadoRole();
-      allow write: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
+      allow read: if isAlmacenStaff();
+      allow create, update: if isAlmacenStaff();
+      allow delete: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
     }
 
+    // Un movimiento no se corrige ni se borra desde el almacén: si algo quedó
+    // mal registrado, lo arregla inventario/admin desde el escritorio.
     match /inventario_movimientos/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('inventario')) || isEmpleadoRole();
+      allow read: if isAlmacenStaff();
       allow update, delete: if isAdmin() || (isActiveStaff() && hasRole('inventario'));
       allow create: if isAdmin() || (isActiveStaff() && hasRole('inventario')) || (
-        isEmpleadoRole() &&
+        isAlmacenistaRole() &&
         (request.resource.data.tipo == 'ingreso' || request.resource.data.tipo == 'salida') &&
+        // Toda salida queda amarrada a la orden de producción que se la llevó.
         (request.resource.data.tipo != 'salida' || (
           request.resource.data.ordenProduccion is number && request.resource.data.ordenProduccion > 0
         )) &&
-        (request.resource.data.tipo != 'ingreso' || (
-          !('costoUnitario' in request.resource.data) || request.resource.data.costoUnitario == 0
-        ))
+        // El precio solo entra con la factura de compra, nunca en una salida.
+        (request.resource.data.tipo != 'salida' ||
+          !('costoUnitario' in request.resource.data) ||
+          request.resource.data.costoUnitario == 0)
       );
     }
 

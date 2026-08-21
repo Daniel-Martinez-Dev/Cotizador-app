@@ -9,6 +9,8 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import EmptyState from "../components/ui/EmptyState";
 import Button from "../components/ui/Button";
+import Combobox from "../components/ui/Combobox";
+import { normalizarNombreCliente } from "../utils/clienteVinculo";
 
 const CARGA_INICIAL = 300;
 
@@ -58,7 +60,22 @@ export default function HistorialPage() {
     });
     const datos = Array.from(mapa.values());
     setCotizaciones(datos);
-    setClientesUnicos([...new Set(datos.map(c => c.nombreCliente || c.cliente).filter(Boolean))].sort());
+    // Un mismo cliente aparece escrito de varias formas ("ALIMENTOS SAS" /
+    // "Alimentos S.A.S."). En la lista dejamos una sola variante por nombre
+    // normalizado: el filtro compara normalizado, así la elegida alcanza a las
+    // demás. El conteo ayuda a distinguir clientes de nombre parecido.
+    const porCliente = new Map();
+    datos.forEach(c => {
+      const nombre = (c.nombreCliente || c.cliente || "").trim();
+      if (!nombre) return;
+      const clave = normalizarNombreCliente(nombre);
+      const previo = porCliente.get(clave);
+      if (previo) previo.cantidad += 1;
+      else porCliente.set(clave, { nombre, cantidad: 1 });
+    });
+    setClientesUnicos(
+      [...porCliente.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+    );
     setProductosUnicos([
       ...new Set(
         datos
@@ -141,10 +158,25 @@ export default function HistorialPage() {
     }
   };
 
+  const opcionesCliente = React.useMemo(
+    () => clientesUnicos.map(c => ({
+      id: c.nombre,
+      label: c.nombre,
+      sublabel: c.cantidad === 1 ? "1 cotización" : `${c.cantidad} cotizaciones`
+    })),
+    [clientesUnicos]
+  );
+
   // Filtro
+  // El cliente se escribe libre: comparamos normalizado (sin tildes ni
+  // puntuación) y por coincidencia parcial, para que "carnic" o "s.a.s"
+  // encuentren igual.
+  const terminoCliente = normalizarNombreCliente(filtroCliente);
   const filtradas = cotizaciones.filter(c => {
     const nombreCliente = c.nombreCliente || c.cliente || "";
-    const coincideCliente = filtroCliente ? nombreCliente === filtroCliente : true;
+    const coincideCliente = terminoCliente
+      ? normalizarNombreCliente(nombreCliente).includes(terminoCliente)
+      : true;
     const coincideProducto = filtroProducto
       ? (c.productos || []).some(p => (p.nombrePersonalizado || p.tipo || "") === filtroProducto)
       : true;
@@ -398,10 +430,14 @@ export default function HistorialPage() {
 
       {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6 text-xs md:text-sm">
-        <select value={filtroCliente} onChange={e=>setFiltroCliente(e.target.value)} className="border p-2 rounded">
-          <option value="">Todos los clientes</option>
-          {clientesUnicos.map(c=> <option key={c} value={c}>{c}</option>)}
-        </select>
+        <Combobox
+          value={filtroCliente}
+          onChange={setFiltroCliente}
+          options={opcionesCliente}
+          placeholder="Buscar cliente…"
+          emptyText="Ningún cliente con ese nombre"
+          inputClassName="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600"
+        />
         <input value={filtroNumero} onChange={e=>setFiltroNumero(e.target.value)} placeholder="Filtrar #" className="border p-2 rounded" />
         <select value={filtroProducto} onChange={e=>setFiltroProducto(e.target.value)} className="border p-2 rounded">
           <option value="">Todos los productos</option>

@@ -1,7 +1,7 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FaChevronLeft, FaFileAlt, FaCheckCircle, FaTruck } from "react-icons/fa";
+import { FaChevronLeft, FaFileAlt, FaCheckCircle, FaTruck, FaRulerCombined } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { obtenerFichaProduccion, agregarNotaFicha } from "../../utils/firebaseFichas";
 import EstadoBadge from "../../components/fichas/EstadoBadge";
@@ -13,6 +13,7 @@ import FirmaModal from "../../components/fichas/FirmaModal";
 import { getImpresionComponent } from "../../components/fichas/impresionPorTipo";
 import { ROL_CORRIGE_FIRMAS } from "../../utils/firmasFicha";
 import { codigoFichaOFallback } from "../../utils/codigoFicha";
+import { medidasFicha } from "../../utils/medidasFicha";
 
 function fmtFecha(f) {
   if (!f) return "—";
@@ -74,6 +75,7 @@ export default function EmpleadoFichaDetalle() {
   }
 
   const ImpresionComponent = getImpresionComponent(tipo);
+  const medida = medidasFicha(ficha);
   // Firmas y fotos ya guardadas son de solo lectura en planta: corregirlas es
   // cosa de producción/admin desde el escritorio (ver firestore.rules).
   const puedeCorregir = hasRole(ROL_CORRIGE_FIRMAS);
@@ -88,10 +90,26 @@ export default function EmpleadoFichaDetalle() {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{ficha.tipoLabel}</div>
-            <div className="font-semibold text-base truncate">{ficha.cliente || "Sin cliente"}</div>
+            <div className="font-semibold text-base break-words">{ficha.cliente || "Sin cliente"}</div>
           </div>
           <EstadoBadge estado={ficha.estado} />
         </div>
+
+        {/* La medida va pegada al cliente y con el mismo formato del listado:
+            es el dato con el que planta reconoce cuál de las órdenes del mismo
+            cliente tiene en la mesa. */}
+        {medida && (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-gray-900 text-white dark:bg-gris-700 dark:text-gray-100 px-3 py-2">
+            <FaRulerCombined className="text-xs opacity-70" aria-hidden="true" />
+            <span className="font-mono font-bold text-lg leading-none">
+              {Math.round(medida.ancho)} × {Math.round(medida.alto)}
+            </span>
+            <span className="text-[10px] opacity-70">mm</span>
+            {medida.label && (
+              <span className="text-[10px] uppercase tracking-wide opacity-70 border-l border-white/25 pl-2">{medida.label}</span>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
           <div>
             <div className="text-gray-400">N.° ficha de producción</div>

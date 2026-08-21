@@ -12,32 +12,7 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import imagenesPorProducto from "../data/imagenesPorProducto";
 import { numeroALetras } from "../utils/numeroALetras";
-import { EXTRAS_POR_DEFECTO } from "../data/precios";
-import { getExtrasPorTipo } from "../data/catalogoProductos";
-
-// Desglose de extras (de catálogo y personalizados) de un producto, con el
-// mismo cálculo de precio unitario que CotizadorApp.calcularSubtotalExtras,
-// para que la suma de estas líneas coincida siempre con p.subtotalExtras.
-function getExtrasDetalle(p, extrasOverride) {
-  const detalle = [];
-  const lista = getExtrasPorTipo(p.tipo, extrasOverride) || EXTRAS_POR_DEFECTO[p.tipo] || [];
-  (p.extras || []).forEach((nombre) => {
-    const ex = lista.find((e) => e.nombre === nombre);
-    if (!ex) return;
-    const cantidad = parseInt(p.extrasCantidades?.[nombre]) || 1;
-    const precioUnit = (ex.precioDistribuidor != null || ex.precioCliente != null)
-      ? (p.cliente === 'Distribuidor' ? (ex.precioDistribuidor || 0) : (ex.precioCliente || 0))
-      : (ex.precio || 0);
-    detalle.push({ nombre, cantidad, precioUnit, total: precioUnit * cantidad });
-  });
-  (p.extrasPersonalizados || []).forEach((ex, idx) => {
-    if (!ex?.nombre) return;
-    const cantidad = parseInt(p.extrasPersonalizadosCant?.[idx]) || 1;
-    const precioUnit = ex.precio || 0;
-    detalle.push({ nombre: ex.nombre, cantidad, precioUnit, total: precioUnit * cantidad });
-  });
-  return detalle;
-}
+import { getExtrasDetalle } from "../utils/totales";
 
 // Grilla de miniaturas para elegir una imagen del catálogo (reemplaza el
 // selector de texto plano, que obligaba a reconocer la imagen por su
@@ -907,7 +882,7 @@ export default function PreviewPage() {
                       {extrasDetalle.map((ex, exIdx) => (
                         <tr key={`${i}-extra-${exIdx}`} className="bg-gray-50/70 dark:bg-gray-800/30 text-xs">
                           <td className="pl-8 pr-4 py-1.5 text-gray-500 dark:text-gray-400">↳ {ex.nombre}</td>
-                          <td className="text-right px-4 py-1.5 text-gray-500 dark:text-gray-400">{ex.cantidad}</td>
+                          <td className="text-right px-4 py-1.5 text-gray-500 dark:text-gray-400">{Number.isInteger(ex.cantidad) ? ex.cantidad : ex.cantidad.toFixed(2)}</td>
                           <td className="text-right px-4 py-1.5 text-gray-500 dark:text-gray-400">{formatCOP(ex.total)}</td>
                         </tr>
                       ))}

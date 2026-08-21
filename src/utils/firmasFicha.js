@@ -73,18 +73,32 @@ export function fechaFirmaTexto(valor) {
   return new Date(ms).toLocaleDateString("es-CO");
 }
 
-// Deja la lista de firmantes en la forma que se guarda: {uid, nombre}. El uid
-// va vacío en los operarios sin cuenta en la app, que se escriben a mano; el
-// nombre es lo único obligatorio porque es lo que se imprime.
+// Deja la lista de firmantes en la forma que se guarda: {uid, nombre} y, si la
+// persona dibujó su firma en su perfil, `firma` con esa imagen. El uid va vacío
+// en los operarios sin cuenta en la app, que se escriben a mano; el nombre es lo
+// único obligatorio porque es lo que se imprime.
+//
+// La firma se copia dentro de la ficha en vez de leerse del perfil al imprimir:
+// la ficha firmada es una constancia de lo que se firmó ese día, así que cambiar
+// después la firma en el perfil no puede reescribir las fichas ya cerradas.
+//
 // Se quitan los repetidos —la misma persona marcada de la lista y escrita a
 // mano— comparando por uid, y si no lo hay por nombre sin tildes ni mayúsculas.
 export function normalizarPersonasFirma(lista) {
   const vistos = new Set();
   return (Array.isArray(lista) ? lista : [])
-    .map((p) => ({
-      uid: (p?.uid || "").toString().trim(),
-      nombre: (p?.nombre || "").toString().trim().replace(/\s+/g, " "),
-    }))
+    .map((p) => {
+      const persona = {
+        uid: (p?.uid || "").toString().trim(),
+        nombre: (p?.nombre || "").toString().trim().replace(/\s+/g, " "),
+      };
+      // El campo solo existe cuando hay imagen: quien no tiene firma dibujada
+      // no mete un campo vacío en la ficha, y sigue saliendo con su nombre
+      // sobre la línea, como siempre.
+      const firma = (p?.firma || "").toString();
+      if (firma.startsWith("data:image/")) persona.firma = firma;
+      return persona;
+    })
     .filter((p) => {
       if (!p.nombre) return false;
       const clave = p.uid || claveNombre(p.nombre);

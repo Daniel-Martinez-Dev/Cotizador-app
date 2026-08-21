@@ -38,4 +38,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Lector de códigos de barras del inventario (entradas y salidas de
+         materia prima). La cámara es opcional: en tabletas sin cámara la app
+         sigue instalándose y se usa el lector de pistola o el código a mano. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
