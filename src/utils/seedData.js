@@ -112,6 +112,13 @@ export async function seedEmpresasYContactos({ onProgress } = {}) {
 }
 
 /**
+ * OBSOLETO — no usar. La deduplicación está ahora en la pantalla de Empresas
+ * ("Revisar duplicados"), que detecta también los duplicados por nombre y por
+ * alias y, sobre todo, repunta las fichas y cotizaciones de la duplicada antes
+ * de borrarla (ver firebaseClienteVinculo.fusionarEmpresas). Esta versión solo
+ * mueve contactos: si se ejecutara, dejaría sin cliente todas las fichas que
+ * colgaban de la empresa eliminada.
+ *
  * Deduplicación de empresas por NIT.
  * Estrategia:
  *  - Normalizar NIT removiendo espacios y puntos y comillas.

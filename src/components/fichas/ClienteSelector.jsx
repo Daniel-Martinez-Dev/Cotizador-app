@@ -1,13 +1,14 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { FaCheckCircle, FaExclamationTriangle, FaPlus, FaTimes } from "react-icons/fa";
+import { FaCheckCircle, FaExclamationTriangle, FaPlus, FaTimes, FaLink } from "react-icons/fa";
 import Combobox from "../ui/Combobox";
 import { useQuote } from "../../context/QuoteContext";
-import { listarEmpresas, crearEmpresa } from "../../utils/firebaseCompanies";
+import { listarEmpresas, resolverOCrearEmpresa } from "../../utils/firebaseCompanies";
+import { resolverEmpresa, buscarPosiblesDuplicados } from "../../utils/empresaIdentidad";
 import {
   clienteDesdeEmpresa,
   clienteSinVincular,
-  buscarEmpresaPorNombre,
+  aliasManual,
 } from "../../utils/clienteVinculo";
 
 // Selector de cliente de la ficha. Escoge sobre `empresas`, la misma base que
@@ -29,9 +30,11 @@ export default function ClienteSelector({
   const { empresas, setEmpresas } = useQuote();
   const [cargando, setCargando] = React.useState(false);
   const [creando, setCreando] = React.useState(false);
+  const idAlias = React.useId();
 
   const lista = React.useMemo(() => empresas || [], [empresas]);
   const nombre = value.cliente || "";
+  const alias = value.clienteAlias || "";
   const vinculado = Boolean(value.clienteId);
 
   // La caché de empresas vive en el contexto y la comparten cotizador y fichas;
@@ -48,41 +51,57 @@ export default function ClienteSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // El alias entra en el sublabel para que el Combobox también busque por él:
+  // quien conoce al cliente como "CI ANDINA" no debería tener que acordarse
+  // del nombre legal completo.
   const opciones = React.useMemo(
     () => lista.map((em) => ({
       id: em.id,
       label: em.nombre || "",
-      sublabel: [em.nit, em.ciudad].filter(Boolean).join(" · "),
+      sublabel: [em.alias, em.nit, em.ciudad].filter(Boolean).join(" · "),
       data: em,
     })),
     [lista]
   );
 
-  // Al teclear se busca la empresa que corresponde exactamente al nombre (sin
-  // tildes ni puntuación). Si aparece una sola, queda vinculada sin que el
-  // usuario tenga que abrir la lista; si no, el nombre queda suelto.
+  // Al teclear se busca la empresa que corresponde exactamente a lo escrito
+  // —nombre o alias, sin tildes ni puntuación—. Si aparece una sola, queda
+  // vinculada sin que el usuario tenga que abrir la lista; si hay dos que
+  // normalizan igual no se adivina, porque colgar la ficha del cliente
+  // equivocado es peor que dejarla suelta.
   const handleTexto = (texto) => {
-    const empresa = buscarEmpresaPorNombre(texto, lista);
-    onChange(empresa ? clienteDesdeEmpresa(empresa) : clienteSinVincular(texto));
+    const { empresa, coincidencias } = resolverEmpresa({ nombre: texto }, lista);
+    if (empresa && coincidencias === 1) onChange(clienteDesdeEmpresa(empresa, { usarAlias: value.usarAlias }));
+    else onChange(aliasManual(clienteSinVincular(texto), alias));
   };
 
   const handleElegir = (opcion) => onChange(clienteDesdeEmpresa(opcion.data));
 
   // Desvincular deja el nombre escrito: sirve cuando la ficha es para un
   // cliente distinto que se llama parecido.
-  const handleDesvincular = () => onChange(clienteSinVincular(nombre));
+  const handleDesvincular = () => onChange(aliasManual(clienteSinVincular(nombre), alias));
+
+  // Empresas parecidas que podrían ser la misma (mismo nombre salvo la forma
+  // legal, o el mismo NIT sin dígito de verificación). Se ofrecen para
+  // vincular antes de crear: es el momento en que nace el duplicado.
+  const parecidas = React.useMemo(
+    () => (vinculado || !nombre.trim() ? [] : buscarPosiblesDuplicados({ nombre, alias }, lista).slice(0, 3)),
+    [vinculado, nombre, alias, lista]
+  );
 
   const handleCrear = async () => {
     const limpio = nombre.trim();
     if (!limpio) return;
     setCreando(true);
     try {
-      const id = await crearEmpresa({ nombre: limpio, nit: "", ciudad: "" });
+      // Pasa por resolverOCrearEmpresa y no por crearEmpresa: si el cliente ya
+      // existía con otra escritura, se reutiliza en vez de duplicarlo.
+      const { empresa, creada } = await resolverOCrearEmpresa({ nombre: limpio, alias }, { empresas: lista });
       const datos = await listarEmpresas();
       setEmpresas(datos);
-      const empresa = datos.find((e) => e.id === id) || { id, nombre: limpio, nit: "", ciudad: "" };
-      onChange(clienteDesdeEmpresa(empresa));
-      toast.success("Cliente creado y vinculado");
+      const actual = datos.find((e) => e.id === empresa.id) || empresa;
+      onChange(clienteDesdeEmpresa(actual, { usarAlias: value.usarAlias }));
+      toast.success(creada ? "Cliente creado y vinculado" : `Ya existía como "${actual.nombre}": se vinculó a ese`);
     } catch (e) {
       console.error(e);
       toast.error("No se pudo crear el cliente");
@@ -99,7 +118,7 @@ export default function ClienteSelector({
         onChange={handleTexto}
         onSelect={handleElegir}
         options={opciones}
-        placeholder={cargando ? "Cargando clientes…" : "Nombre del cliente"}
+        placeholder={cargando ? "Cargando clientes…" : "Nombre o alias del cliente"}
         inputClassName={inputCls}
         emptyText="Ningún cliente con ese nombre"
       />
@@ -135,6 +154,47 @@ export default function ClienteSelector({
           </button>
         </div>
       ) : null}
+
+      {parecidas.map(({ empresa, motivo }) => (
+        <div key={empresa.id} className="mt-1 flex items-center gap-1.5 text-[11px] text-blue-700 dark:text-blue-400">
+          <FaLink className="shrink-0" />
+          <span className="truncate">
+            ¿Es «{empresa.nombre}»? {motivo === "nit" ? "Mismo NIT" : "Mismo nombre sin la forma legal"}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(clienteDesdeEmpresa(empresa))}
+            className="ml-auto shrink-0 font-medium underline"
+          >
+            Vincular
+          </button>
+        </div>
+      ))}
+
+      {/* Alias impreso. Va aquí y no solo en la pantalla de empresas porque la
+          decisión es de la orden: el alias de la empresa llega puesto, y esta
+          ficha puede salir con el nombre completo si así conviene. Lo que se
+          escriba aquí queda dentro de la ficha, no cambia la empresa. */}
+      <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+        <input
+          id={idAlias}
+          type="checkbox"
+          checked={Boolean(value.usarAlias)}
+          disabled={!alias.trim()}
+          onChange={(e) => onChange({ ...value, usarAlias: e.target.checked })}
+          className="shrink-0 accent-blue-600 disabled:opacity-40"
+        />
+        <label htmlFor={idAlias} className="shrink-0 text-gray-600 dark:text-gray-400">
+          Imprimir alias
+        </label>
+        <input
+          value={alias}
+          onChange={(e) => onChange(aliasManual(value, e.target.value))}
+          placeholder="Alias en la orden (opcional)"
+          title="Abreviación con la que sale el cliente en la orden de producción. Solo afecta a esta ficha."
+          className="min-w-0 flex-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 px-2 py-1 text-[11px] uppercase"
+        />
+      </div>
     </div>
   );
 }

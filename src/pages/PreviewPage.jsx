@@ -6,7 +6,7 @@ import { generarPDFReact, entregarPDFBlob } from "../utils/pdfReact";
 import { generarSeccionesHTML, generarSeccionesPorProducto } from "../utils/htmlSections";
 import { sanitizeHtml } from "../utils/sanitizeHtml";
 import { isoHoyMasDias, textoVigenciaDesdeISO, reemplazarVigenciaEnHTML, VIGENCIA_DIAS_POR_DEFECTO } from "../utils/vigencia";
-import { obtenerEmpresaPorNIT, crearEmpresa, actualizarEmpresa, listarEmpresas, listarContactos, buscarContactoPorEmail, crearContacto, actualizarContacto } from "../utils/firebaseCompanies";
+import { actualizarEmpresa, listarEmpresas, listarContactos, resolverOCrearEmpresa, resolverOCrearContacto, actualizarContacto } from "../utils/firebaseCompanies";
 import toast from "react-hot-toast";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
@@ -262,46 +262,49 @@ export default function PreviewPage() {
     }
 
     try {
-      let empresa = null;
-      if(nit) { empresa = await obtenerEmpresaPorNIT(nit); }
-      if(!empresa && nombreEmpresa) {
-        const empresaId = await crearEmpresa({ nit: nit || '', nombre: nombreEmpresa, ciudad });
-        empresa = { id: empresaId, nit: nit || '', nombre: nombreEmpresa, ciudad };
-        toast.success("Empresa creada");
-      } else if(empresa) {
+      // Se busca la empresa por NIT, nombre y alias antes de crear nada (ver
+      // firebaseCompanies.resolverOCrearEmpresa). Antes solo se buscaba por NIT
+      // exacto: un cliente sin NIT se volvía a crear cada vez que se guardaban
+      // sus datos desde esta pantalla, y de ahí salía buena parte de los
+      // duplicados.
+      const { empresa, creada } = await resolverOCrearEmpresa(
+        { nit: nit || '', nombre: nombreEmpresa, ciudad },
+        { empresas }
+      );
+      if(!empresa){ setEditandoCliente(false); return; }
+      if(creada) toast.success("Empresa creada");
+
+      // Sobre una empresa que ya existía, esta pantalla sí corrige nombre y
+      // ciudad: el usuario acaba de confirmar que quiere sobrescribirlos.
+      if(!creada){
         const cambios = {};
         if(nombreEmpresa && nombreEmpresa !== empresa.nombre) cambios.nombre = nombreEmpresa;
         if(ciudad && ciudad !== empresa.ciudad) cambios.ciudad = ciudad;
         if(Object.keys(cambios).length){ await actualizarEmpresa(empresa.id, cambios); }
       }
 
-      if(empresa) {
-        let contacto = null;
-        if(emailContacto){
-          contacto = await buscarContactoPorEmail(empresa.id, emailContacto);
-        }
-        if(!contacto && nombreContacto){
-          const listaC = await listarContactos(empresa.id);
-          contacto = listaC.find(c=> c.nombre?.toLowerCase() === nombreContacto.toLowerCase());
-        }
-        if(!contacto && (nombreContacto || emailContacto)){
-          const contactoId = await crearContacto(empresa.id, { nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto });
-          contacto = { id: contactoId, nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto };
-          toast.success("Contacto creado");
-        } else if(contacto) {
+      const { contacto, creada: contactoCreado } = await resolverOCrearContacto(
+        empresa.id,
+        { nombre: nombreContacto, email: emailContacto, telefono: telefonoContacto }
+      );
+      if(contacto){
+        if(contactoCreado) toast.success("Contacto creado");
+        else {
           const cambiosC = {};
           if(nombreContacto && nombreContacto !== contacto.nombre) cambiosC.nombre = nombreContacto;
           if(emailContacto && emailContacto !== contacto.email) cambiosC.email = emailContacto;
           if(telefonoContacto && telefonoContacto !== contacto.telefono) cambiosC.telefono = telefonoContacto;
-          if(Object.keys(cambiosC).length){ await actualizarContacto(empresa.id, contacto.id, cambiosC); }
-          toast.success("Contacto actualizado (sobrescrito)");
+          if(Object.keys(cambiosC).length){
+            await actualizarContacto(empresa.id, contacto.id, cambiosC);
+            toast.success("Contacto actualizado (sobrescrito)");
+          }
         }
-
-        const listaEmp = await listarEmpresas();
-        setEmpresas(listaEmp);
-        setEmpresaSeleccionada(listaEmp.find(e=> e.id===empresa.id) || empresa);
-        if(contacto) setContactoSeleccionado(contacto);
       }
+
+      const listaEmp = await listarEmpresas();
+      setEmpresas(listaEmp);
+      setEmpresaSeleccionada(listaEmp.find(e=> e.id===empresa.id) || empresa);
+      if(contacto) setContactoSeleccionado(contacto);
 
     } catch(e){
       console.error("Error guardando empresa/contacto", e);

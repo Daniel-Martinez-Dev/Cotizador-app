@@ -4,6 +4,7 @@ import { fmtN, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { Membrete, Firmas, FichaFooter, InfoChip, SectionTitle, Casilla } from "./fichas/FichaVisualKit";
 import { codigoFichaOFallback } from "../utils/codigoFicha";
+import { nombreClienteImpreso } from "../utils/clienteVinculo";
 
 // Orden de producción para lo que NO tiene ficha de fabricación: repuestos y
 // productos que se despachan tal cual (semáforos, lámparas, topes, rampas…).
@@ -31,7 +32,7 @@ export default function FichaImpresionGeneral({ ficha, numero, onClose }) {
     <FichaImpresionShell
       productLabel="Ficha Básica"
       numero={codigo}
-      cliente={f.cliente}
+      cliente={nombreClienteImpreso(f)}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
@@ -50,7 +51,7 @@ export default function FichaImpresionGeneral({ ficha, numero, onClose }) {
           <div style={{ display: "grid", gridTemplateColumns: "2.4fr 1fr", gap: "8px", marginBottom: "8px" }}>
             <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 12px" }}>
               <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1a3f8f" }}>{nombreClienteImpreso(f) || "—"}</div>
             </div>
             <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 12px", textAlign: "center" }}>
               <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Total unidades</div>

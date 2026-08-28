@@ -4,7 +4,7 @@ import { priceMatrices, CLIENTE_FACTORES, EXTRAS_POR_DEFECTO, buscarPrecio, busc
 import { getPrecioProducto, validarRangoProducto, getConfigProducto } from '../data/catalogoProductos';
 import { PRODUCTOS_ACTIVOS } from '../data/catalogoProductos';
 import { useQuote } from '../context/QuoteContext';
-import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, crearEmpresa, crearContacto, buscarContactoPorEmail } from '../utils/firebaseCompanies';
+import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, resolverOCrearEmpresa, resolverOCrearContacto } from '../utils/firebaseCompanies';
 import { waitForAuth, getAuthError } from '../firebase';
 import toast from 'react-hot-toast';
 import { numeroALetras } from '../utils/numeroALetras';
@@ -256,36 +256,37 @@ export default function CotizadorApp(){
     }
 
     let empresaRef = empresaSeleccionada;
-    if(!empresaRef && nitTrim){
-      const existente = await obtenerEmpresaPorNIT(nitTrim);
-      if(existente){ empresaRef = existente; }
-      else if(nombreEmpresaTrim){
-        const id = await crearEmpresa({ nit: nitTrim, nombre: nombreEmpresaTrim, ciudad: ciudadTrim });
-        toast.success('Empresa creada');
-        const lista = await listarEmpresas(); setEmpresas(lista); empresaRef = lista.find(e=>e.id===id) || { id, nit:nitTrim, nombre:nombreEmpresaTrim, ciudad:ciudadTrim };
-      } else {
+    if(!empresaRef && (nitTrim || nombreEmpresaTrim)){
+      // Un único punto de alta (ver firebaseCompanies.resolverOCrearEmpresa):
+      // busca por NIT en dígitos, por nombre y por alias antes de crear. Antes
+      // solo se miraba el NIT tal cual, así que el mismo cliente escrito con
+      // puntos —o sin NIT— entraba otra vez cada vez que se cotizaba.
+      const { empresa, creada } = await resolverOCrearEmpresa(
+        { nit: nitTrim, nombre: nombreEmpresaTrim, ciudad: ciudadTrim },
+        { empresas }
+      );
+      if(!empresa){
         toast.error('Nombre empresa requerido');
         throw new Error('Nombre empresa requerido');
       }
-    }
-    if(!empresaRef && nombreEmpresaTrim && !nitTrim){
-      // Crear empresa sin NIT (permitido?) -> se permite con NIT vacío
-      const id = await crearEmpresa({ nit:'', nombre: nombreEmpresaTrim, ciudad: ciudadTrim });
-      toast.success('Empresa creada');
-      const lista = await listarEmpresas(); setEmpresas(lista); empresaRef = lista.find(e=>e.id===id) || { id, nit:'', nombre:nombreEmpresaTrim, ciudad:ciudadTrim };
+      toast.success(creada ? 'Empresa creada' : `Cliente ya registrado: ${empresa.nombre}`);
+      const lista = await listarEmpresas(); setEmpresas(lista);
+      empresaRef = lista.find(e=>e.id===empresa.id) || empresa;
     }
     if(empresaRef) setEmpresaSeleccionada(empresaRef);
 
     let contactoRef = contactoSeleccionado;
     if(empresaRef && !contactoRef && (nombreContTrim || emailContTrim)){
-      let existente = null;
-      if(emailContTrim){ existente = await buscarContactoPorEmail(empresaRef.id, emailContTrim); }
-      if(!existente){
-        const id = await crearContacto(empresaRef.id, { nombre: nombreContTrim || emailContTrim || 'Contacto', email: emailContTrim, telefono: telContTrim });
-        toast.success('Contacto creado');
-        const listaC = await listarContactos(empresaRef.id); setContactosEmpresa(listaC); existente = listaC.find(c=>c.id===id) || { id, nombre:nombreContTrim, email:emailContTrim, telefono:telContTrim };
-      }
-      contactoRef = existente;
+      // El contacto también se busca por nombre y no solo por email: la mayoría
+      // entra sin correo, y por eso cada cotización creaba de nuevo al mismo
+      // agente de compras.
+      const { contacto, creada } = await resolverOCrearContacto(
+        empresaRef.id,
+        { nombre: nombreContTrim, email: emailContTrim, telefono: telContTrim }
+      );
+      if(creada) toast.success('Contacto creado');
+      const listaC = await listarContactos(empresaRef.id); setContactosEmpresa(listaC);
+      contactoRef = listaC.find(c=>c.id===contacto?.id) || contacto;
     }
     if(contactoRef) setContactoSeleccionado(contactoRef);
     return { empresa: empresaRef || null, contacto: contactoRef || null };

@@ -14,6 +14,7 @@ import { getImpresionComponent } from "../../components/fichas/impresionPorTipo"
 import { ROL_CORRIGE_FIRMAS } from "../../utils/firmasFicha";
 import { codigoFichaOFallback } from "../../utils/codigoFicha";
 import { medidasFicha } from "../../utils/medidasFicha";
+import { nombreClienteImpreso } from "../../utils/clienteVinculo";
 
 function fmtFecha(f) {
   if (!f) return "—";
@@ -90,7 +91,12 @@ export default function EmpleadoFichaDetalle() {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{ficha.tipoLabel}</div>
-            <div className="font-semibold text-base break-words">{ficha.cliente || "Sin cliente"}</div>
+            {/* El mismo nombre que salió impreso en la orden — alias incluido —
+                para que lo que dice el papel y lo que dice la app coincidan. */}
+            <div className="font-semibold text-base break-words">{nombreClienteImpreso(ficha) || "Sin cliente"}</div>
+            {ficha.usarAlias && ficha.cliente && (
+              <div className="text-[11px] text-gray-500 dark:text-gray-400 break-words">{ficha.cliente}</div>
+            )}
           </div>
           <EstadoBadge estado={ficha.estado} />
         </div>

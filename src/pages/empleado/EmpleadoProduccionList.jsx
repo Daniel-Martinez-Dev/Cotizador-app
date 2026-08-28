@@ -10,6 +10,7 @@ import EstadoBadge from "../../components/fichas/EstadoBadge";
 import EmptyState from "../../components/ui/EmptyState";
 import { codigoFicha as codigoDeFicha, codigoFichaOFallback } from "../../utils/codigoFicha";
 import { medidasFichaTexto, coincideMedida } from "../../utils/medidasFicha";
+import { nombreClienteImpreso } from "../../utils/clienteVinculo";
 
 const ESTADO_TABS = [
   { key: "en_produccion", label: "En producción" },
@@ -104,7 +105,9 @@ export default function EmpleadoProduccionList() {
       .filter((f) => tipoFiltro === "todos" || f.tipo === tipoFiltro)
       .filter((f) => {
         if (!term) return true;
-        const blob = `${f.cliente || ""} ${f.ordenProduccion || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
+        // El alias entra en la búsqueda junto al nombre completo: en planta se
+        // busca por el que salió impreso, pero desde oficina se pregunta por el otro.
+        const blob = `${f.cliente || ""} ${f.clienteAlias || ""} ${f.ordenProduccion || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
         // La medida es el otro dato con el que planta busca una ficha.
         return blob.includes(term) || coincideMedida(f, term);
       });
@@ -245,7 +248,7 @@ export default function EmpleadoProduccionList() {
 
                   {/* Cliente y medida juntos: cuando un mismo cliente tiene varias
                       órdenes abiertas, la medida es lo que las distingue en planta. */}
-                  <div className="font-semibold text-[15px] leading-snug break-words mt-0.5">{f.cliente || "Sin cliente"}</div>
+                  <div className="font-semibold text-[15px] leading-snug break-words mt-0.5">{nombreClienteImpreso(f) || "Sin cliente"}</div>
 
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     {medida ? (

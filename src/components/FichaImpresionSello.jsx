@@ -6,6 +6,7 @@ import { FaUserTie, FaRegCalendarAlt } from "react-icons/fa";
 import { MedidaCard, InfoChip, AcabadoCard, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
 import { codigoFichaOFallback } from "../utils/codigoFicha";
 import planoSelloAnden from "../assets/imagenes/SelloDeAnden/Plano.png";
+import { nombreClienteImpreso } from "../utils/clienteVinculo";
 
 // ─── Plano técnico (imagen de referencia + medidas superpuestas) ─────────────
 // La imagen fuente (Plano.png) trae cada cota como "Etiqueta =" sin el valor
@@ -118,7 +119,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
     <FichaImpresionShell
       productLabel="Sello de Andén"
       numero={codigo}
-      cliente={f.cliente}
+      cliente={nombreClienteImpreso(f)}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
@@ -160,7 +161,7 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <Panel title="Información General">
                 <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.5px" }}>Cliente:</div>
-                <div style={{ fontSize: "19px", fontWeight: "bold", color: "#1a3f8f", marginBottom: "10px" }}>{f.cliente || "—"}</div>
+                <div style={{ fontSize: "19px", fontWeight: "bold", color: "#1a3f8f", marginBottom: "10px" }}>{nombreClienteImpreso(f) || "—"}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
                   <InfoChip label="Fecha orden"   value={fmtDate(f.fechaOrden)} />
                   <InfoChip label="Fecha entrega" value={fmtDate(f.fechaEntrega)} highlight={!!f.fechaEntrega} />

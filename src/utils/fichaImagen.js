@@ -17,6 +17,10 @@ import { htmlParaImprimir } from "./impresionAhorroTinta";
 // del tamaño de la pantalla ni del zoom del visor.
 
 export const ESCALA_HD = 2; // 1220 px de diseño → 2440 px de ancho real
+// Lo que va al papel se rasteriza más fino: a 3× el ancho de diseño la ficha
+// impresa queda por encima de los 300 ppp en una carta horizontal, que es lo
+// que hace falta para que se lea la letra pequeña de las tablas.
+export const ESCALA_IMPRESION = 3;
 
 // `ahorroTinta` deja la ficha como se imprime (sin fondos de color, texto
 // negro); sin él sale como se ve en pantalla, que es lo que se quiere cuando la
@@ -103,7 +107,7 @@ async function incrustarImagenes(raiz) {
       try {
         const resp = await fetch(src);
         const blob = await resp.blob();
-        img.setAttribute("src", await blobABase64Url(blob));
+        img.setAttribute("src", await blobADataUrl(blob));
         // Hay que esperar a que quede decodificada: al rasterizar el SVG, el
         // navegador no descarga ni decodifica nada nuevo, así que una imagen
         // aún sin decodificar sale en blanco (era lo que pasaba con los planos
@@ -196,7 +200,7 @@ async function compartirEnAndroid(blob, nombreArchivo) {
   await Share.share({ title: nombreArchivo, url: uri, dialogTitle: "Compartir ficha" });
 }
 
-function blobABase64Url(blob) {
+export function blobADataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(String(reader.result));
@@ -206,5 +210,16 @@ function blobABase64Url(blob) {
 }
 
 async function blobABase64(blob) {
-  return String(await blobABase64Url(blob)).split(",")[1];
+  return String(await blobADataUrl(blob)).split(",")[1];
+}
+
+// Alto × ancho reales del PNG ya generado: la hoja necesita su proporción para
+// encogerlo sin deformarlo.
+export function medirImagen(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("No se pudo medir la imagen de la ficha"));
+    img.src = src;
+  });
 }

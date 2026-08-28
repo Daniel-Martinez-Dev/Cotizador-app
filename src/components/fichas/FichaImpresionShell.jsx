@@ -5,8 +5,8 @@ import {
   FaPrint, FaTimes, FaFileAlt, FaSearchPlus, FaSearchMinus, FaCompressArrowsAlt,
   FaRegCopy, FaCheck,
 } from "react-icons/fa";
-import { fichaAPngBlob, copiarImagenFicha } from "../../utils/fichaImagen";
-import { htmlParaImprimir } from "../../utils/impresionAhorroTinta";
+import { fichaAPngBlob, copiarImagenFicha, blobADataUrl, medirImagen, ESCALA_IMPRESION } from "../../utils/fichaImagen";
+import { tamanoEnHoja } from "../../utils/hojaImpresion";
 import { compartirFichaParaImprimir, esCancelacion } from "../../utils/fichaImpresionMovil";
 
 // Modal + lógica de impresión compartida por las fichas de impresión
@@ -241,35 +241,53 @@ export default function FichaImpresionShell({
   const nombreBase = () => `Ficha_${String(numero || "").replace(/[^\w-]/g, "") || "produccion"}`;
 
   // ── Impresión ────────────────────────────────────────────────────────────
-  // Lo que se manda al papel NO es lo mismo que se ve en pantalla: pasa por el
-  // modo ahorro de tinta (utils/impresionAhorroTinta.js), que quita los fondos
-  // de color y deja el texto en negro. En el visor la ficha conserva sus bandas.
-  const buildHtml = () => `<!DOCTYPE html><html><head>
+  // Al papel va una IMAGEN de la ficha, no su HTML.
+  //
+  // Con el HTML, el navegador vuelve a maquetar la ficha con el ancho del papel
+  // (unos 780 px en carta vertical, 1018 en horizontal) en vez de los 1220 px
+  // para los que está diseñada: las tarjetas se angostan, los rótulos se parten
+  // en más renglones, la ficha crece de alto y termina saliendo en dos hojas con
+  // la letra desproporcionada. El `zoom` con el que se intentaba corregir no
+  // servía, porque se calculaba sobre la maquetación del iframe —a otro ancho—
+  // y no sobre la que acaba en la hoja.
+  //
+  // La imagen se rasteriza siempre al ancho de diseño y con el modo ahorro de
+  // tinta (utils/impresionAhorroTinta.js: sin fondos de color, texto negro), y
+  // en la hoja solo se encoge para caber completa. Así lo que se imprime es
+  // exactamente lo que muestra el visor, y en UNA sola hoja. Es el mismo camino
+  // que ya usaba el celular (utils/fichaImpresionMovil.js).
+  const buildHtml = (dataUrl, tamanoPng) => {
+    // La ficha se lleva a milímetros —no a porcentajes— para que su tamaño en
+    // la hoja no dependa de cómo resuelva cada motor los altos relativos al
+    // imprimir. Los max-* del 100% quedan de red de seguridad por si la hoja
+    // termina siendo más pequeña (carta vertical, A4, media carta): recortan la
+    // caja y `object-fit: contain` mantiene la proporción dentro de ella.
+    const { anchoMm, altoMm } = tamanoEnHoja(tamanoPng);
+
+    return `<!DOCTYPE html><html><head>
       <meta charset="utf-8"/>
       <title>Ficha ${productLabel} ${numero} — ${cliente || ""}</title>
       <style>
-        * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; }
-        body { margin: 8mm; font-family: Arial, sans-serif; background: white; color: #000; }
-        table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #333; padding: 4px 7px; font-size: 12px; vertical-align: middle; }
-        @media print { body { margin: 5mm; } @page { size: letter landscape; margin: 0; } }
+        html, body { height: 100%; margin: 0; padding: 0; background: white; }
+        body { display: flex; align-items: center; justify-content: center; }
+        img {
+          width: ${anchoMm.toFixed(2)}mm; height: ${altoMm.toFixed(2)}mm;
+          max-width: 100%; max-height: 100%;
+          object-fit: contain; display: block;
+        }
+        @page { size: letter landscape; margin: 5mm; }
       </style>
-    </head><body><div id="print-content">${htmlParaImprimir(printRef.current)}</div></body></html>`;
+    </head><body><img src="${dataUrl}" alt="Ficha ${productLabel} ${numero}"/></body></html>`;
+  };
 
-  // Encoge el contenido (si hace falta) para que cualquier ficha, sin importar
-  // cuántas filas/insumos tenga, entre siempre en una sola página carta (Letter)
-  // horizontal — el tamaño real en el que se imprime. Si este cálculo usara
-  // A4 (más ancho que carta) y el driver de impresión luego reescala a carta,
-  // el contenido se encoge dos veces y el texto sale más pequeño de lo previsto.
-  const ajustarAUnaPagina = (targetWin) => {
-    const el = targetWin.document.getElementById("print-content");
-    if (!el) return;
-    const mmToPx = 96 / 25.4;
-    const pageW = (279.4 - 10) * mmToPx; // Carta (Letter) horizontal menos márgenes de 5mm
-    const pageH = (215.9 - 10) * mmToPx;
-    const escala = Math.min(1, pageW / el.scrollWidth, pageH / el.scrollHeight);
-    if (escala < 1) el.style.zoom = escala;
+  const htmlDeLaFicha = async () => {
+    const png = await fichaAPngBlob(printRef.current, {
+      anchoDiseno: designWidth,
+      escala: ESCALA_IMPRESION,
+      ahorroTinta: true,
+    });
+    const dataUrl = await blobADataUrl(png);
+    return buildHtml(dataUrl, await medirImagen(dataUrl));
   };
 
   const cuandoCargue = (targetWin, accion) => {
@@ -311,7 +329,6 @@ export default function FichaImpresionShell({
           // quita el documento mientras el diálogo sigue abierto, el trabajo de
           // impresión se cancela solo.
           win.addEventListener("afterprint", retirar, { once: true });
-          ajustarAUnaPagina(win);
           win.focus();
           win.print();
         } catch (e) {
@@ -357,7 +374,6 @@ export default function FichaImpresionShell({
       cuandoCargue(win, () => {
         try {
           win.addEventListener("afterprint", cerrar, { once: true });
-          ajustarAUnaPagina(win);
           win.focus();
           win.print();
           // En Chrome, Edge y Electron print() no devuelve el control hasta que
@@ -401,14 +417,25 @@ export default function FichaImpresionShell({
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!printRef.current || printing) return;
     setPrinting(true);
     if (Capacitor.isNativePlatform()) {
       imprimirEnCelular();
       return;
     }
-    imprimirConIframe(buildHtml());
+    // Rasterizar la ficha toma un momento: sin el aviso parece que el botón no
+    // hizo nada mientras se arma la hoja.
+    const aviso = toast.loading("Preparando la ficha para imprimir…");
+    try {
+      imprimirConIframe(await htmlDeLaFicha());
+    } catch (e) {
+      console.error("No se pudo preparar la ficha para imprimir", e);
+      toast.error("No se pudo preparar la ficha para imprimir");
+      setPrinting(false);
+    } finally {
+      toast.dismiss(aviso);
+    }
   };
 
   // ── Copiar la ficha como imagen ──────────────────────────────────────────

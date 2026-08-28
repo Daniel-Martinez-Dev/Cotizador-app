@@ -52,6 +52,8 @@ const INITIAL_FORM = {
   clienteId:         null,
   clienteNit:        "",
   clienteCiudad:     "",
+  clienteAlias:      "",
+  usarAlias:         false,
   responsable:       "",
   fechaOrden:        hoy(),
   fechaEntrega:      "",

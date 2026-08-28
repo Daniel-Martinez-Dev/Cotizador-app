@@ -5,6 +5,7 @@ import logoPng from "../assets/imagenes/logo.png";
 import { PARAMETROS_PUERTA_SECCIONAL } from "../modules/produccion/puertas-seccionales/parametros.js";
 import { AcabadoCard, SectionTitle, Membrete, Firmas, FichaFooter, InfoChip, MedidaHero, Casilla } from "./fichas/FichaVisualKit";
 import { codigoFichaOFallback } from "../utils/codigoFicha";
+import { nombreClienteImpreso } from "../utils/clienteVinculo";
 
 // Cotas del plano: negro y con halo blanco (paintOrder) para que el número se
 // lea aunque caiga encima del dibujo — la ficha se imprime y se lleva al taller.
@@ -331,7 +332,7 @@ export default function FichaImpresionPuertaSeccional({ ficha, numero, onClose }
     <FichaImpresionShell
       productLabel="Puerta Seccional"
       numero={codigo}
-      cliente={f.cliente}
+      cliente={nombreClienteImpreso(f)}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
@@ -357,7 +358,7 @@ export default function FichaImpresionPuertaSeccional({ ficha, numero, onClose }
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
               <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
                 <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{nombreClienteImpreso(f) || "—"}</div>
               </div>
               <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>
                 <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cantidad</div>

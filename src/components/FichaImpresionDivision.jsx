@@ -4,6 +4,7 @@ import { fmtMm, fmtCm as fmt1, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { MedidaCard, InfoChip, AcabadoCard, SectionTitle, MedidaHero, Membrete, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
 import { codigoFichaOFallback } from "../utils/codigoFicha";
+import { nombreClienteImpreso } from "../utils/clienteVinculo";
 
 // Convierte un valor en milímetros a metros (2 decimales) — distinto de fmtM2,
 // que formatea un área en m² ya calculada.
@@ -256,7 +257,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
     <FichaImpresionShell
       productLabel="División Térmica"
       numero={codigo}
-      cliente={f.cliente}
+      cliente={nombreClienteImpreso(f)}
       onClose={onClose}
       maxWidthClass="max-w-[1220px]"
       windowSize={{ width: 1300, height: 840 }}
@@ -292,7 +293,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "6px" }}>
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px" }}>
                   <div style={{ fontSize: "9.5px", color: "#000000", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "3px" }}>Cliente</div>
-                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{f.cliente || "—"}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3f8f" }}>{nombreClienteImpreso(f) || "—"}</div>
                 </div>
 
                 <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "8px 10px", textAlign: "center" }}>

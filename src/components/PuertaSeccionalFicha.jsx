@@ -41,6 +41,8 @@ const INITIAL_FORM = {
   clienteId:         null,
   clienteNit:        "",
   clienteCiudad:     "",
+  clienteAlias:      "",
+  usarAlias:         false,
   cantidad:          1,
   fechaOrden:        hoy(),
   anchoVano:         "",
@@ -132,7 +134,9 @@ export default function PuertaSeccionalFicha() {
     return fichas
       .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx), codigo: codigoDeFicha(f, "puertaseccional") }))
       .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
-      .filter(({ f }) => !term || (f.cliente || "").toLowerCase().includes(term));
+      // Busca por el nombre y por el alias: en oficina se pregunta por el
+      // nombre legal y en planta por la abreviación que salió impresa.
+      .filter(({ f }) => !term || `${f.cliente || ""} ${f.clienteAlias || ""}`.toLowerCase().includes(term));
   }, [fichas, search, estadoFiltro]);
 
   const loadFichas = React.useCallback(async () => {

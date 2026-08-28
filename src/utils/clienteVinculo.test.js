@@ -10,6 +10,8 @@ import {
   buscarEmpresaPorNombre,
   buscarEmpresaPorNit,
   planVinculacion,
+  nombreClienteImpreso,
+  aliasManual,
 } from "./clienteVinculo";
 
 const EMPRESAS = [
@@ -52,14 +54,35 @@ describe("datos del cliente en la ficha", () => {
     expect(clienteDesdeEmpresa(EMPRESAS[1])).toEqual({
       clienteId: "e2",
       cliente: "Frigorífico del Norte",
+      clienteAlias: "",
+      usarAlias: false,
       clienteNit: "901234567",
       clienteCiudad: "Bogotá",
     });
   });
 
+  it("copia el alias y lo deja activo, porque para eso se define", () => {
+    const datos = clienteDesdeEmpresa({ id: "e9", nombre: "Comercializadora Internacional Andina S.A.S.", alias: "CI ANDINA" });
+    expect(datos.clienteAlias).toBe("CI ANDINA");
+    expect(datos.usarAlias).toBe(true);
+    expect(nombreClienteImpreso(datos)).toBe("CI ANDINA");
+  });
+
+  it("respeta que la ficha haya pedido el nombre completo", () => {
+    const datos = clienteDesdeEmpresa({ id: "e9", nombre: "Comercializadora Andina S.A.S.", alias: "ANDINA" }, { usarAlias: false });
+    expect(datos.usarAlias).toBe(false);
+    expect(nombreClienteImpreso(datos)).toBe("Comercializadora Andina S.A.S.");
+  });
+
+  it("una empresa sin alias nunca queda pidiendo alias", () => {
+    expect(clienteDesdeEmpresa(EMPRESAS[1], { usarAlias: true }).usarAlias).toBe(false);
+  });
+
   it("un cliente escrito a mano queda sin id", () => {
     const datos = clienteSinVincular("  Taller Nuevo  ");
-    expect(datos).toEqual({ clienteId: null, cliente: "Taller Nuevo", clienteNit: "", clienteCiudad: "" });
+    expect(datos).toEqual({
+      clienteId: null, cliente: "Taller Nuevo", clienteAlias: "", usarAlias: false, clienteNit: "", clienteCiudad: "",
+    });
     expect(fichaVinculada(datos)).toBe(false);
   });
 
@@ -67,6 +90,8 @@ describe("datos del cliente en la ficha", () => {
     expect(camposClienteFicha({ clienteId: "  ", cliente: "  ACME  ", clienteNit: '"123"' })).toEqual({
       clienteId: null,
       cliente: "ACME",
+      clienteAlias: "",
+      usarAlias: false,
       clienteNit: "123",
       clienteCiudad: "",
     });
@@ -74,14 +99,14 @@ describe("datos del cliente en la ficha", () => {
 
   it("camposClienteFicha sobre un objeto vacío no rompe", () => {
     expect(camposClienteFicha()).toEqual({
-      clienteId: null, cliente: "", clienteNit: "", clienteCiudad: "",
+      clienteId: null, cliente: "", clienteAlias: "", usarAlias: false, clienteNit: "", clienteCiudad: "",
     });
   });
 
   it("clienteDeFicha lee fichas viejas que solo tienen el nombre", () => {
     const ficha = { cliente: "Cliente Antiguo", cantidad: 2 };
     expect(clienteDeFicha(ficha)).toEqual({
-      clienteId: null, cliente: "Cliente Antiguo", clienteNit: "", clienteCiudad: "",
+      clienteId: null, cliente: "Cliente Antiguo", clienteAlias: "", usarAlias: false, clienteNit: "", clienteCiudad: "",
     });
     expect(fichaVinculada(ficha)).toBe(false);
   });
@@ -135,6 +160,8 @@ describe("planVinculacion", () => {
     expect(vincular[0].datos).toEqual({
       clienteId: "e1",
       cliente: "Alimentos Cárnicos S.A.S.",
+      clienteAlias: "",
+      usarAlias: false,
       clienteNit: "890900608",
       clienteCiudad: "Medellín",
     });
@@ -150,5 +177,46 @@ describe("planVinculacion", () => {
 
   it("sin empresas cargadas no vincula nada", () => {
     expect(planVinculacion(fichas, []).vincular).toEqual([]);
+  });
+});
+
+describe("nombreClienteImpreso", () => {
+  it("saca el alias cuando la ficha lo pidió", () => {
+    expect(nombreClienteImpreso({ cliente: "Comercializadora Andina S.A.S.", clienteAlias: "ANDINA", usarAlias: true }))
+      .toBe("ANDINA");
+  });
+
+  it("saca el nombre completo cuando la ficha no lo pidió", () => {
+    expect(nombreClienteImpreso({ cliente: "Comercializadora Andina S.A.S.", clienteAlias: "ANDINA", usarAlias: false }))
+      .toBe("Comercializadora Andina S.A.S.");
+  });
+
+  it("no deja la orden en blanco si se pidió un alias que no existe", () => {
+    expect(nombreClienteImpreso({ cliente: "Taller Nuevo", usarAlias: true })).toBe("Taller Nuevo");
+  });
+
+  it("las fichas anteriores al alias siguen imprimiendo su nombre", () => {
+    expect(nombreClienteImpreso({ cliente: "Cliente Antiguo" })).toBe("Cliente Antiguo");
+    expect(nombreClienteImpreso({})).toBe("");
+  });
+});
+
+describe("aliasManual", () => {
+  it("permite escribir el alias en una ficha sin vincular", () => {
+    const datos = aliasManual(clienteSinVincular("Taller Nuevo"), "  TALLER  ");
+    expect(datos.clienteAlias).toBe("TALLER");
+    expect(datos.usarAlias).toBe(true);
+    expect(nombreClienteImpreso(datos)).toBe("TALLER");
+  });
+
+  it("no vuelve a encender la casilla que se apagó a propósito", () => {
+    const datos = aliasManual({ cliente: "Taller", clienteAlias: "TAL", usarAlias: false }, "TALL");
+    expect(datos.usarAlias).toBe(false);
+  });
+
+  it("borrar el alias apaga la marca", () => {
+    const datos = aliasManual({ cliente: "Taller Nuevo", clienteAlias: "TALLER", usarAlias: true }, "");
+    expect(datos.usarAlias).toBe(false);
+    expect(nombreClienteImpreso(datos)).toBe("Taller Nuevo");
   });
 });

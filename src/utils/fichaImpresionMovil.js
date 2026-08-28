@@ -1,6 +1,7 @@
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import { fichaAPngBlob } from "./fichaImagen";
+import { fichaAPngBlob, blobADataUrl, medirImagen } from "./fichaImagen";
+import { CARTA_HORIZONTAL_MM, tamanoEnHoja } from "./hojaImpresion";
 
 // Imprimir la ficha desde el celular (app Android).
 //
@@ -17,9 +18,6 @@ import { fichaAPngBlob } from "./fichaImagen";
 // jsPDF se carga bajo demanda (import dinámico) para no engordar el arranque
 // de la app: solo hace falta cuando alguien imprime desde el celular.
 
-const CARTA_HORIZONTAL_MM = { ancho: 279.4, alto: 215.9 };
-const MARGEN_MM = 5;
-
 export async function fichaAPdfBlob(nodo, { anchoDiseno = 1220 } = {}) {
   // Se rasteriza en modo ahorro de tinta: lo que se comparte es para imprimir.
   const png = await fichaAPngBlob(nodo, { anchoDiseno, ahorroTinta: true });
@@ -30,12 +28,8 @@ export async function fichaAPdfBlob(nodo, { anchoDiseno = 1220 } = {}) {
   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
 
   // La ficha entra completa en la hoja conservando su proporción y centrada,
-  // igual que el ajuste a una página de la impresión de escritorio.
-  const dispW = CARTA_HORIZONTAL_MM.ancho - MARGEN_MM * 2;
-  const dispH = CARTA_HORIZONTAL_MM.alto - MARGEN_MM * 2;
-  const escala = Math.min(dispW / width, dispH / height);
-  const w = width * escala;
-  const h = height * escala;
+  // con la misma cuenta que la impresión de escritorio (utils/hojaImpresion.js).
+  const { anchoMm: w, altoMm: h } = tamanoEnHoja({ width, height });
   pdf.addImage(dataUrl, "PNG", (CARTA_HORIZONTAL_MM.ancho - w) / 2, (CARTA_HORIZONTAL_MM.alto - h) / 2, w, h);
 
   return pdf.output("blob");
@@ -63,24 +57,6 @@ export async function compartirFichaParaImprimir(nodo, { anchoDiseno = 1220, nom
 // tampoco hay que reintentar con otra forma de compartir.
 export function esCancelacion(e) {
   return /cancel/i.test(String(e?.message || e || ""));
-}
-
-function medirImagen(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error("No se pudo medir la imagen de la ficha"));
-    img.src = src;
-  });
-}
-
-function blobADataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }
 
 async function blobABase64(blob) {
