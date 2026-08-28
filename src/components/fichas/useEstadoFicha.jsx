@@ -22,11 +22,16 @@ import FirmaModal from "./FirmaModal";
 // "terminada" pide quién alistó y empacó, "entregada" quién revisó y aprobó
 // más los datos del despacho— y esos formularios se abren desde aquí venga de
 // donde venga el cambio.
+//
+// `tipo` puede venir null: es el caso del listado de órdenes, que mezcla las
+// seis colecciones y donde cada ficha trae el suyo en `ficha.tipo`. Las
+// pestañas de producto sí lo pasan fijo, porque sus fichas no lo llevan encima.
 export default function useEstadoFicha(tipo, fichas, setFichas) {
   const { user, profile } = useAuth();
-  const tipoLabel = getFichaTipoConfig(tipo).label;
   const [firmaAbierta, setFirmaAbierta] = React.useState(null);
   const [entregaAbierta, setEntregaAbierta] = React.useState(null);
+
+  const tipoDe = React.useCallback((ficha) => tipo || ficha?.tipo, [tipo]);
 
   // Quién queda firmando la nota en el historial.
   const autor = React.useMemo(() => ({
@@ -50,6 +55,7 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     const estadoAnterior = normalizarEstado(ficha?.estado);
     if (estadoAnterior === estado) return true;
     if (!ficha) return false;
+    const tipoFicha = tipoDe(ficha);
 
     if (estado === "terminado") {
       setFirmaAbierta({ ficha, notaInicial: nota || "" });
@@ -69,7 +75,7 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     }
 
     try {
-      const entrada = await cambiarEstadoFicha(tipo, id, {
+      const entrada = await cambiarEstadoFicha(tipoFicha, id, {
         estado,
         estadoAnterior,
         nota,
@@ -79,12 +85,12 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
       anexarNota(id, entrada, { estado });
       if (estado === "en_produccion") {
         crearNotificacionFichaEnProduccion({
-          fichaTipo: tipo,
-          tipoLabel,
+          fichaTipo: tipoFicha,
+          tipoLabel: getFichaTipoConfig(tipoFicha).label,
           fichaId: id,
           cliente: ficha?.cliente,
           ordenProduccion: ficha?.ordenProduccion,
-          codigoFicha: ficha ? codigoDeFicha(ficha, tipo) : "",
+          codigoFicha: codigoDeFicha(ficha, tipoFicha),
         }).catch((e) => console.error(e));
       }
       return true;
@@ -93,15 +99,16 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
       toast.error("Error actualizando estado");
       return false;
     }
-  }, [fichas, tipo, tipoLabel, autor, anexarNota]);
+  }, [fichas, tipoDe, autor, anexarNota]);
 
   // Lanza el error hacia arriba a propósito: el cuadro de texto necesita saber
   // si falló para no borrar lo que el usuario escribió.
   const agregarNota = React.useCallback(async (id, texto) => {
-    const entrada = await agregarNotaFicha(tipo, id, { texto, ...autor });
+    const ficha = fichas.find((x) => x.id === id);
+    const entrada = await agregarNotaFicha(tipoDe(ficha), id, { texto, ...autor });
     anexarNota(id, entrada);
     toast.success("Nota agregada");
-  }, [tipo, autor, anexarNota]);
+  }, [fichas, tipoDe, autor, anexarNota]);
 
   // Reabre el formulario de entrega sobre una ficha ya entregada, para corregir
   // placas o sumar fotos que faltaron.
@@ -124,7 +131,7 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     <>
       {firmaAbierta && (
         <FirmaModal
-          tipo={tipo}
+          tipo={tipoDe(firmaAbierta.ficha)}
           ficha={firmaAbierta.ficha}
           notaInicial={firmaAbierta.notaInicial}
           onClose={() => setFirmaAbierta(null)}
@@ -148,7 +155,7 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
 
       {entregaAbierta && (
         <EntregaModal
-          tipo={tipo}
+          tipo={tipoDe(entregaAbierta.ficha)}
           ficha={entregaAbierta.ficha}
           notaInicial={entregaAbierta.notaInicial}
           onClose={() => setEntregaAbierta(null)}

@@ -26,6 +26,12 @@ const ITEMS_COL = "inventario_items";
 const SUPPLIERS_COL = "inventario_proveedores";
 const MOVEMENTS_COL = "inventario_movimientos";
 
+// Tope de documentos que devuelven los listados completos de materiales y de
+// proveedores. Al tocarlo el listado deja de crecer por más registros que se
+// creen: los nuevos entran de primeros (orden por createdAt desc) y los más
+// viejos quedan por fuera. La UI avisa cuando el resultado llega a este tope.
+export const LIMITE_LISTADO = 1000;
+
 const sanitizeText = (v) => {
   if (v === null || typeof v === "undefined") return "";
   return String(v)
@@ -194,7 +200,7 @@ export async function crearProveedoresBulk(list) {
 
 export async function listarProveedores() {
   await waitForAuth();
-  const q = query(collection(db, SUPPLIERS_COL), orderBy("createdAt", "desc"), limit(200));
+  const q = query(collection(db, SUPPLIERS_COL), orderBy("createdAt", "desc"), limit(LIMITE_LISTADO));
   const snap = await getDocs(q);
   return snap.docs.map((d) => {
     const data = d.data() || {};
@@ -349,7 +355,7 @@ export async function asignarCodigosMaterialFaltantes(items = null) {
 
 // Busca el material que corresponde a un código leído. La lista que ya está en
 // pantalla se consulta primero desde la UI; esto es el respaldo para cuando el
-// material no está en ella (el listado se corta en 200) y para que un barrido
+// material no está en ella (el listado se corta en LIMITE_LISTADO) y para que un barrido
 // nunca se quede sin respuesta por un problema de paginación.
 export async function buscarItemPorCodigo(codigo) {
   await waitForAuth();
@@ -373,7 +379,7 @@ export async function buscarItemPorCodigo(codigo) {
 
 export async function listarItemsInventario() {
   await waitForAuth();
-  const q = query(collection(db, ITEMS_COL), orderBy("createdAt", "desc"), limit(200));
+  const q = query(collection(db, ITEMS_COL), orderBy("createdAt", "desc"), limit(LIMITE_LISTADO));
   const snap = await getDocs(q);
   return snap.docs.map((d) => {
     const data = d.data() || {};

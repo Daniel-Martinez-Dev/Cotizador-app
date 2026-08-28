@@ -1,18 +1,10 @@
 import React from "react";
 import toast from "react-hot-toast";
 import { FaEdit, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
-import {
-  crearFichaGeneral,
-  listarFichasGenerales,
-  actualizarFichaGeneral,
-  eliminarFichaGeneral,
-} from "../utils/firebaseGeneral";
+import { crearFichaGeneral, actualizarFichaGeneral } from "../utils/firebaseGeneral";
 import { construirFichaGeneral, totalUnidades } from "../modules/produccion/general/normalizar";
-import FichaImpresionGeneral from "./FichaImpresionGeneral";
 import { fmtDate } from "../utils/fichaFormat";
-import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoControl from "./fichas/EstadoControl";
-import useEstadoFicha from "./fichas/useEstadoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
@@ -63,32 +55,13 @@ const INITIAL_FORM = {
 
 const CATEGORIA_OPCIONES = CATEGORIAS_GENERAL.map((c) => ({ id: c, label: c }));
 
-export default function FichaBasicaFicha() {
+export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardada }) {
   const { confirm } = useQuote();
   const [form, setForm]             = React.useState(INITIAL_FORM);
-  const [fichas, setFichas]         = React.useState([]);
   const [loading, setLoading]       = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState(null);
-  const [printFicha, setPrintFicha] = React.useState(null);
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
-
-  const { cambiarEstado, agregarNota, editarEntrega, editarFirma, modales } = useEstadoFicha("general", fichas, setFichas);
-
-  const loadFichas = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      setFichas(await listarFichasGenerales());
-    } catch (e) {
-      console.error(e);
-      toast.error("Error cargando fichas básicas");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => { loadFichas(); }, [loadFichas]);
 
   // ── Handlers de formulario ────────────────────────────────────────────────
 
@@ -135,7 +108,7 @@ export default function FichaBasicaFicha() {
         toast.success("Ficha básica guardada");
       }
       setForm(INITIAL_FORM);
-      await loadFichas();
+      onGuardada?.();
     } catch (err) {
       console.error(err);
       toast.error(editingId ? "Error actualizando ficha" : "Error guardando ficha");
@@ -156,7 +129,6 @@ export default function FichaBasicaFicha() {
       items:             Array.isArray(f.items) && f.items.length ? f.items.map((it) => ({ ...it })) : [itemVacio()],
     });
     setEditingId(f.id);
-    setSelectedId(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -165,20 +137,18 @@ export default function FichaBasicaFicha() {
     setForm(INITIAL_FORM);
   };
 
-  const handleEliminar = async (f) => {
-    const ok = await confirm(`¿Eliminar la ficha básica de ${f.cliente || "este cliente"}? Esta acción no se puede deshacer.`);
-    if (!ok) return;
-    try {
-      await eliminarFichaGeneral(f.id);
-      setFichas((prev) => prev.filter((x) => x.id !== f.id));
-      if (selectedId === f.id) setSelectedId(null);
-      if (editingId === f.id) cancelarEdicion();
-      toast.success("Ficha eliminada");
-    } catch (err) {
-      console.error(err);
-      toast.error("Error eliminando ficha");
-    }
-  };
+  // Órdenes es la lista de producción; desde allí se pide crear o editar una
+  // ficha de este producto y ProduccionPage cambia de pestaña dejando el
+  // encargo aquí. Se atiende una sola vez y se avisa para no repetirlo.
+  React.useEffect(() => {
+    if (!encargo) return;
+    if (encargo.accion === "editar" && encargo.ficha) handleEditar(encargo.ficha);
+    else cancelarEdicion();
+    onEncargoAtendido?.();
+    // Lo que dispara esto es el encargo; handleEditar y cancelarEdicion se
+    // rehacen en cada render y meterlos aquí lo dispararía en bucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encargo]);
 
   return (
     <div className="space-y-5">
@@ -358,120 +328,12 @@ export default function FichaBasicaFicha() {
         </form>
       </section>
 
-      {/* ── Fichas guardadas ── */}
-      <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-medium text-sm">Fichas básicas guardadas</div>
-          <button onClick={loadFichas} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-            Actualizar
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-sm opacity-60">Cargando…</div>
-        ) : fichas.length === 0 ? (
-          <div className="text-sm opacity-60">Sin fichas básicas guardadas</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                  <th className="text-left py-2 font-medium whitespace-nowrap">N.° ficha</th>
-                  <th className="text-left py-2 font-medium">Cliente</th>
-                  <th className="text-left py-2 font-medium">Ítems</th>
-                  <th className="text-center py-2 font-medium">Unidades</th>
-                  <th className="text-left py-2 font-medium whitespace-nowrap">Entrega</th>
-                  <th className="text-center py-2 font-medium">Estado</th>
-                  <th className="py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fichas.map((f) => {
-                  const items = Array.isArray(f.items) ? f.items : [];
-                  return (
-                    <React.Fragment key={f.id}>
-                      <tr
-                        onClick={() => setSelectedId(selectedId === f.id ? null : f.id)}
-                        className="border-b border-gray-100 dark:border-gris-700/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gris-700/40 transition-colors"
-                      >
-                        <td className="py-2 font-mono text-gray-500 whitespace-nowrap">
-                          {codigoDeFicha(f, "general") || f.ordenProduccion}
-                        </td>
-                        <td className="py-2 font-medium">{f.cliente || "—"}</td>
-                        <td className="py-2 text-gray-600 dark:text-gray-300 max-w-[22rem] truncate">
-                          {items.map((it) => it.descripcion).join(", ") || "—"}
-                        </td>
-                        <td className="py-2 text-center">{f.cantidad ?? 0}</td>
-                        <td className="py-2 text-gray-500 whitespace-nowrap">{fmtDate(f.fechaEntrega)}</td>
-                        <td className="py-2 text-center">
-                          <EstadoBadge estado={f.estado} onChange={(estado) => cambiarEstado(f.id, estado)} />
-                        </td>
-                        <td className="py-2 pl-2">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setPrintFicha(f); }}
-                              className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap"
-                            >
-                              Ver ficha
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEditar(f); }}
-                              title="Editar ficha"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                            >
-                              <FaEdit className="text-[11px]" />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEliminar(f); }}
-                              title="Eliminar ficha"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                            >
-                              <FaTrash className="text-[11px]" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {selectedId === f.id && (
-                        <tr className="border-b border-gray-200 dark:border-gris-700">
-                          <td colSpan={7} className="py-3 px-2">
-                            <FichaBasicaDetalle
-                              ficha={f}
-                              onCambiarEstado={cambiarEstado}
-                              onAgregarNota={agregarNota}
-                              onEditarEntrega={editarEntrega}
-                              onEditarFirma={editarFirma}
-                              onVerFicha={() => setPrintFicha(f)}
-                              onEditar={() => handleEditar(f)}
-                              onEliminar={() => handleEliminar(f)}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {printFicha && (
-        <FichaImpresionGeneral
-          ficha={printFicha}
-          numero={printFicha.ordenProduccion}
-          onClose={() => setPrintFicha(null)}
-        />
-      )}
-
-      {modales}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaBasicaDetalle({ ficha: f, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
+export function FichaBasicaDetalle({ ficha: f, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
   const items = Array.isArray(f.items) ? f.items : [];
 
   return (

@@ -37,7 +37,7 @@ function BotonVolver() {
   );
 }
 
-function CajonMovil({ grupos, activaTo, onNueva, user, profile, dark, onToggleTheme, onSignOut, isAdminUser, requireLogin }) {
+function CajonMovil({ grupos, activaTo, onNueva, mostrarNueva, user, profile, dark, onToggleTheme, onSignOut, isAdminUser, requireLogin }) {
   const [open, setOpen] = React.useState(false);
   const cerrar = () => setOpen(false);
 
@@ -96,12 +96,14 @@ function CajonMovil({ grupos, activaTo, onNueva, user, profile, dark, onToggleTh
               </div>
             </nav>
 
-            <div className="p-3 shrink-0 border-t border-gray-200 dark:border-gris-700">
-              <button type="button" onClick={() => { cerrar(); onNueva(); }}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 text-white">
-                <FaPlus className="text-xs" /> Nueva cotización
-              </button>
-            </div>
+            {mostrarNueva && (
+              <div className="p-3 shrink-0 border-t border-gray-200 dark:border-gris-700">
+                <button type="button" onClick={() => { cerrar(); onNueva(); }}
+                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 text-white">
+                  <FaPlus className="text-xs" /> Nueva cotización
+                </button>
+              </div>
+            )}
           </aside>
         </div>
       )}
@@ -124,6 +126,9 @@ export default function AppHeader({
   const location = useLocation();
   const grupos = React.useMemo(() => gruposVisibles(permisos), [permisos]);
   const actual = seccionDe(location.pathname);
+  // "Nueva cotización" es la acción principal de Cotizar, no de la app: en
+  // Producción o Inventario no hay nada que iniciar y solo ocupaba sitio.
+  const enCotizar = actual?.to === "/cotizar";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center gap-2 px-3 sm:px-4 bg-white dark:bg-negro text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gris-700 shadow-sm">
@@ -131,6 +136,7 @@ export default function AppHeader({
         grupos={grupos}
         activaTo={actual?.to}
         onNueva={onNuevaCotizacion}
+        mostrarNueva={enCotizar}
         user={user}
         profile={profile}
         dark={dark}
@@ -174,17 +180,20 @@ export default function AppHeader({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onNuevaCotizacion}
-          title="Iniciar una cotización nueva"
-          className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-trafico/60"
-        >
-          <FaPlus className="text-xs" />
-          <span className="hidden sm:inline">Nueva cotización</span>
-        </button>
-
-        <span className="hidden sm:block h-6 w-px bg-gray-200 dark:bg-gris-700" />
+        {enCotizar && (
+          <>
+            <button
+              type="button"
+              onClick={onNuevaCotizacion}
+              title="Iniciar una cotización nueva"
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-trafico/60"
+            >
+              <FaPlus className="text-xs" />
+              <span className="hidden sm:inline">Nueva cotización</span>
+            </button>
+            <span className="hidden sm:block h-6 w-px bg-gray-200 dark:bg-gris-700" />
+          </>
+        )}
 
         <UserMenu
           user={user}

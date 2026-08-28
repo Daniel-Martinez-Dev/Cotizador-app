@@ -1,22 +1,13 @@
 import React from "react";
 import toast from "react-hot-toast";
-import {
-  FaEdit, FaTrash, FaTimes, FaSearch, FaSyncAlt, FaEye, FaChevronRight,
-  FaInbox
-} from "react-icons/fa";
+import { FaEdit, FaTrash, FaTimes } from "react-icons/fa";
 import { calcularAbrigoRetractil } from "../modules/produccion/abrigo-retractil/calcular.js";
 import {
   crearFichaAbrigoRetractil,
-  listarFichasAbrigoRetractil,
   actualizarFichaAbrigoRetractil,
-  eliminarFichaAbrigoRetractil,
 } from "../utils/firebaseAbrigoRetractil";
-import FichaImpresionAbrigoRetractil from "./FichaImpresionAbrigoRetractil";
 import { fmtMm, fmtM2, fmtDec, fmtN } from "../utils/fichaFormat";
-import EstadoBadge from "./fichas/EstadoBadge";
 import EstadoControl from "./fichas/EstadoControl";
-import useEstadoFicha from "./fichas/useEstadoFicha";
-import EstadoResumen from "./fichas/EstadoResumen";
 import { useQuote } from "../context/QuoteContext";
 import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
@@ -56,20 +47,14 @@ const INITIAL_FORM = {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function AbrigoRetractilFicha() {
+export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGuardada }) {
   const { confirm } = useQuote();
   const [form, setForm]             = React.useState(INITIAL_FORM);
-  const [fichas, setFichas]         = React.useState([]);
   const [loading, setLoading]       = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState(null);
-  const [printFicha, setPrintFicha] = React.useState(null);
   const [search, setSearch]         = React.useState("");
-  const [estadoFiltro, setEstadoFiltro] = React.useState("todos");
   const [editingId, setEditingId]   = React.useState(null);
   const formRef = React.useRef(null);
-
-  const { cambiarEstado, agregarNota, editarEntrega, editarFirma, modales } = useEstadoFicha("abrigoretractil", fichas, setFichas);
 
   // ── Cálculo reactivo ─────────────────────────────────────────────────────
 
@@ -90,31 +75,7 @@ export default function AbrigoRetractilFicha() {
 
   // ── Listado: resumen por estado + filtros ────────────────────────────────
 
-  const fichasFiltradas = React.useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return fichas
-      .map((f, idx) => ({ f, numero: f.ordenProduccion ?? (fichas.length - idx), codigo: codigoDeFicha(f, "abrigoretractil") }))
-      .filter(({ f }) => estadoFiltro === "todos" || (f.estado || "borrador") === estadoFiltro)
-      // Busca por el nombre y por el alias: en oficina se pregunta por el
-      // nombre legal y en planta por la abreviación que salió impresa.
-      .filter(({ f }) => !term || `${f.cliente || ""} ${f.clienteAlias || ""}`.toLowerCase().includes(term));
-  }, [fichas, search, estadoFiltro]);
-
   // ── Firebase ─────────────────────────────────────────────────────────────
-
-  const loadFichas = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      setFichas(await listarFichasAbrigoRetractil());
-    } catch (e) {
-      console.error(e);
-      toast.error("Error cargando fichas");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => { loadFichas(); }, [loadFichas]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -154,8 +115,8 @@ export default function AbrigoRetractilFicha() {
         toast.success("Ficha guardada");
       }
       setForm(INITIAL_FORM);
+      onGuardada?.();
       setFechaManual(false);
-      await loadFichas();
     } catch (err) {
       console.error(err);
       toast.error(editingId ? "Error actualizando ficha" : "Error guardando ficha");
@@ -182,7 +143,6 @@ export default function AbrigoRetractilFicha() {
     });
     setFechaManual(true);
     setEditingId(f.id);
-    setSelectedId(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -192,20 +152,18 @@ export default function AbrigoRetractilFicha() {
     setFechaManual(false);
   };
 
-  const handleEliminar = async (f) => {
-    const ok = await confirm(`¿Eliminar la ficha de ${f.cliente || "este cliente"}? Esta acción no se puede deshacer.`);
-    if (!ok) return;
-    try {
-      await eliminarFichaAbrigoRetractil(f.id);
-      setFichas((prev) => prev.filter((x) => x.id !== f.id));
-      if (selectedId === f.id) setSelectedId(null);
-      if (editingId === f.id) cancelarEdicion();
-      toast.success("Ficha eliminada");
-    } catch (err) {
-      console.error(err);
-      toast.error("Error eliminando ficha");
-    }
-  };
+  // Órdenes es la lista de producción; desde allí se pide crear o editar una
+  // ficha de este producto y ProduccionPage cambia de pestaña dejando el
+  // encargo aquí. Se atiende una sola vez y se avisa para no repetirlo.
+  React.useEffect(() => {
+    if (!encargo) return;
+    if (encargo.accion === "editar" && encargo.ficha) handleEditar(encargo.ficha);
+    else cancelarEdicion();
+    onEncargoAtendido?.();
+    // Lo que dispara esto es el encargo; handleEditar y cancelarEdicion se
+    // rehacen en cada render y meterlos aquí lo dispararía en bucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encargo]);
 
   const med = calculo?.medidas;
   const mp  = calculo?.materiaPrimaPorAbrigo;
@@ -450,153 +408,12 @@ export default function AbrigoRetractilFicha() {
         </section>
       </div>
 
-      {/* ── Fichas guardadas ── */}
-      <section className="bg-white dark:bg-gris-800 border border-gray-200 dark:border-gris-700 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-medium text-sm">Fichas guardadas</div>
-          <button onClick={loadFichas} disabled={loading}
-            className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50">
-            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualizar
-          </button>
-        </div>
-
-        <EstadoResumen fichas={fichas} filtro={estadoFiltro} onFiltrar={setEstadoFiltro} />
-
-        {/* Búsqueda */}
-        <div className="relative mb-3 max-w-xs">
-          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por cliente…"
-            className={`${inputCls} pl-8`}
-          />
-        </div>
-
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm opacity-60 py-6 justify-center">
-            <FaSyncAlt className="animate-spin" /> Cargando…
-          </div>
-        ) : fichas.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
-            <FaInbox className="text-2xl" /> Sin fichas guardadas
-          </div>
-        ) : fichasFiltradas.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 text-sm opacity-60 py-8">
-            <FaSearch className="text-2xl" /> Ninguna ficha coincide con el filtro
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
-                  <th className="text-left py-2 font-medium whitespace-nowrap">N.° ficha</th>
-                  <th className="text-left py-2 font-medium">Cliente</th>
-                  <th className="text-center py-2 font-medium">Ancho×Alto (mm)</th>
-                  <th className="text-center py-2 font-medium">Travesaños</th>
-                  <th className="text-center py-2 font-medium">Cant.</th>
-                  <th className="text-center py-2 font-medium">Estado</th>
-                  <th className="text-left py-2 font-medium">Creada</th>
-                  <th className="py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fichasFiltradas.map(({ f, numero, codigo }) => {
-                  const isSelected = selectedId === f.id;
-                  return (
-                    <React.Fragment key={f.id}>
-                      <tr
-                        onClick={() => setSelectedId(isSelected ? null : f.id)}
-                        className={`border-b border-gray-100 dark:border-gris-700/50 cursor-pointer transition-colors ${
-                          isSelected ? "bg-blue-50/60 dark:bg-blue-900/20" : "hover:bg-gray-50 dark:hover:bg-gris-700/40"
-                        }`}
-                      >
-                        <td className="py-2 font-mono text-gray-500 whitespace-nowrap">{codigo || numero}</td>
-                        <td className="py-2 font-medium">
-                          <span className="inline-flex items-center gap-1.5">
-                            <FaChevronRight className={`text-[9px] text-gray-400 transition-transform ${isSelected ? "rotate-90" : ""}`} />
-                            {f.cliente || "—"}
-                          </span>
-                        </td>
-                        <td className="py-2 text-center font-mono">{f.ancho}×{f.alto}</td>
-                        <td className="py-2 text-center font-mono">{f.travesanos}</td>
-                        <td className="py-2 text-center">{f.cantidad}</td>
-                        <td className="py-2 text-center">
-                          <EstadoBadge estado={f.estado} onChange={(estado) => cambiarEstado(f.id, estado)} />
-                        </td>
-                        <td className="py-2 text-gray-500">
-                          {f.createdAt?.toDate
-                            ? f.createdAt.toDate().toLocaleDateString("es-CO")
-                            : "—"}
-                        </td>
-                        <td className="py-2 pl-2">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setPrintFicha({ ficha: f, numero }); }}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gris-700 dark:hover:bg-gris-600 border border-gray-300 dark:border-gris-600 whitespace-nowrap transition-colors"
-                              title="Ver ficha imprimible"
-                            >
-                              <FaEye className="text-[11px]" /> Ver ficha
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEditar(f); }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors"
-                              title="Editar ficha"
-                            >
-                              <FaEdit className="text-[11px]" />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEliminar(f); }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 transition-colors"
-                              title="Eliminar ficha"
-                            >
-                              <FaTrash className="text-[11px]" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {isSelected && (
-                        <tr className="border-b border-gray-200 dark:border-gris-700">
-                          <td colSpan={9} className="py-3 px-2">
-                            <FichaDetalleAbrigoRetractil
-                              ficha={f}
-                              numero={numero}
-                              onCambiarEstado={cambiarEstado}
-                              onAgregarNota={agregarNota}
-                              onEditarEntrega={editarEntrega}
-                              onEditarFirma={editarFirma}
-                              onVerFicha={() => setPrintFicha({ ficha: f, numero })}
-                              onEditar={() => handleEditar(f)}
-                              onEliminar={() => handleEliminar(f)}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {printFicha && (
-        <FichaImpresionAbrigoRetractil
-          ficha={printFicha.ficha}
-          numero={printFicha.numero}
-          onClose={() => setPrintFicha(null)}
-        />
-      )}
-
-      {modales}
     </div>
   );
 }
 
 // ─── Detalle expandido inline ─────────────────────────────────────────────────
-function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
+export function FichaDetalleAbrigoRetractil({ ficha: f, numero, onCambiarEstado, onAgregarNota, onEditarEntrega, onEditarFirma, onVerFicha, onEditar, onEliminar }) {
   const med  = f.medidas               || {};
   const mp   = f.materiaPrimaPorAbrigo || {};
   const mpt  = f.materiaPrimaTotal     || {};

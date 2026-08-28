@@ -1,26 +1,30 @@
 import { db, waitForAuth } from "../firebase";
 import { doc, updateDoc, serverTimestamp, arrayUnion, Timestamp } from "firebase/firestore";
-import { listarFichasDivision, obtenerFichaDivision, actualizarFichaDivision } from "./firebaseDivision";
-import { listarFichasSellos, obtenerFichaSello, actualizarFichaSello } from "./firebaseSellos";
+import { listarFichasDivision, obtenerFichaDivision, actualizarFichaDivision, eliminarFichaDivision } from "./firebaseDivision";
+import { listarFichasSellos, obtenerFichaSello, actualizarFichaSello, eliminarFichaSello } from "./firebaseSellos";
 import {
   listarFichasAbrigoRetractil,
   obtenerFichaAbrigoRetractil,
   actualizarFichaAbrigoRetractil,
+  eliminarFichaAbrigoRetractil,
 } from "./firebaseAbrigoRetractil";
 import {
   listarFichasPuertaRapida,
   obtenerFichaPuertaRapida,
   actualizarFichaPuertaRapida,
+  eliminarFichaPuertaRapida,
 } from "./firebasePuertaRapida";
 import {
   listarFichasPuertaSeccional,
   obtenerFichaPuertaSeccional,
   actualizarFichaPuertaSeccional,
+  eliminarFichaPuertaSeccional,
 } from "./firebasePuertaSeccional";
 import {
   listarFichasGenerales,
   obtenerFichaGeneral,
   actualizarFichaGeneral,
+  eliminarFichaGeneral,
 } from "./firebaseGeneral";
 import { ESTADOS_FICHA } from "../components/fichas/estadoFicha";
 import {
@@ -42,6 +46,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasDivision,
     obtener: obtenerFichaDivision,
     actualizar: actualizarFichaDivision,
+    eliminar: eliminarFichaDivision,
   },
   sello: {
     label: "Sello de Andén",
@@ -49,6 +54,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasSellos,
     obtener: obtenerFichaSello,
     actualizar: actualizarFichaSello,
+    eliminar: eliminarFichaSello,
   },
   abrigoretractil: {
     label: "Abrigo Retráctil",
@@ -56,6 +62,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasAbrigoRetractil,
     obtener: obtenerFichaAbrigoRetractil,
     actualizar: actualizarFichaAbrigoRetractil,
+    eliminar: eliminarFichaAbrigoRetractil,
   },
   puertarapida: {
     label: "Puertas Rápidas",
@@ -63,6 +70,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasPuertaRapida,
     obtener: obtenerFichaPuertaRapida,
     actualizar: actualizarFichaPuertaRapida,
+    eliminar: eliminarFichaPuertaRapida,
   },
   puertaseccional: {
     label: "Puertas Seccionales",
@@ -70,6 +78,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasPuertaSeccional,
     obtener: obtenerFichaPuertaSeccional,
     actualizar: actualizarFichaPuertaSeccional,
+    eliminar: eliminarFichaPuertaSeccional,
   },
   // Órdenes sin ficha de fabricación (repuestos, semáforos, lámparas, topes,
   // rampas…). Igual pasan a producción, así que comparten consecutivo, estados
@@ -80,6 +89,7 @@ export const FICHA_TIPOS = {
     listar: listarFichasGenerales,
     obtener: obtenerFichaGeneral,
     actualizar: actualizarFichaGeneral,
+    eliminar: eliminarFichaGeneral,
   },
 };
 
@@ -99,6 +109,12 @@ export async function listarTodasFichasProduccion({ max = 200 } = {}) {
     )
   );
   return listas.flat().sort((a, b) => Number(b.ordenProduccion || 0) - Number(a.ordenProduccion || 0));
+}
+
+// Borrar desde el listado de órdenes, que trabaja con las seis colecciones a la
+// vez y no debería saber en cuál vive cada ficha.
+export async function eliminarFichaProduccion(tipo, id) {
+  return getFichaTipoConfig(tipo).eliminar(id);
 }
 
 export async function obtenerFichaProduccion(tipo, id) {

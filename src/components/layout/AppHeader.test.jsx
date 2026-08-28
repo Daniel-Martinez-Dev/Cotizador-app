@@ -112,6 +112,14 @@ describe("barra superior", () => {
     expect(header("/inventario")).toContain(">Inventario<");
   });
 
+  it("solo ofrece Nueva cotización dentro de Cotizar", () => {
+    // Es la acción principal de esa sección, no de la app: en Producción o
+    // Inventario no hay nada que iniciar.
+    expect(header("/cotizar")).toContain("Nueva cotización");
+    expect(header("/produccion")).not.toContain("Nueva cotización");
+    expect(header("/dashboard")).not.toContain("Nueva cotización");
+  });
+
   it("avisa del modo edición con el número de la cotización", () => {
     const html = header("/cotizar", { quoteData: { modoEdicion: true, numero: 412 } });
     expect(html).toContain("Editando #412");

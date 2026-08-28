@@ -26,6 +26,7 @@ import {
   obtenerProveedorPorId,
   asignarCodigosMaterialFaltantes,
   buscarItemPorCodigo,
+  LIMITE_LISTADO,
 } from "../utils/firebaseInventory";
 import EscanerCodigoModal from "../components/inventario/EscanerCodigoModal";
 import EtiquetasMaterialModal from "../components/inventario/EtiquetasMaterialModal";
@@ -33,6 +34,10 @@ import CodigoBarrasMaterial from "../components/inventario/CodigoBarrasMaterial"
 import { buscarItemPorCodigoEnLista, itemNecesitaCodigos } from "../utils/codigoMaterial";
 
 import PageHeader from "../components/ui/PageHeader";
+
+// Cuántas materias primas se pintan a la vez en el selector del proveedor.
+const MAX_MATERIAS_VISIBLES = 200;
+
 export default function InventarioPage() {
   const { confirm } = useQuote();
   const [activeTab, setActiveTab] = React.useState("materiales"); // materiales | proveedores | movimientos
@@ -430,17 +435,24 @@ export default function InventarioPage() {
     return allProductoTipos.filter((t) => String(t).toLowerCase().includes(q));
   }, [productoSearch, allProductoTipos]);
 
-  const materiasPrimasFiltradas = React.useMemo(() => {
+  // El selector solo pinta las primeras MAX_MATERIAS_VISIBLES para no colgar el
+  // modal; cuando hay más se avisa y se resuelve refinando la búsqueda.
+  const materiasPrimasCoincidentes = React.useMemo(() => {
     const q = (provMateriaSearch || "").trim().toLowerCase();
     const base = Array.isArray(items) ? items : [];
-    const arr = q
-      ? base.filter((it) => {
-          const hay = `${it.nombre || ""} ${it.sku || ""} ${it.categoria || ""}`.toLowerCase();
-          return hay.includes(q);
-        })
-      : base;
-    return arr.slice(0, 200);
+    if (!q) return base;
+    return base.filter((it) => {
+      const hay = `${it.nombre || ""} ${it.sku || ""} ${it.categoria || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
   }, [provMateriaSearch, items]);
+
+  const materiasPrimasFiltradas = React.useMemo(
+    () => materiasPrimasCoincidentes.slice(0, MAX_MATERIAS_VISIBLES),
+    [materiasPrimasCoincidentes]
+  );
+
+  const materiasPrimasOcultas = materiasPrimasCoincidentes.length - materiasPrimasFiltradas.length;
 
   const toggleMateriaPrimaItem = (itemId) => {
     setProvForm((prev) => {
@@ -707,6 +719,15 @@ export default function InventarioPage() {
     () => (Array.isArray(items) ? items : []).filter(itemNecesitaCodigos).length,
     [items]
   );
+
+  // Cuando una colección llega al tope de la consulta, los registros más
+  // antiguos quedan fuera del listado y los totales dejan de ser reales.
+  const listadosEnTope = React.useMemo(() => {
+    const cortados = [];
+    if (items.length >= LIMITE_LISTADO) cortados.push("materiales");
+    if (proveedores.length >= LIMITE_LISTADO) cortados.push("proveedores");
+    return cortados;
+  }, [items, proveedores]);
 
   const sortedItems = React.useMemo(() => {
     const list = Array.isArray(filteredItems) ? filteredItems.slice() : [];
@@ -996,6 +1017,19 @@ export default function InventarioPage() {
           )}
         </>}
       />
+
+      {listadosEnTope.length > 0 && !loading && (
+        <div className="mt-4 rounded-lg border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-900/20 px-4 py-3">
+          <div className="text-sm font-medium text-red-900 dark:text-red-100">
+            El listado de {listadosEnTope.join(" y ")} llegó al tope de {LIMITE_LISTADO} registros
+          </div>
+          <div className="text-xs text-red-800 dark:text-red-200 mt-1">
+            Se están mostrando los {LIMITE_LISTADO} más recientes; los más antiguos quedaron
+            por fuera y los totales de arriba no son el total real. Avisa para subir el tope
+            o pasar a carga por páginas.
+          </div>
+        </div>
+      )}
 
       {itemsSinCodigo > 0 && !loading && (
         <div className="mt-4 rounded-lg border border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20 px-4 py-3">
@@ -1464,6 +1498,13 @@ export default function InventarioPage() {
                     )}
                   </div>
                 </div>
+
+                {materiasPrimasOcultas > 0 && (
+                  <div className="mt-1 text-[11px] opacity-70">
+                    Mostrando {materiasPrimasFiltradas.length} de {materiasPrimasCoincidentes.length}.
+                    Escribe en el buscador para encontrar las {materiasPrimasOcultas} restantes.
+                  </div>
+                )}
               </div>
             </div>
 
