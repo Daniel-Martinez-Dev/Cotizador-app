@@ -32,6 +32,7 @@ import EtiquetasMaterialModal from "../components/inventario/EtiquetasMaterialMo
 import CodigoBarrasMaterial from "../components/inventario/CodigoBarrasMaterial";
 import { buscarItemPorCodigoEnLista, itemNecesitaCodigos } from "../utils/codigoMaterial";
 
+import PageHeader from "../components/ui/PageHeader";
 export default function InventarioPage() {
   const { confirm } = useQuote();
   const [activeTab, setActiveTab] = React.useState("materiales"); // materiales | proveedores | movimientos
@@ -936,14 +937,9 @@ export default function InventarioPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Inventario</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-            Base inicial: materia prima + proveedores (lead time).
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        section="/inventario"
+        actions={<>
           <Button
             variant="brand"
             size="sm"
@@ -998,8 +994,8 @@ export default function InventarioPage() {
               {movGeneralLoaded ? "Refrescar movimientos" : "Cargar movimientos"}
             </Button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       {itemsSinCodigo > 0 && !loading && (
         <div className="mt-4 rounded-lg border border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20 px-4 py-3">

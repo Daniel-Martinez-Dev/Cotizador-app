@@ -43,45 +43,67 @@ function getMimeType(filePath) {
   }
 }
 
+// El navegador guarda IndexedDB y localStorage por *origen*, y ahí es justo
+// donde Firebase Auth deja la sesión iniciada. Con `listen(0)` el sistema daba
+// un puerto distinto en cada arranque, o sea un origen nuevo cada vez
+// (http://127.0.0.1:53412, luego :61180, ...), y la app abría sin sesión: al
+// cerrarla tocaba volver a iniciar sesión siempre. Con puerto fijo el origen no
+// cambia y la sesión sobrevive. La lista es solo plan B por si otro programa
+// tiene el puerto ocupado; el primero es el que se usa en la práctica.
+const PUERTOS_APP = [47821, 47822, 47823, 47824, 47825]
+
 function startStaticServer() {
   const distDir = path.join(__dirname, '..', 'dist')
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      const reqUrl = new URL(req.url ?? '/', `http://${req.headers.host}`)
-      let pathname = decodeURIComponent(reqUrl.pathname)
+  // Al reabrir la ventana (macOS) el servidor ya está escuchando: hay que
+  // reutilizar su puerto, no levantar otro, o el origen cambiaría.
+  if (staticServer) return Promise.resolve(staticServer.address().port)
 
-      if (pathname === '/') pathname = '/index.html'
-      const filePath = path.join(distDir, pathname.replace(/^\//, ''))
-      const hasExt = path.extname(filePath) !== ''
+  const server = http.createServer((req, res) => {
+    const reqUrl = new URL(req.url ?? '/', `http://${req.headers.host}`)
+    let pathname = decodeURIComponent(reqUrl.pathname)
 
-      const serveFile = (finalPath) => {
-        fs.readFile(finalPath, (err, data) => {
-          if (err) {
-            res.writeHead(404)
-            res.end('Not found')
-            return
-          }
-          res.writeHead(200, { 'Content-Type': getMimeType(finalPath) })
-          res.end(data)
-        })
-      }
+    if (pathname === '/') pathname = '/index.html'
+    const filePath = path.join(distDir, pathname.replace(/^\//, ''))
+    const hasExt = path.extname(filePath) !== ''
 
-      if (hasExt && fs.existsSync(filePath)) {
-        serveFile(filePath)
+    const serveFile = (finalPath) => {
+      fs.readFile(finalPath, (err, data) => {
+        if (err) {
+          res.writeHead(404)
+          res.end('Not found')
+          return
+        }
+        res.writeHead(200, { 'Content-Type': getMimeType(finalPath) })
+        res.end(data)
+      })
+    }
+
+    if (hasExt && fs.existsSync(filePath)) {
+      serveFile(filePath)
+      return
+    }
+
+    serveFile(path.join(distDir, 'index.html'))
+  })
+
+  const escuchar = (indice) => new Promise((resolve, reject) => {
+    const onError = (err) => {
+      // Puerto ocupado por otro programa: se prueba el siguiente de la lista.
+      if (err && err.code === 'EADDRINUSE' && indice + 1 < PUERTOS_APP.length) {
+        resolve(escuchar(indice + 1))
         return
       }
-
-      serveFile(path.join(distDir, 'index.html'))
-    })
-
-    server.on('error', reject)
-
-    // Puerto 0 = el SO asigna un puerto libre, sin conflictos entre instancias
-    server.listen(0, '127.0.0.1', () => {
+      reject(err)
+    }
+    server.once('error', onError)
+    server.listen(PUERTOS_APP[indice], '127.0.0.1', () => {
+      server.removeListener('error', onError)
       staticServer = server
-      resolve(server.address().port)
+      resolve(PUERTOS_APP[indice])
     })
   })
+
+  return escuchar(0)
 }
 
 async function createWindow() {
@@ -176,13 +198,28 @@ async function createWindow() {
 
 app.setAppUserModelId('com.ccs.cotizador')
 
-app.whenReady().then(async () => {
-  await createWindow()
+// Una sola instancia: dos copias abiertas se pelearían por el puerto fijo y la
+// segunda terminaría en otro origen, es decir sin la sesión iniciada. Si
+// alguien vuelve a abrir la app, se trae al frente la ventana que ya existe.
+const tieneInstanciaUnica = app.requestSingleInstanceLock()
 
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+if (!tieneInstanciaUnica) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
   })
-})
+
+  app.whenReady().then(async () => {
+    await createWindow()
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit()

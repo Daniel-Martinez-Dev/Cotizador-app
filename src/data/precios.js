@@ -68,12 +68,13 @@ export const priceMatrices = {
     anchoRanges: [0, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500],
     altoRanges: [0, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500]
   },
+  // El sello completo se cotiza como cortina + postes laterales (cortina por
+  // ancho de vano, postes por alto), no con una fila propia de juego completo.
   "Sello de Andén": {
     base: {
       cortina: [480000, 590000, 650000],
       postes: [1960000, 2270000, 2350000],
-      travesano: [980000, 1140000, 1180000],
-      completos: [2450000, 2860000, 3000000]
+      travesano: [980000, 1140000, 1180000]
     },
     medidaRanges: [0, 2000, 2900, 3500]
   }
@@ -90,6 +91,25 @@ export const matrizPanamericana = {
   anchoRanges: [0, 1600, 1900, 2250, 2500, 2650], // 5 columnas, 6 rangos
   altoRanges: [0, 1600, 1900, 2200, 2450, 2650],  // 5 filas, 6 rangos
 };
+// ===== REDONDEO DE PRECIOS =====
+// Los precios de venta se cotizan a múltiplos de 10.000. Las Puertas Rápidas
+// son la excepción: su matriz está armada al múltiplo de 5.000 y se cotizan así.
+export const PASO_REDONDEO_DEFECTO = 10000;
+export const PASO_REDONDEO_POR_PRODUCTO = {
+  "Puertas Rápidas": 5000,
+};
+
+/** Múltiplo al que se redondea el precio de un producto. */
+export function getPasoRedondeo(tipo) {
+  return PASO_REDONDEO_POR_PRODUCTO[tipo] || PASO_REDONDEO_DEFECTO;
+}
+
+/** Redondea un precio al múltiplo que le corresponde a su tipo de producto. */
+export function redondearPrecio(valor, tipo) {
+  const paso = getPasoRedondeo(tipo);
+  return Math.round(valor / paso) * paso;
+}
+
 export const CLIENTE_FACTORES = {
   "Distribuidor": 1,
   "Cliente Final Contado": 1.15,

@@ -12,6 +12,7 @@ import Button from "../components/ui/Button";
 import Combobox from "../components/ui/Combobox";
 import { normalizarNombreCliente } from "../utils/clienteVinculo";
 
+import PageHeader from "../components/ui/PageHeader";
 const CARGA_INICIAL = 300;
 
 export default function HistorialPage() {
@@ -415,18 +416,16 @@ export default function HistorialPage() {
           </Button>
         </div>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <button onClick={() => navigate('/cotizar')} className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700">← Volver</button>
-          <h1 className="text-2xl font-bold">Historial de Cotizaciones</h1>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-600">Registros: {totalRegistros}</span>
-          <select value={pageSize} onChange={e=>setPageSize(parseInt(e.target.value)||20)} className="border rounded px-2 py-1">
+      <PageHeader
+        section="/historial"
+        title="Historial de Cotizaciones"
+        actions={<>
+          <span className="text-xs text-gray-600 dark:text-gray-300">Registros: {totalRegistros}</span>
+          <select value={pageSize} onChange={e=>setPageSize(parseInt(e.target.value)||20)} className="border rounded px-2 py-1 text-xs">
             {[10,20,50,100].map(sz=> <option key={sz} value={sz}>{sz}/pág</option>)}
           </select>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6 text-xs md:text-sm">

@@ -1,7 +1,15 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -28,7 +36,34 @@ if (missingKeys.length) {
 // cloudinary.js) porque activar Firebase Storage obliga a pasar a plan Blaze.
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
+// La sesión se guarda a mano en vez de dejar que `getAuth` elija: su lista por
+// defecto termina en `browserSessionPersistence` y en memoria, y cuando el
+// WebView de Android o Electron le niegan IndexedDB cae ahí sin avisar. El
+// resultado era el que reportaba la gente: se cierra la app y hay que volver a
+// iniciar sesión. Con esta lista solo quedan almacenes que sobreviven al cierre.
+function crearAuth() {
+  try {
+    return initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch (e) {
+    // `auth/already-initialized`: pasa con el recargado en caliente de Vite.
+    return getAuth(app);
+  }
+}
+
+const auth = crearAuth();
+
+// Sin esto el sistema puede borrar IndexedDB del origen cuando anda escaso de
+// espacio —y con ella la sesión—. Marcarlo como almacenamiento persistente le
+// pide que no la desaloje. Si el navegador no lo soporta, no pasa nada.
+if (typeof navigator !== "undefined" && navigator.storage?.persist) {
+  navigator.storage
+    .persisted()
+    .then((yaEsPersistente) => (yaEsPersistente ? true : navigator.storage.persist()))
+    .catch(() => {});
+}
 
 // Exponer helpers para esperar autenticación y reportar errores de auth
 let resolveAuthReady;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { priceMatrices, CLIENTE_FACTORES, EXTRAS_POR_DEFECTO, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana } from '../data/precios';
-import { getPrecioProducto, validarRangoProducto, getConfigProducto } from '../data/catalogoProductos';
+import { priceMatrices, CLIENTE_FACTORES, EXTRAS_POR_DEFECTO, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, redondearPrecio, getPasoRedondeo } from '../data/precios';
+import { getPrecioProducto, validarRangoProducto, getConfigProducto, getFactorCliente } from '../data/catalogoProductos';
 import { PRODUCTOS_ACTIVOS } from '../data/catalogoProductos';
 import { useQuote } from '../context/QuoteContext';
 import { listarEmpresas, listarContactos, obtenerEmpresaPorNIT, resolverOCrearEmpresa, resolverOCrearContacto } from '../utils/firebaseCompanies';
@@ -11,8 +11,8 @@ import { numeroALetras } from '../utils/numeroALetras';
 import Combobox from '../components/ui/Combobox';
 import { calcularSubtotalExtras as sumarExtras, calcularTotales } from '../utils/totales';
 
+import PageHeader from "../components/ui/PageHeader";
 // Utilidades
-const redondear5000 = v => Math.round(v / 5000) * 5000;
 // Pista de cliente: mostrar variación vs Cliente Final (baseline)
 const obtenerPistaCliente = (clienteTipo) => {
   const base = CLIENTE_FACTORES['Cliente Final Contado'] || 1;
@@ -187,7 +187,7 @@ export default function CotizadorApp(){
   const handleChangeCantidadExtraPersonalizado = (ip, idx,val)=> setProductos(p=>{ const n=[...p]; n[ip].extrasPersonalizadosCant={...(n[ip].extrasPersonalizadosCant||{}), [idx]:val}; return n;});
 
   // Precios
-  const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondear5000(parseInt(precioManual)||0); if(precioEditado) return redondear5000(parseInt(precioEditado)||0); const r=getPrecioProducto(p,{ matricesOverride, productosOverride }); return r.ajustado; };
+  const calcularPrecio = (p,i)=>{ const {precioManual, precioEditado}=p; if(precioManual) return redondearPrecio(parseInt(precioManual)||0, p.tipo); if(precioEditado) return redondearPrecio(parseInt(precioEditado)||0, p.tipo); const r=getPrecioProducto(p,{ matricesOverride, productosOverride }); return r.ajustado; };
   // Suma exacta de los extras: el redondeo a 5.000 es regla de precio del
   // producto, no de los extras, que se imprimen uno a uno en la tabla.
   const calcularSubtotalExtras = (p)=> sumarExtras(p, extrasOverride);
@@ -371,7 +371,7 @@ export default function CotizadorApp(){
           <button type="button" onClick={()=>{ setQuoteData({}); setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); }} className="flex-shrink-0 text-xs text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap">Salir edición</button>
         </div>
       )}
-      <h1 className="text-2xl font-bold mb-4">Generar Cotización</h1>
+      <PageHeader section="/cotizar" title="Generar Cotización" />
       <nav className="sticky top-16 z-10 -mx-4 lg:mx-0 mb-4 flex gap-2 overflow-x-auto bg-gray-50/95 dark:bg-gris-900/95 backdrop-blur px-4 lg:px-0 py-2 text-xs font-medium">
         {[
           { href: '#seccion-empresa', label: '1. Empresa' },
@@ -611,7 +611,11 @@ export default function CotizadorApp(){
                               );
                             })}
                           </div>
-                          {/* Desglose de precio por componente */}
+                          {/* Desglose de precio por componente.
+                              Las líneas llevan el factor del tipo de cliente y el total es el
+                              precio que realmente se cobra: mostrar los valores crudos de la
+                              matriz hacía que el chip y la tabla impresa dijeran cifras
+                              distintas para todo cliente que no fuera Distribuidor. */}
                           {producto.ancho && producto.alto && (producto.componentes||[]).length > 0 && (()=>{
                             const dbMat = productosOverride?.['Sello de Andén']?.matrizComponentes;
                             const mat = dbMat || priceMatrices['Sello de Andén'];
@@ -619,17 +623,25 @@ export default function CotizadorApp(){
                             const iAncho = getRangoIndex(ranges, parseInt(producto.ancho));
                             const iAlto  = getRangoIndex(ranges, parseInt(producto.alto));
                             const comps  = producto.componentes || [];
+                            const factor = getFactorCliente(producto.tipo, producto.cliente);
+                            const linea  = (nombre, val) => ({ nombre, val: Math.round((val||0) * factor) });
                             const lineas = [];
                             if(comps.includes('sello completo')){
-                              lineas.push({ nombre:'Cortina',   val: mat.base.cortina?.[iAncho]||0 });
-                              lineas.push({ nombre:'Postes',    val: mat.base.postes?.[iAlto]||0 });
+                              lineas.push(linea('Cortina', mat.base.cortina?.[iAncho]));
+                              lineas.push(linea('Postes',  mat.base.postes?.[iAlto]));
                             } else {
-                              if(comps.includes('cortina'))          lineas.push({ nombre:'Cortina',   val: mat.base.cortina?.[iAncho]||0 });
-                              if(comps.includes('postes laterales')) lineas.push({ nombre:'Postes',    val: mat.base.postes?.[iAlto]||0 });
+                              if(comps.includes('cortina'))          lineas.push(linea('Cortina', mat.base.cortina?.[iAncho]));
+                              if(comps.includes('postes laterales')) lineas.push(linea('Postes',  mat.base.postes?.[iAlto]));
                             }
-                            if(comps.includes('travesaño')) lineas.push({ nombre:'Travesaño', val: mat.base.travesano?.[iAncho]||0 });
+                            if(comps.includes('travesaño')) lineas.push(linea('Travesaño', mat.base.travesano?.[iAncho]));
                             if(!lineas.length) return null;
-                            const total = lineas.reduce((s,l)=>s+l.val, 0);
+                            const suma  = lineas.reduce((s,l)=>s+l.val, 0);
+                            const total = calcularPrecio(producto, i);
+                            // El total puede no ser la suma exacta: se redondea a 5.000, y el
+                            // precio manual o el ajuste % del producto tienen prioridad.
+                            const nota = (producto.precioManual || producto.precioEditado)
+                              ? 'precio manual'
+                              : (parseFloat(producto.ajusteValor) ? `${producto.ajusteTipo?.toLowerCase()} ${producto.ajusteValor}%` : (total !== suma ? `redondeado a ${getPasoRedondeo(producto.tipo).toLocaleString('es-CO')}` : ''));
                             const fmt = v => `${(v/1000).toLocaleString('es-CO')}k`;
                             return (
                               <div className="mt-2 rounded bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 px-3 py-2 text-[11px] font-mono flex flex-wrap items-center gap-x-1.5 gap-y-1 text-gray-600 dark:text-gray-300">
@@ -641,6 +653,7 @@ export default function CotizadorApp(){
                                 ))}
                                 <span className="text-gray-400 dark:text-gray-500">=</span>
                                 <span className="font-semibold text-gray-800 dark:text-gray-100">{total.toLocaleString('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0})}</span>
+                                <span className="text-gray-400 dark:text-gray-500">· {producto.cliente}{nota ? ` · ${nota}` : ''}</span>
                               </div>
                             );
                           })()}

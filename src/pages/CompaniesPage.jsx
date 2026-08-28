@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { calcularVinculacionPendiente, aplicarVinculacion, fusionarEmpresas, contarRelacionesEmpresa } from '../utils/firebaseClienteVinculo';
 import { resolverEmpresa, buscarPosiblesDuplicados, resolverContacto, agruparDuplicados, planFusion } from '../utils/empresaIdentidad';
 
+import PageHeader from "../components/ui/PageHeader";
 // Ficha de una empresa en el formulario. `alias` es la abreviación con la que
 // se conoce al cliente en planta: los nombres legales largos no caben en la
 // orden de producción, y es lo que la gente reconoce (ver clienteVinculo.js).
@@ -380,7 +381,7 @@ export default function CompaniesPage(){
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white dark:bg-gris-900 rounded-lg shadow text-gray-900 dark:text-gray-100">
-      <h1 className="text-2xl font-bold mb-4 flex items-center gap-2"><FaBuilding/> Empresas & Contactos</h1>
+      <PageHeader section="/empresas" title="Empresas & Contactos" />
       <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
         <div className="flex items-center gap-2 flex-1 min-w-[200px] border rounded px-2 bg-white dark:bg-gris-800">
           <FaSearch className="text-gray-500" />

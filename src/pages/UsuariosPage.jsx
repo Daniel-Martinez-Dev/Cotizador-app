@@ -12,6 +12,7 @@ import { useQuote } from "../context/QuoteContext";
 import Tabs from "../components/ui/Tabs";
 import { ROLES as ALL_ROLES, ROL_LABEL as ROLE_LABELS } from "../utils/roles";
 
+import PageHeader from "../components/ui/PageHeader";
 const STATUS_BADGE = {
   active:   "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   pending:  "bg-amber-100  text-amber-800  dark:bg-amber-900/40  dark:text-amber-300",
@@ -348,13 +349,14 @@ export default function UsuariosPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 pb-10">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Usuarios y permisos</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-        Aprueba solicitudes de acceso, asigna roles y pre-registra usuarios.
-      </p>
+      <PageHeader
+        section="/usuarios"
+        title="Usuarios y permisos"
+        description="Aprueba solicitudes de acceso, asigna roles y pre-registra usuarios."
+      />
 
       {/* Tabs */}
-      <div className="mt-5">
+      <div>
         <Tabs items={tabs} active={tab} onChange={setTab} variant="underline" />
       </div>
 

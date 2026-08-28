@@ -1,6 +1,6 @@
 // Catálogo centralizado de productos
 // Permite agregar nuevos productos en un solo lugar (descripción PDF, línea en tabla, etc.)
-import { priceMatrices, EXTRAS_POR_DEFECTO, EXTRAS_UNIVERSALES, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES, getRangoIndex } from './precios';
+import { priceMatrices, EXTRAS_POR_DEFECTO, EXTRAS_UNIVERSALES, buscarPrecio, buscarPrecioAbrigo, matrizPanamericana, CLIENTE_FACTORES, getRangoIndex, redondearPrecio } from './precios';
 
 // Definición base por etiqueta (coincide con claves existentes en priceMatrices / EXTRAS_POR_DEFECTO)
 // Para cada producto se puede definir:
@@ -402,7 +402,6 @@ export function validarRangoProducto(producto, { matricesOverride, productosOver
 }
 
 // ===== CÁLCULO CENTRALIZADO DE PRECIOS =====
-const redondear5000 = v => Math.round(v / 5000) * 5000;
 const aplicarAjuste = (v, tipo, p) => {
   if (!p || p === 0) return v;
   if (tipo === 'Descuento') return Math.round(v * (1 - p / 100));
@@ -410,20 +409,32 @@ const aplicarAjuste = (v, tipo, p) => {
   return v;
 };
 
+/**
+ * Factor de precio por tipo de cliente. Cada matriz está expresada en la moneda
+ * de un cliente base — Distribuidor, salvo que el producto declare otro en
+ * `factorBaseCliente` — así que el factor se normaliza contra esa base.
+ *
+ * Se exporta para que la interfaz pueda mostrar los mismos valores que se
+ * cobran: el desglose por componentes del Sello de Andén pintaba los números
+ * crudos de la matriz y no cuadraba con el precio de la tabla para ningún
+ * cliente distinto de Distribuidor.
+ */
+export function getFactorCliente(tipo, cliente){
+  const factor = CLIENTE_FACTORES[cliente] || 1;
+  const baselineKey = getConfigProducto(tipo)?.factorBaseCliente;
+  if (!baselineKey) return factor;
+  const baseline = CLIENTE_FACTORES[baselineKey] || 1;
+  if (!baseline) return factor;
+  return factor / baseline;
+}
+
 export function getPrecioProducto(producto, { matricesOverride, productosOverride } = {}){
   const { tipo, ancho, alto, cliente, ajusteTipo, ajusteValor } = producto;
   const cfg = getConfigProducto(tipo);
   const dbProd = productosOverride?.[tipo]; // doc completo de Firestore
   let base=0; let fuera=false;
 
-  const getFactorCliente = () => {
-    const factor = CLIENTE_FACTORES[cliente] || 1;
-    const baselineKey = cfg?.factorBaseCliente;
-    if (!baselineKey) return factor;
-    const baseline = CLIENTE_FACTORES[baselineKey] || 1;
-    if (!baseline) return factor;
-    return factor / baseline;
-  };
+  const factorCliente = () => getFactorCliente(tipo, cliente);
 
   // ── Divisiones Térmicas / Carrocerías Panamericana ───────────────────────────
   if(tipo==='Divisiones Térmicas' && cliente==='Carrocerías Panamericana'){
@@ -449,7 +460,7 @@ export function getPrecioProducto(producto, { matricesOverride, productosOverrid
     }
     if(componentes.includes('travesaño')) total+=mat.base.travesano?.[iAncho]||0;
     base=total;
-    base = Math.round(base * getFactorCliente());
+    base = Math.round(base * factorCliente());
 
   // ── Productos tipo "especial" con precios en Firestore ───────────────────────
   } else if(dbProd && cfg?.getPrecioBase && cfg?.tipoCalculo==='especial'){
@@ -478,30 +489,30 @@ export function getPrecioProducto(producto, { matricesOverride, productosOverrid
     if(cfg.requiereMedidas && (!ancho || !alto)) return { base:0, ajustado:0, fueraDeRango:false };
     const r = cfg.getPrecioBase(producto);
     base = r.precio||0; fuera = r.fueraDeRango;
-    if(tipo==='Sello de Andén' && !fuera){ base = Math.round(base * getFactorCliente()); }
+    if(tipo==='Sello de Andén' && !fuera){ base = Math.round(base * factorCliente()); }
 
   } else if(tipo==='Abrigo Retráctil Estándar'){
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
-    if(!fuera){ base = Math.round(base * getFactorCliente()); }
+    if(!fuera){ base = Math.round(base * factorCliente()); }
   } else if(tipo==='Abrigo Retráctil Inflable'){
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     const r = buscarPrecioAbrigo(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
-    if(!fuera){ base = Math.round(base * getFactorCliente()); }
+    if(!fuera){ base = Math.round(base * factorCliente()); }
   } else {
     if(!ancho || !alto) return { base:0, ajustado:0, fueraDeRango:false };
     const matriz = (matricesOverride && matricesOverride[tipo]) || priceMatrices[tipo];
     if(!matriz) return { base:0, ajustado:0, fueraDeRango:false };
     const r = buscarPrecio(matriz, parseInt(ancho), parseInt(alto));
     base = r.precio||0; fuera = r.fueraDeRango;
-    if(!fuera){ base = Math.round(base * getFactorCliente()); }
+    if(!fuera){ base = Math.round(base * factorCliente()); }
   }
 
   if(fuera) return { base:0, ajustado:0, fueraDeRango:true };
   let ajustado = aplicarAjuste(base, ajusteTipo, parseFloat(ajusteValor)||0);
-  return { base: redondear5000(base), ajustado: redondear5000(ajustado), fueraDeRango:false };
+  return { base: redondearPrecio(base, tipo), ajustado: redondearPrecio(ajustado, tipo), fueraDeRango:false };
 }
 
 // Re-export (opcional) para centralizar importaciones futuras

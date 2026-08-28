@@ -8,6 +8,7 @@ import FichaBasicaFicha from "../components/FichaBasicaFicha";
 import OrdenesProduccionList from "../components/produccion/OrdenesProduccionList";
 import Tabs from "../components/ui/Tabs";
 
+import PageHeader from "../components/ui/PageHeader";
 // Cada pestaña de producto crea y edita sus propias fichas; "Fichas básicas"
 // cubre lo que pasa a producción sin ficha de fabricación (repuestos,
 // semáforos, lámparas, topes, rampas…) y "Órdenes" es la vista transversal:
@@ -27,7 +28,7 @@ export default function ProduccionPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <h1 className="text-xl font-semibold">Producción</h1>
+      <PageHeader section="/produccion" />
 
       <Tabs items={TABS} active={tab} onChange={setTab} variant="boxed" />
 

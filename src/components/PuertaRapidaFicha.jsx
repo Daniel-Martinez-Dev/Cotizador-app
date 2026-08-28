@@ -107,27 +107,40 @@ export default function PuertaRapidaFicha() {
     [form.fechaOrden, form.cantidad]
   );
 
-  // Precarga la lista de empaque calculada a partir de las medidas, solo
-  // mientras el usuario no la haya llenado (manualmente o al editar una ficha
-  // existente) — así no se pisan ediciones manuales cuando cambian medidas.
+  // Mientras el usuario no toque la lista, se mantiene sincronizada con las
+  // medidas: al crear una ficha las cantidades salen bien solas, sin pulsar
+  // "Recalcular según medidas". (Precargarla una sola vez dejaba congeladas las
+  // del ancho/alto a medio escribir.) En cuanto se edita una fila —o se abre
+  // una ficha que ya trae su lista guardada— deja de sobrescribirse.
+  const empaqueManual = React.useRef(false);
+  const marcarEmpaqueManual = () => { empaqueManual.current = true; };
+
   React.useEffect(() => {
-    if (!calculo) return;
-    setEmpaque((prev) => (prev.length === 0 ? conOpciones(calculo.empaque) : prev));
+    if (!calculo || empaqueManual.current) return;
+    setEmpaque(conOpciones(calculo.empaque));
   }, [calculo]);
 
+  // Devuelve la lista al modo automático y la pone al día con las medidas.
   const handleRecalcularEmpaque = () => {
     if (!calculo) return;
+    empaqueManual.current = false;
     setEmpaque(conOpciones(calculo.empaque));
   };
 
-  const updateEmpaqueField = (idx, field, value) =>
+  const updateEmpaqueField = (idx, field, value) => {
+    marcarEmpaqueManual();
     setEmpaque((prev) => prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
+  };
 
-  const addEmpaqueRow = () =>
+  const addEmpaqueRow = () => {
+    marcarEmpaqueManual();
     setEmpaque((prev) => [...prev, { insumo: "", unidad: "und", cantidad: 1 }]);
+  };
 
-  const removeEmpaqueRow = (idx) =>
+  const removeEmpaqueRow = (idx) => {
+    marcarEmpaqueManual();
     setEmpaque((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const fichasFiltradas = React.useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -198,6 +211,7 @@ export default function PuertaRapidaFicha() {
       }
       setForm(INITIAL_FORM);
       setEmpaque([]);
+      empaqueManual.current = false;
       await loadFichas();
     } catch (err) {
       console.error(err);
@@ -224,6 +238,8 @@ export default function PuertaRapidaFicha() {
       distanciaCortavientos: f.distanciaCortavientos ?? PARAMETROS_PUERTA_RAPIDA.DISTANCIA_CORTAVIENTOS_DEFAULT_MM,
       adicional:             f.adicional || "",
     });
+    // La lista guardada manda; si la ficha no trae ninguna se vuelve a calcular.
+    empaqueManual.current = Array.isArray(f.empaque) && f.empaque.length > 0;
     setEmpaque(conOpciones(Array.isArray(f.empaque) ? f.empaque : []));
     setEditingId(f.id);
     setSelectedId(null);
@@ -234,6 +250,7 @@ export default function PuertaRapidaFicha() {
     setEditingId(null);
     setForm(INITIAL_FORM);
     setEmpaque([]);
+    empaqueManual.current = false;
   };
 
   const handleEliminar = async (f) => {

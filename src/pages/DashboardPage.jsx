@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ENABLE_INVENTARIO, ENABLE_PRODUCCION } from "../utils/featureFlags";
 import { useAuth } from "../context/AuthContext";
 
+import PageHeader from "../components/ui/PageHeader";
 function useOnlineStatus() {
   const [online, setOnline] = React.useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
   React.useEffect(() => {
@@ -71,23 +72,19 @@ export default function DashboardPage() {
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-50 via-white to-sky-50 dark:from-[#0b1220] dark:via-[#0f172a] dark:to-[#0a0f1f]" />
       <div className="absolute -top-24 left-1/2 -z-10 h-64 w-64 -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(34,113,179,0.16),transparent_60%)]" />
       <div className="max-w-6xl mx-auto px-4 pb-10 pt-6">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-gray-400 dark:text-gray-500">Panel principal</p>
-            <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white" style={{ fontFamily: '"Space Grotesk", "Segoe UI", sans-serif' }}>Inicio</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 max-w-xl">
-              Accede rápido a los módulos disponibles según tus permisos.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-gray-200/80 dark:border-gris-700/80 bg-white/80 dark:bg-gris-900/70 px-4 py-3 text-xs text-gray-500 dark:text-gray-300">
-            Conexión:{" "}
-            {online ? (
-              <span className="text-emerald-600 dark:text-emerald-300 font-medium">Conectado</span>
-            ) : (
-              <span className="text-red-600 dark:text-red-400 font-medium">Sin conexión</span>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          section="/dashboard"
+          actions={
+            <div className="rounded-2xl border border-gray-200/80 dark:border-gris-700/80 bg-white/80 dark:bg-gris-900/70 px-4 py-3 text-xs text-gray-500 dark:text-gray-300">
+              Conexión:{" "}
+              {online ? (
+                <span className="text-emerald-600 dark:text-emerald-300 font-medium">Conectado</span>
+              ) : (
+                <span className="text-red-600 dark:text-red-400 font-medium">Sin conexión</span>
+              )}
+            </div>
+          }
+        />
 
         {denied && (
           <div className="mt-4 text-sm rounded-xl border border-amber-300/80 bg-amber-50 text-amber-900 dark:bg-gris-800 dark:border-trafico dark:text-trafico px-4 py-3">

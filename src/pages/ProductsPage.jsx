@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuote } from '../context/QuoteContext';
 import { useAuth } from '../context/AuthContext';
 import { guardarProducto, subirFotoProducto, sembrarProductos, cargarTerminos, guardarTerminos } from '../utils/firebaseProductos';
 import { generarTerminosGeneralesHTML } from '../utils/htmlSections';
+import { redondearPrecio } from '../data/precios';
 import RichTextEditor from '../components/RichTextEditor';
 import 'react-quill-new/dist/quill.snow.css';
 import toast from 'react-hot-toast';
 import EmptyState from '../components/ui/EmptyState';
 import Badge from '../components/ui/Badge';
 
+import PageHeader from "../components/ui/PageHeader";
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TIPO_CALCULO_TONE = { matriz: 'info', componentes: 'purple', especial: 'warning' };
@@ -62,11 +63,12 @@ function TablaSelloAndenReadOnly({ datos }) {
   if (!datos) return null;
   const { base, medidaRanges } = datos;
   const labels = medidaRanges.slice(0, base.cortina.length).map((_, i) => labelRango(medidaRanges, i));
+  // No se lista "Juego Completo": el sello completo se cotiza como cortina +
+  // postes laterales, así que esa fila no entra en ningún precio.
   const filas = [
     { nombre: 'Cortina', valores: base.cortina },
     { nombre: 'Postes Laterales', valores: base.postes },
     { nombre: 'Travesaño', valores: base.travesano },
-    { nombre: 'Juego Completo', valores: base.completos },
   ];
   return (
     <div className="overflow-x-auto border rounded dark:border-gris-700">
@@ -146,11 +148,12 @@ function TablaSelloAndenEditable({ datos, onChange }) {
   if (!datos) return null;
   const { base, medidaRanges } = datos;
   const labels = medidaRanges.slice(0, base.cortina.length).map((_, i) => labelRango(medidaRanges, i));
+  // "Juego Completo" no es editable porque no se cobra: al marcar "sello
+  // completo" en la cotización se suman cortina + postes laterales.
   const claves = [
     { key: 'cortina', label: 'Cortina' },
     { key: 'postes', label: 'Postes Laterales' },
     { key: 'travesano', label: 'Travesaño' },
-    { key: 'completos', label: 'Juego Completo' },
   ];
   const handleChange = (clave, idx, valor) => {
     const nuevoBase = { ...base };
@@ -430,13 +433,16 @@ function PanelEdicion({ producto, onClose, onGuardado, confirm: confirmFn }) {
     });
   }, []);
 
+  // El ajuste % deja la matriz en los mismos múltiplos a los que se cotiza el
+  // producto (10.000, o 5.000 en Puertas Rápidas), para que subir precios aquí
+  // no meta cifras que después el cotizador vuelve a mover al redondear.
   const handleApplyPercent = useCallback((pct) => {
     setMatriz(prev => {
       const factor = 1 + pct / 100;
-      const base = prev.base.map(r => r.map(v => Math.round(v * factor / 5000) * 5000));
+      const base = prev.base.map(r => r.map(v => redondearPrecio(v * factor, producto.etiqueta)));
       return { ...prev, base };
     });
-  }, []);
+  }, [producto.etiqueta]);
 
   const handleGuardar = async () => {
     setGuardando(true);
@@ -746,7 +752,6 @@ function ProductCard({ producto, isAdmin, onEditar, onVerDetalle }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function ProductsPage() {
-  const navigate = useNavigate();
   const { productosDB, productosLoading, recargarProductos, confirm } = useQuote();
   const { isMainAdmin, hasRole } = useAuth();
   const esAdmin = isMainAdmin || hasRole('admin');
@@ -800,26 +805,24 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
-        <button onClick={() => navigate('/cotizar')}
-          className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded text-sm shrink-0">
-          ← Volver
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-trafico flex-1">Catálogo de Productos</h1>
-        {esAdmin && !productosLoading && productosDB.length === 0 && (
-          <button onClick={handleSembrar} disabled={sembrando}
-            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium">
-            {sembrando ? 'Migrando...' : 'Migrar datos iniciales'}
-          </button>
-        )}
-        {esAdmin && (
-          <button onClick={() => setModalTerminos(true)}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm font-medium">
-            Términos y condiciones
-          </button>
-        )}
-      </div>
+      <PageHeader
+        section="/productos"
+        title="Catálogo de Productos"
+        actions={<>
+          {esAdmin && !productosLoading && productosDB.length === 0 && (
+            <button onClick={handleSembrar} disabled={sembrando}
+              className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-4 py-2 rounded text-sm font-medium">
+              {sembrando ? 'Migrando...' : 'Migrar datos iniciales'}
+            </button>
+          )}
+          {esAdmin && (
+            <button onClick={() => setModalTerminos(true)}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm font-medium">
+              Términos y condiciones
+            </button>
+          )}
+        </>}
+      />
 
       {/* Buscador */}
       <div className="mb-6">

@@ -2,5 +2,9 @@
   "appId": "com.ccs.cotizador",
   "appName": "Cotizador Cold Chain",
   "webDir": "dist",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  }
 }
