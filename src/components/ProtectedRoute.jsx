@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import RequireOnline from "./RequireOnline";
 
 function PendingScreen({ onSignOut }) {
   return (
@@ -38,34 +39,32 @@ export default function ProtectedRoute({ requireRole, requireAnyRole, requireEma
   const { loading, isLoggedIn, isPending, hasRole, user, signOutUser } = useAuth();
   const location = useLocation();
 
+  let content;
   if (loading) {
-    return (
+    content = (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gris-900 text-gray-900 dark:text-gray-100">
         <div className="text-sm opacity-80">Cargando…</div>
       </div>
     );
-  }
-
-  if (!isLoggedIn) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  }
-
-  // Usuario autenticado pero pendiente de aprobación
-  if (isPending) {
-    return <PendingScreen onSignOut={signOutUser} />;
-  }
-
-  const rolesAdmitidos = requireAnyRole || (requireRole ? [requireRole] : null);
-  if (rolesAdmitidos && !rolesAdmitidos.some((r) => hasRole(r))) {
-    return <Navigate to={redirectTo} replace state={{ denied: rolesAdmitidos.join(",") }} />;
-  }
-
-  if (requireEmail) {
+  } else if (!isLoggedIn) {
+    content = <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  } else if (isPending) {
+    // Usuario autenticado pero pendiente de aprobación
+    content = <PendingScreen onSignOut={signOutUser} />;
+  } else {
+    const rolesAdmitidos = requireAnyRole || (requireRole ? [requireRole] : null);
     const userEmail = (user?.email ?? "").toLowerCase();
-    if (userEmail !== requireEmail.toLowerCase()) {
-      return <Navigate to={redirectTo} replace state={{ denied: "email" }} />;
+    if (rolesAdmitidos && !rolesAdmitidos.some((r) => hasRole(r))) {
+      content = <Navigate to={redirectTo} replace state={{ denied: rolesAdmitidos.join(",") }} />;
+    } else if (requireEmail && userEmail !== requireEmail.toLowerCase()) {
+      content = <Navigate to={redirectTo} replace state={{ denied: "email" }} />;
+    } else {
+      content = <Outlet />;
     }
   }
 
-  return <Outlet />;
+  // Una sesión de Firebase Auth en caché sobrevive sin internet, así que sin
+  // esta comprobación un empleado podría abrir el cotizador (o la interfaz de
+  // planta) totalmente offline.
+  return <RequireOnline>{content}</RequireOnline>;
 }
