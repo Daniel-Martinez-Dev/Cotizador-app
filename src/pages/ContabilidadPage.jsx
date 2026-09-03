@@ -143,30 +143,40 @@ export default function ContabilidadPage() {
   const comunes = { liquidados, documentos, pagos, empresas, config, cargando, anio, recargar };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pb-10">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-10">
       <PageHeader
         section="/contabilidad"
         actions={
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 dark:text-gray-400" htmlFor="anio-contable">Año</label>
-            {/* El ancho va en el contenedor y no en el <select>: la clase
-                w-full del control y una w-24 encima compiten en la misma
-                especificidad y gana la que Tailwind emita de última. */}
-            <div className="w-24">
-              <Select
-                id="anio-contable"
-                value={anio}
-                onChange={(e) => setAnio(Number(e.target.value))}
-              >
-                {Array.from({ length: 8 }, (_, i) => ANIO_ACTUAL - i).map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </Select>
+          /* En el teléfono la fila de acciones ocupa el ancho completo: el año
+             y "Refrescar" se reparten arriba y "Nueva factura" queda sola
+             abajo, que es la acción a la que se viene. Amontonadas en una sola
+             línea, las tres quedaban de menos de un centímetro. */
+          <div className="w-full sm:w-auto grid grid-cols-[1fr_auto] sm:flex sm:items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0" htmlFor="anio-contable">Año</label>
+              {/* El ancho va en el contenedor y no en el <select>: la clase
+                  w-full del control y una w-24 encima compiten en la misma
+                  especificidad y gana la que Tailwind emita de última. */}
+              <div className="w-full sm:w-24">
+                <Select
+                  id="anio-contable"
+                  value={anio}
+                  onChange={(e) => setAnio(Number(e.target.value))}
+                >
+                  {Array.from({ length: 8 }, (_, i) => ANIO_ACTUAL - i).map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </Select>
+              </div>
             </div>
             <Button variant="secondary" onClick={recargar} disabled={cargando}>
               {cargando ? "Cargando…" : "Refrescar"}
             </Button>
-            <Button variant="primary" onClick={() => setEditando({ modo: "nueva", datos: null })}>
+            <Button
+              variant="primary"
+              onClick={() => setEditando({ modo: "nueva", datos: null })}
+              className="col-span-2 sm:col-auto"
+            >
               Nueva factura
             </Button>
           </div>
@@ -190,8 +200,8 @@ export default function ContabilidadPage() {
           que subir hasta el principio para cambiar de vista era el paso que más
           se repetía. `top-14` y no `top-0` porque el header de la app es fijo y
           mide h-14: debajo quedaría tapada. */}
-      <div className="sticky top-14 z-20 -mx-4 px-4 bg-white/95 dark:bg-gris-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gris-900/80">
-        <Tabs items={tabs} active={tab} onChange={setTab} variant="boxed" />
+      <div className="sticky top-14 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 bg-white/95 dark:bg-gris-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gris-900/80">
+        <Tabs items={tabs} active={tab} onChange={setTab} variant="boxed" deslizable />
       </div>
 
       <div className="mt-5">
@@ -211,7 +221,13 @@ export default function ContabilidadPage() {
             onVerPagos={(doc) => setViendoPagos(doc)}
           />
         )}
-        {tab === "clientes" && <ClientesTab {...comunes} />}
+        {tab === "clientes" && (
+          <ClientesTab
+            {...comunes}
+            onEditar={(doc) => setEditando({ modo: "editar", datos: doc })}
+            onVerPagos={(doc) => setViendoPagos(doc)}
+          />
+        )}
         {tab === "importar" && <ImportarTab {...comunes} onImportado={recargar} />}
         {tab === "config" && <ConfiguracionTab config={config} onGuardado={recargar} />}
       </div>

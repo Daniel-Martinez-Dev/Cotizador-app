@@ -12,6 +12,7 @@ import { eliminarLoteImportacion, importarLote } from "../../utils/firebaseConta
 import { resolverEmpresa } from "../../utils/empresaIdentidad";
 import { resolverOCrearEmpresa } from "../../utils/firebaseCompanies";
 import { Campo, InputNumero, Seccion, claseControl } from "./ui";
+import { valorNumerico, numeroODefecto } from "../../utils/campoNumero";
 
 const PASOS = [
   "El JSON de migración (con clientes, documentos, pagos y saldos ya normalizados), o",
@@ -65,7 +66,7 @@ export default function ImportarTab({ empresas, onImportado }) {
   const migracion = React.useMemo(() => (texto.trim() ? esMigracion(texto) : false), [texto]);
 
   const analisis = React.useMemo(
-    () => (texto.trim() && !migracion ? importarFact(texto, { plazoDias: plazo }) : null),
+    () => (texto.trim() && !migracion ? importarFact(texto, { plazoDias: numeroODefecto(plazo, PLAZO_POR_DEFECTO) }) : null),
     [texto, plazo, migracion]
   );
 
@@ -209,7 +210,7 @@ export default function ImportarTab({ empresas, onImportado }) {
                 className="text-xs file:mr-3 file:h-9 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 dark:file:bg-gris-700 file:text-gray-700 dark:file:text-gray-200 hover:file:bg-gray-200 dark:hover:file:bg-gris-600 file:cursor-pointer"
               />
             </Campo>
-            <div className={`w-40 ${migracion ? "hidden" : ""}`}>
+            <div className={`w-full md:w-40 ${migracion ? "hidden" : ""}`}>
               <Campo
                 label="Plazo de pago (días)"
                 hint="El Excel no tenía vencimiento; se calcula desde la fecha de cada factura."
@@ -217,7 +218,8 @@ export default function ImportarTab({ empresas, onImportado }) {
                 <InputNumero
                   min={0}
                   value={plazo}
-                  onChange={(e) => setPlazo(Math.max(0, Number(e.target.value) || 0))}
+                  onChange={(e) => setPlazo(valorNumerico(e.target.value))}
+                  placeholder={String(PLAZO_POR_DEFECTO)}
                 />
               </Campo>
             </div>
@@ -328,7 +330,7 @@ export default function ImportarTab({ empresas, onImportado }) {
           )}
 
           {analisis.documentos.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
+            <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gris-700">
@@ -378,6 +380,56 @@ export default function ImportarTab({ empresas, onImportado }) {
             </div>
           )}
 
+          {/* Vista previa en el teléfono. Lo que hay que poder comprobar antes
+              de importar es a qué cliente va cada fila y por cuánto; en la
+              tabla de siete columnas eso quedaba tras un scroll lateral. */}
+          {analisis.documentos.length > 0 && (
+            <div className="md:hidden grid gap-2">
+              {analisis.documentos.slice(0, 25).map((d) => {
+                const vinculo = vinculos.get(d.clienteNombre);
+                return (
+                  <div
+                    key={d._fila}
+                    className="rounded-lg border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm break-words">{d.clienteNombre}</div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          Fila {d._fila} · {d.numero || "sin número"} · {d.fecha || "sin fecha"}
+                        </div>
+                        {!vinculo?.empresa && (
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                            {crearFaltantes ? "Se creará el cliente" : "Quedará sin vincular"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-semibold tabular-nums">{formatCOP(d.neto)}</div>
+                        {d.pagos.length > 0 && (
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {d.pagos.length} abono{d.pagos.length === 1 ? "" : "s"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                      {d.tipo === TIPO_NOTA_CREDITO && <Badge tone="purple">Nota crédito</Badge>}
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 min-w-0 truncate">
+                        {d.items[0]?.producto || "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {analisis.documentos.length > 25 && (
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 px-1">
+                  Se muestran 25 de {analisis.documentos.length} documentos. Se importarán todos.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             {guardando && progreso.total > 0 && (
               <div className="flex-1">
@@ -396,7 +448,7 @@ export default function ImportarTab({ empresas, onImportado }) {
               variant="primary"
               onClick={confirmar}
               disabled={guardando || (!resumen.documentos && !resumen.saldosIniciales)}
-              className="md:ml-auto"
+              className="w-full md:w-auto md:ml-auto"
             >
               {guardando
                 ? "Importando…"

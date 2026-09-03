@@ -79,3 +79,27 @@ describe("FacturaModal", () => {
     expect(html).toContain("suma</strong> a la cartera");
   });
 });
+
+// El formulario también se llena desde Android. Lo que se cuida aquí es que en
+// pantalla angosta no queden controles sin decir qué son: la cabecera de
+// columnas de los conceptos se oculta, y sin rótulo propio eran cuatro cajas
+// numéricas seguidas donde no se distingue la cantidad del valor unitario.
+describe("FacturaModal en pantalla angosta", () => {
+  it("cada campo del concepto lleva su rótulo cuando la cabecera no está", () => {
+    const html = pintar();
+    // La cabecera de columnas solo existe desde md.
+    expect(html).toContain('class="hidden md:grid');
+    // Y el rótulo por campo, solo hasta md.
+    for (const rotulo of ["Producto", "Cantidad", "Unidad", "Valor unitario", "Subtotal"]) {
+      expect(html, `falta el rótulo móvil de ${rotulo}`).toContain(
+        `<span class="md:hidden text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">${rotulo}</span>`
+      );
+    }
+  });
+
+  it("numera los conceptos y ofrece quitarlos con un botón que se puede tocar", () => {
+    const html = pintar();
+    expect(html).toContain("Concepto 1");
+    expect(html).toContain("Quitar");
+  });
+});

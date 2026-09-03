@@ -133,6 +133,14 @@ export default function EmpleadoFichaDetalle() {
             <div className="text-gray-400">Fecha entrega</div>
             <div className="font-medium">{fmtFecha(ficha.fechaEntrega)}</div>
           </div>
+          {/* Va a lo ancho y solo si existe: es la referencia del cliente, no
+              un dato que toda ficha tenga. */}
+          {ficha.numeroOrdenCompra && (
+            <div className="col-span-2">
+              <div className="text-gray-400">Orden de compra</div>
+              <div className="font-mono font-medium break-words">{ficha.numeroOrdenCompra}</div>
+            </div>
+          )}
         </div>
 
         {ImpresionComponent && (

@@ -9,6 +9,7 @@ import {
 } from "../../modules/contabilidad/catalogos";
 import { guardarBancos, guardarRetenciones } from "../../utils/firebaseContabilidad";
 import { Campo, Casilla, Input, InputNumero, Seccion, Select } from "./ui";
+import { valorNumerico, numeroODefecto } from "../../utils/campoNumero";
 
 const codigoDesde = (nombre) =>
   String(nombre || "")
@@ -26,6 +27,22 @@ const codigoDesde = (nombre) =>
  * datos, y las facturas ya guardadas conservan el valor con el que se
  * liquidaron —cambiar una tarifa no reescribe el pasado—.
  */
+/**
+ * Campo con su nombre encima mientras la cabecera de columnas no esté (ver la
+ * rejilla de retenciones: en escritorio rotula una vez arriba, en el teléfono
+ * se oculta y los controles se quedaban sin decir qué son).
+ */
+function Rotulo({ texto, children, className = "" }) {
+  return (
+    <div className={`grid gap-1 min-w-0 ${className}`}>
+      <span className="md:hidden text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {texto}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 export default function ConfiguracionTab({ config, onGuardado }) {
   const [retenciones, setRetenciones] = React.useState([]);
   const [bancos, setBancos] = React.useState([]);
@@ -63,8 +80,13 @@ export default function ConfiguracionTab({ config, onGuardado }) {
     try {
       await Promise.all([
         guardarRetenciones(
-          retenciones.map((r) => ({ ...r, codigo: r.codigo || codigoDesde(r.nombre) })),
-          { ivaPorDefecto: iva, plazoPorDefecto: plazo }
+          // Un campo que se dejó en blanco vale 0: se guarda número, nunca "".
+          retenciones.map((r) => ({
+            ...r,
+            codigo: r.codigo || codigoDesde(r.nombre),
+            porcentaje: numeroODefecto(r.porcentaje, 0),
+          })),
+          { ivaPorDefecto: numeroODefecto(iva, 0), plazoPorDefecto: numeroODefecto(plazo, 0) }
         ),
         guardarBancos(bancos.map((b) => ({ ...b, codigo: b.codigo || codigoDesde(b.nombre) }))),
       ]);
@@ -88,13 +110,14 @@ export default function ConfiguracionTab({ config, onGuardado }) {
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Campo label="IVA (%)">
-            <InputNumero min={0} step="0.01" value={iva} onChange={(e) => setIva(Number(e.target.value) || 0)} />
+            <InputNumero min={0} step="0.01" value={iva} onChange={(e) => setIva(valorNumerico(e.target.value))} placeholder="0" />
           </Campo>
           <Campo label="Plazo de pago (días)">
             <InputNumero
               min={0}
               value={plazo}
-              onChange={(e) => setPlazo(Math.max(0, Number(e.target.value) || 0))}
+              onChange={(e) => setPlazo(valorNumerico(e.target.value))}
+              placeholder="0"
             />
           </Campo>
         </div>
@@ -116,33 +139,56 @@ export default function ConfiguracionTab({ config, onGuardado }) {
           {retenciones.map((ret, idx) => (
             <div
               key={idx}
-              className="grid grid-cols-2 md:grid-cols-[2fr_1.2fr_0.8fr_auto_auto] gap-2 items-center rounded-lg bg-gray-50 dark:bg-gris-900/40 md:bg-transparent md:dark:bg-transparent p-2 md:p-0"
+              className="grid grid-cols-2 md:grid-cols-[2fr_1.2fr_0.8fr_auto_auto] gap-2 md:items-center rounded-lg border border-gray-200 dark:border-gris-700 md:border-0 bg-gray-50 dark:bg-gris-900/40 md:bg-transparent md:dark:bg-transparent p-2.5 md:p-0"
             >
-              <Input
-                value={ret.nombre}
-                onChange={(e) => cambiarRet(idx, "nombre", e.target.value)}
-                placeholder="Nombre de la retención"
-                aria-label={`Nombre de la retención ${idx + 1}`}
-              />
-              <Select
-                value={ret.base}
-                onChange={(e) => cambiarRet(idx, "base", e.target.value)}
-                aria-label={`Base de ${ret.nombre || `la retención ${idx + 1}`}`}
-              >
-                {BASES_RETENCION.map((b) => <option key={b.valor} value={b.valor}>{b.label}</option>)}
-              </Select>
-              <InputNumero
-                min={0}
-                step="0.01"
-                value={ret.porcentaje}
-                onChange={(e) => cambiarRet(idx, "porcentaje", Number(e.target.value) || 0)}
-                disabled={ret.base === "manual"}
-                aria-label={`Porcentaje de ${ret.nombre || `la retención ${idx + 1}`}`}
-              />
+              {/* En el teléfono no hay cabecera de columnas que rotule, así que
+                  cada campo lleva su nombre y el quitar deja de ser un aspa de
+                  ocho píxeles perdida al final de la fila. */}
+              <div className="col-span-2 flex items-center justify-between md:hidden">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Retención {idx + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => quitarRet(idx)}
+                  className="text-xs font-medium text-red-600 dark:text-red-400 px-2 py-1 -mr-1"
+                >
+                  Quitar
+                </button>
+              </div>
+
+              <Rotulo texto="Nombre" className="col-span-2 md:col-span-1">
+                <Input
+                  value={ret.nombre}
+                  onChange={(e) => cambiarRet(idx, "nombre", e.target.value)}
+                  placeholder="Nombre de la retención"
+                  aria-label={`Nombre de la retención ${idx + 1}`}
+                />
+              </Rotulo>
+              <Rotulo texto="Se calcula">
+                <Select
+                  value={ret.base}
+                  onChange={(e) => cambiarRet(idx, "base", e.target.value)}
+                  aria-label={`Base de ${ret.nombre || `la retención ${idx + 1}`}`}
+                >
+                  {BASES_RETENCION.map((b) => <option key={b.valor} value={b.valor}>{b.label}</option>)}
+                </Select>
+              </Rotulo>
+              <Rotulo texto="Porcentaje">
+                <InputNumero
+                  min={0}
+                  step="0.01"
+                  value={ret.porcentaje}
+                  onChange={(e) => cambiarRet(idx, "porcentaje", valorNumerico(e.target.value))}
+                  placeholder="0"
+                  disabled={ret.base === "manual"}
+                  aria-label={`Porcentaje de ${ret.nombre || `la retención ${idx + 1}`}`}
+                />
+              </Rotulo>
               <Casilla
                 checked={ret.activa !== false}
                 onChange={(e) => cambiarRet(idx, "activa", e.target.checked)}
-                className="whitespace-nowrap"
+                className="whitespace-nowrap col-span-2 md:col-span-1"
               >
                 <span className="md:sr-only">Activa</span>
               </Casilla>
@@ -150,7 +196,7 @@ export default function ConfiguracionTab({ config, onGuardado }) {
                 type="button"
                 onClick={() => quitarRet(idx)}
                 aria-label={`Quitar ${ret.nombre || "retención"}`}
-                className="h-9 w-8 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-trafico/50"
+                className="hidden md:inline-flex h-9 w-8 items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-trafico/50"
               >
                 ✕
               </button>
@@ -166,28 +212,28 @@ export default function ConfiguracionTab({ config, onGuardado }) {
       >
         <div className="grid gap-2">
           {bancos.map((banco, idx) => (
-            <div key={idx} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+            <div key={idx} className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1 items-center">
               <Input
                 value={banco.nombre}
                 onChange={(e) => cambiarBanco(idx, "nombre", e.target.value)}
                 placeholder="Nombre del banco"
                 aria-label={`Nombre del banco ${idx + 1}`}
               />
-              <Casilla
-                checked={banco.activo !== false}
-                onChange={(e) => cambiarBanco(idx, "activo", e.target.checked)}
-                className="whitespace-nowrap"
-              >
-                Activo
-              </Casilla>
               <button
                 type="button"
                 onClick={() => quitarBanco(idx)}
                 aria-label={`Quitar ${banco.nombre || "banco"}`}
-                className="h-9 w-8 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-trafico/50"
+                className="h-11 w-11 sm:h-9 sm:w-8 sm:order-last inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-trafico/50"
               >
                 ✕
               </button>
+              <Casilla
+                checked={banco.activo !== false}
+                onChange={(e) => cambiarBanco(idx, "activo", e.target.checked)}
+                className="whitespace-nowrap col-span-2 sm:col-span-1"
+              >
+                Activo
+              </Casilla>
             </div>
           ))}
         </div>

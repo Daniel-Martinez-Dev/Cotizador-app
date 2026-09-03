@@ -91,11 +91,15 @@ export const ESTADO_PAGADA = "pagada";
 export const ESTADO_ABONADA = "abonada";
 export const ESTADO_PENDIENTE = "pendiente";
 export const ESTADO_ANULADA = "anulada";
+// Una nota crédito no se paga: nace aplicada. Antes caía en "pendiente" —su
+// saldo era su propio neto— y el cliente aparecía debiendo notas crédito.
+export const ESTADO_APLICADA = "aplicada";
 
 export const ESTADOS_PAGO = [
   { valor: ESTADO_PAGADA, label: "Pagada", tono: "success" },
   { valor: ESTADO_ABONADA, label: "Abonada", tono: "info" },
   { valor: ESTADO_PENDIENTE, label: "Pendiente", tono: "warning" },
+  { valor: ESTADO_APLICADA, label: "Aplicada", tono: "purple" },
   { valor: ESTADO_ANULADA, label: "Anulada", tono: "neutral" },
 ];
 

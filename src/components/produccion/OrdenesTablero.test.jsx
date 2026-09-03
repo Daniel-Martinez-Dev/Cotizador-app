@@ -80,6 +80,11 @@ describe("tablero de órdenes", () => {
     expect(pintar([orden({})])).not.toContain("sticky");
   });
 
+  it("etiqueta la tarjeta con la orden de compra del cliente", () => {
+    expect(pintar([orden({ numeroOrdenCompra: "4500123456" })])).toContain("OC 4500123456");
+    expect(pintar([orden({})])).not.toContain("OC ");
+  });
+
   it("aguanta una ficha sin cliente y sin medidas", () => {
     const html = pintar([orden({ cliente: "", anchoVehiculo: undefined, altoVehiculo: undefined })]);
     expect(html).toContain("Sin cliente");

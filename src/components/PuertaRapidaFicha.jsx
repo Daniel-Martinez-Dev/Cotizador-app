@@ -25,6 +25,7 @@ import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { valorNumerico, conDefectosNumericos } from "../utils/campoNumero";
 
 const OPCIONES = {
   colorLona: ["NEGRO", "BLANCO", "AZUL", "VERDE", "NARANJA", "GRIS", "OTRO"],
@@ -57,6 +58,17 @@ const INITIAL_FORM = {
   distanciaCortavientos: PARAMETROS_PUERTA_RAPIDA.DISTANCIA_CORTAVIENTOS_DEFAULT_MM,
   adicional:             "",
 };
+
+// Lo que vale un campo numérico que se dejó en blanco. El formulario admite ""
+// para que se pueda borrar y reescribir sin pelear con un 0 (ver
+// utils/campoNumero.js); el cálculo y lo que se guarda usan estos defectos, que
+// además son los que se ven de placeholder.
+const DEFECTOS_NUM = {
+  cantidad:              1,
+  distanciaCortavientos: PARAMETROS_PUERTA_RAPIDA.DISTANCIA_CORTAVIENTOS_DEFAULT_MM,
+};
+
+const conDefectos = (form) => conDefectosNumericos(form, DEFECTOS_NUM);
 
 // Accesorios cuya cantidad no es numérica sino una casilla de validación
 // (lista desplegable de valores fijos, ej. capacidad del transformador/UPS).
@@ -92,13 +104,13 @@ export default function PuertaRapidaFicha({ encargo, onEncargoAtendido, onGuarda
   const formRef = React.useRef(null);
 
   const calculo = React.useMemo(
-    () => calcularPuertaRapida(form),
+    () => calcularPuertaRapida(conDefectos(form)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [form.anchoVano, form.altoVano, form.cantidad, form.distanciaCortavientos]
   );
 
   const fechaEntrega = React.useMemo(
-    () => calcularFechaEntrega(form.fechaOrden, form.cantidad),
+    () => calcularFechaEntrega(form.fechaOrden, conDefectos(form).cantidad),
     [form.fechaOrden, form.cantidad]
   );
 
@@ -138,6 +150,7 @@ export default function PuertaRapidaFicha({ encargo, onEncargoAtendido, onGuarda
   };
 
   const set = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: valorNumerico(e.target.value) }));
 
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
@@ -162,10 +175,9 @@ export default function PuertaRapidaFicha({ encargo, onEncargoAtendido, onGuarda
             : { cantidad: Number(it.cantidad) || 0 }),
         }));
       const datos = {
-        ...form,
+        ...conDefectos(form),
         anchoVano: Number(form.anchoVano),
         altoVano:  Number(form.altoVano),
-        distanciaCortavientos: Number(form.distanciaCortavientos),
         fechaEntrega,
       };
       if (editingId) {
@@ -274,7 +286,7 @@ export default function PuertaRapidaFicha({ encargo, onEncargoAtendido, onGuarda
               <div>
                 <label className={labelCls}>Cantidad</label>
                 <input type="number" min={1} step={1} value={form.cantidad}
-                  onChange={(e) => setForm((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                  onChange={setNum("cantidad")} placeholder={String(DEFECTOS_NUM.cantidad)}
                   className={inputCls} />
               </div>
               <div>
@@ -344,7 +356,8 @@ export default function PuertaRapidaFicha({ encargo, onEncargoAtendido, onGuarda
                 <div>
                   <label className={labelCls}>Distancia cortavientos (mm)</label>
                   <input type="number" min={1} step={1} value={form.distanciaCortavientos}
-                    onChange={set("distanciaCortavientos")}
+                    onChange={setNum("distanciaCortavientos")}
+                    placeholder={String(DEFECTOS_NUM.distanciaCortavientos)}
                     className={`${inputCls} font-mono`} />
                 </div>
                 <div className="col-span-2">

@@ -43,7 +43,8 @@ const crearProductoInicial = () => ({
   mostrarAlerta: false,
   precioEditado: '',
   ajusteTipo: 'Incremento',
-  ajusteValor: 0,
+  // En blanco = sin ajuste. Un 0 escrito obliga a borrarlo antes de teclear.
+  ajusteValor: '',
   conInstalacion: true, // para Cortina Thermofilm
 });
 
@@ -59,7 +60,7 @@ export default function CotizadorApp(){
   const [extrasInputs, setExtrasInputs] = useState({});
   const [alertas, setAlertas] = useState([]);
   const [ajusteTotalTipo, setAjusteTotalTipo] = useState('Descuento');
-  const [ajusteTotalValor, setAjusteTotalValor] = useState(0);
+  const [ajusteTotalValor, setAjusteTotalValor] = useState('');
   const [collapsed, setCollapsed] = useState([]);
 
   // Cargar empresas (nuevo modelo)
@@ -117,7 +118,7 @@ export default function CotizadorApp(){
     })();
   }, [quoteData?.modoEdicion, quoteData?.empresaId, quoteData?.empresaNIT]);
   // Reset externo
-  useEffect(()=>{ if(resetToken){ setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); setExtrasInputs({}); setQuoteData({}); setResetToken(null);} },[resetToken]);
+  useEffect(()=>{ if(resetToken){ setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(''); setExtrasInputs({}); setQuoteData({}); setResetToken(null);} },[resetToken]);
   // Sincronizar collapsed
   useEffect(()=>{ setCollapsed(prev=> productos.map((_,i)=> prev[i]??false)); }, [productos.length]);
   // Alertas rango
@@ -368,7 +369,7 @@ export default function CotizadorApp(){
             <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Modo edición — Cotización #{quoteData.numero || '—'}</p>
             <p className="text-xs text-amber-600 dark:text-amber-400">Al generar, se sobrescribirá la cotización existente.</p>
           </div>
-          <button type="button" onClick={()=>{ setQuoteData({}); setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(0); }} className="flex-shrink-0 text-xs text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap">Salir edición</button>
+          <button type="button" onClick={()=>{ setQuoteData({}); setProductos([crearProductoInicial()]); setCliente(''); setAjusteTotalTipo('Descuento'); setAjusteTotalValor(''); }} className="flex-shrink-0 text-xs text-amber-700 dark:text-amber-400 underline hover:no-underline whitespace-nowrap">Salir edición</button>
         </div>
       )}
       <PageHeader section="/cotizar" title="Generar Cotización" />
@@ -561,7 +562,7 @@ export default function CotizadorApp(){
                       </div>
                       <div className="space-y-2">
                         <label className="block text-xs font-semibold tracking-wide uppercase">Ajuste (%) de este producto</label>
-                        <div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="%" /></div>
+                        <div className="flex gap-2"><select value={producto.ajusteTipo} onChange={e=> handleChangeProducto(i,'ajusteTipo', e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-xs"><option value='Incremento'>Incremento</option><option value='Descuento'>Descuento</option></select><input type="number" value={producto.ajusteValor} onChange={e=> handleChangeProducto(i,'ajusteValor', e.target.value)} className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600" placeholder="0" /></div>
                         <p className="text-[10px] text-gray-400 dark:text-gray-500">Solo afecta este producto. El "Ajuste general" del panel derecho se suma aparte, sobre el total de la cotización.</p>
                       </div>
                       {producto.tipo==='Sello de Andén' && (
@@ -741,7 +742,7 @@ export default function CotizadorApp(){
                 <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mb-3">Se suma sobre el subtotal de toda la cotización, después de los ajustes por producto (no los reemplaza).</p>
                 <div className="flex items-center gap-3">
                   <select value={ajusteTotalTipo} onChange={e=> setAjusteTotalTipo(e.target.value)} className="border p-2 rounded bg-white dark:bg-gris-800 dark:border-gris-600 text-sm"><option value='Descuento'>Descuento</option><option value='Incremento'>Incremento</option></select>
-                  <input type="number" value={ajusteTotalValor} onChange={e=> setAjusteTotalValor(e.target.value)} placeholder="%" className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" /><span className="text-xs">%</span>
+                  <input type="number" value={ajusteTotalValor} onChange={e=> setAjusteTotalValor(e.target.value)} placeholder="0" className="border p-2 rounded w-24 bg-white dark:bg-gris-800 dark:border-gris-600 text-sm" /><span className="text-xs">%</span>
                 </div>
               </div>
               <div className="text-xs space-y-1 font-mono">

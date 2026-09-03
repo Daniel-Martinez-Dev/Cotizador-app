@@ -133,7 +133,42 @@ describe("construirCartera", () => {
     const nc = { id: "nc1", tipo: "nota_credito", fecha: "2026-02-01", empresaId: "emp1", clienteNombre: "Axionlog", neto: 300_000, docAfectadoId: "f1" };
     const { clientes } = construirCartera([fact("f1"), nc], [], { hoy: HOY });
     expect(clientes[0].saldo).toBe(700_000);
-    expect(clientes[0].neto).toBe(1_000_000);
+    // La nota cancela su valor contra el de la factura, también en lo facturado.
+    expect(clientes[0].neto).toBe(700_000);
+  });
+
+  // La razón de ser de la nota crédito: anular la factura. Con la factura y la
+  // nota por el mismo valor el cliente queda en cero, no debiendo la nota.
+  it("una nota crédito por el valor de la factura la deja en cero", () => {
+    const nc = { id: "nc1", tipo: "nota_credito", fecha: "2026-02-01", empresaId: "emp1", clienteNombre: "Axionlog", neto: 1_000_000, docAfectadoId: "f1" };
+    const { clientes, totales } = construirCartera([fact("f1"), nc], [], { hoy: HOY });
+    expect(clientes[0].saldo).toBe(0);
+    expect(clientes[0].neto).toBe(0);
+    expect(clientes[0].vencido).toBe(0);
+    expect(clientes[0].saldado).toBe(true);
+    expect(totales.clientesConSaldo).toBe(0);
+  });
+
+  it("una nota crédito nunca queda pendiente ni vencida", () => {
+    // Vieja de un año: con el plazo de 30 días habría figurado en mora.
+    const nc = { id: "nc1", tipo: "nota_credito", fecha: "2025-09-01", plazoDias: 30, empresaId: "emp1", clienteNombre: "Axionlog", neto: 400_000, docAfectadoId: "f1" };
+    const [factura, nota] = liquidarDocumentos([fact("f1"), nc], [], HOY);
+    expect(nota.resumen.estado).toBe("aplicada");
+    expect(nota.resumen.saldo).toBe(0);
+    expect(nota.resumen.vencida).toBe(false);
+    expect(nota.resumen.credito).toBe(400_000);
+    expect(factura.resumen.saldo).toBe(600_000);
+  });
+
+  // Se podían registrar abonos sobre una nota crédito. Esa plata entró al
+  // banco, así que no se puede perder: queda como anticipo del cliente.
+  it("un abono aplicado a una nota crédito vuelve a ser anticipo del cliente", () => {
+    const nc = { id: "nc1", tipo: "nota_credito", fecha: "2026-02-01", empresaId: "emp1", clienteNombre: "Axionlog S.A.S.", neto: 300_000, docAfectadoId: "f1" };
+    const { clientes } = construirCartera([fact("f1"), nc], [abono("nc1", 300_000)], { hoy: HOY });
+    expect(clientes[0].anticipos).toBe(300_000);
+    expect(clientes[0].abonado).toBe(0);
+    // 1.000.000 − 300.000 de la nota − 300.000 de anticipo.
+    expect(clientes[0].saldo).toBe(400_000);
   });
 
   it("una nota crédito general del cliente sí resta por su cuenta", () => {
@@ -193,6 +228,23 @@ describe("totalesDocumentos", () => {
     expect(t.subtotal).toBe(800_000);
     expect(t.iva).toBe(152_000);
     expect(t.cantidad).toBe(2);
+  });
+
+  // El listado sumaba el neto de la nota como saldo por cobrar en negativo, y
+  // el "Por cobrar" del año quedaba por debajo de lo que la cartera decía.
+  it("una factura anulada por su nota crédito no deja nada por cobrar", () => {
+    const liquidados = liquidarDocumentos(
+      [
+        fact("f1"),
+        { id: "nc1", tipo: "nota_credito", fecha: "2026-02-01", empresaId: "emp1", clienteNombre: "Axionlog S.A.S.", neto: 1_000_000, docAfectadoId: "f1" },
+      ],
+      [],
+      HOY
+    );
+    const t = totalesDocumentos(liquidados);
+    expect(t.saldo).toBe(0);
+    expect(t.neto).toBe(0);
+    expect(t.vencido).toBe(0);
   });
 });
 

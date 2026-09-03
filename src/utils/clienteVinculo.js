@@ -78,8 +78,15 @@ export function clienteDesdeEmpresa(empresa, { usarAlias } = {}) {
 // Cliente escrito a mano, sin empresa en la base. Se permite (una ficha urgente
 // no se puede quedar esperando a que alguien cree la empresa), pero queda sin
 // vincular y el selector lo señala.
-export function clienteSinVincular(nombre) {
-  return { ...vacio(), cliente: String(nombre ?? "").trim() };
+//
+// `recortar: false` conserva el texto tal cual se escribió. Es lo que necesita
+// el campo mientras se teclea: recortar en cada pulsación borra el espacio que
+// se acaba de escribir, así que "Frigorífico Norte" se quedaba en
+// "FrigoríficoNorte" y no había forma de separar las palabras. Lo guardado
+// vuelve a recortarse en camposClienteFicha, que es la puerta a Firestore.
+export function clienteSinVincular(nombre, { recortar = true } = {}) {
+  const texto = String(nombre ?? "");
+  return { ...vacio(), cliente: recortar ? texto.trim() : texto };
 }
 
 // Alias escrito a mano en la ficha: sirve para el cliente que todavía no está
@@ -89,11 +96,19 @@ export function clienteSinVincular(nombre) {
 // Escribir el primer alias lo enciende —para eso se escribe—, pero si ya había
 // uno se respeta la decisión de la casilla: quien la apagó y sigue corrigiendo
 // el texto no quiere que se le vuelva a encender sola.
-export function aliasManual(datos = {}, alias) {
-  const limpio = String(alias ?? "").trim();
-  if (!limpio) return { ...datos, clienteAlias: "", usarAlias: false };
+//
+// `recortar` funciona como en clienteSinVincular: el alias también se escribe
+// con espacios ("CI ANDINA") y recortar en cada tecla los impedía.
+export function aliasManual(datos = {}, alias, { recortar = true } = {}) {
+  const texto = String(alias ?? "");
+  const limpio = texto.trim();
+  if (!limpio) return { ...datos, clienteAlias: recortar ? "" : texto, usarAlias: false };
   const yaTenia = Boolean(String(datos.clienteAlias ?? "").trim());
-  return { ...datos, clienteAlias: limpio, usarAlias: yaTenia ? Boolean(datos.usarAlias) : true };
+  return {
+    ...datos,
+    clienteAlias: recortar ? limpio : texto,
+    usarAlias: yaTenia ? Boolean(datos.usarAlias) : true,
+  };
 }
 
 // Normaliza los campos de cliente antes de escribirlos en Firestore. Lo usan

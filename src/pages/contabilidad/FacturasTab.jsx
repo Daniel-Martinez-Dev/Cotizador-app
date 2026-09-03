@@ -17,6 +17,7 @@ import {
   Tabla,
   Td,
   Th,
+  TiraTotales,
   Tr,
 } from "./ui";
 import {
@@ -24,6 +25,7 @@ import {
   TIPOS_DOCUMENTO,
   TIPO_NOTA_CREDITO,
   TIPO_NOTA_DEBITO,
+  esNotaCredito,
   etiquetaEstado,
   tonoEstado,
 } from "../../modules/contabilidad/catalogos";
@@ -76,6 +78,7 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
   const [filtros, setFiltros] = React.useState(FILTROS_INICIALES);
   const [porAnular, setPorAnular] = React.useState(null);
   const [motivo, setMotivo] = React.useState("");
+  const [filtrosAbiertos, setFiltrosAbiertos] = React.useState(false);
 
   const filtrados = React.useMemo(() => filtrarDocumentos(liquidados, filtros), [liquidados, filtros]);
   const totales = React.useMemo(() => totalesDocumentos(filtrados), [filtrados]);
@@ -111,10 +114,18 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
     }
   };
 
-  const acciones = (doc) => (
-    <div className="flex flex-wrap gap-1.5 justify-end">
+  // `repartidas` estira los botones a lo ancho de la tarjeta del teléfono. En
+  // la tabla van compactos y a la derecha, que es donde cabe la columna.
+  const acciones = (doc, { repartidas = false } = {}) => (
+    <div className={`flex flex-wrap gap-1.5 justify-end ${repartidas ? "[&>button]:flex-1" : ""}`}>
       <Button size="sm" variant="secondary" onClick={() => onEditar(doc)}>Editar</Button>
-      <Button size="sm" variant="accent" onClick={() => onVerPagos(doc)}>Abonos</Button>
+      {/* Una nota crédito no se cobra, así que no tiene abonos que ver. Solo
+          aparece el botón si arrastra alguno mal aplicado, para poder quitarlo. */}
+      {!esNotaCredito(doc) ? (
+        <Button size="sm" variant="accent" onClick={() => onVerPagos(doc)}>Abonos</Button>
+      ) : doc.resumen?.abonosIndebidos ? (
+        <Button size="sm" variant="danger" onClick={() => onVerPagos(doc)}>Abonos mal aplicados</Button>
+      ) : null}
       {doc.anulado ? (
         <Button size="sm" variant="secondary" onClick={() => reactivar(doc)}>Reactivar</Button>
       ) : (
@@ -125,14 +136,14 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
 
   return (
     <section className="grid gap-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+      <TiraTotales>
         <KPI titulo="Documentos" valor={totales.cantidad} detalle={hayFiltro ? `de ${liquidados.length} en ${anio}` : `Año ${anio}`} />
-        <KPI titulo="Subtotal" valor={<Money valor={totales.subtotal} cero="" />} compacto />
-        <KPI titulo="IVA" valor={<Money valor={totales.iva} cero="" />} compacto />
         <KPI titulo="Neto facturado" valor={<Money valor={totales.neto} cero="" />} compacto />
         <KPI titulo="Recaudado" valor={<Money valor={totales.abonado} cero="" />} tono="bueno" compacto />
         <KPI titulo="Por cobrar" valor={<Money valor={totales.saldo} cero="" />} tono={totales.saldo ? "aviso" : "bueno"} compacto />
-      </div>
+        <KPI titulo="Subtotal" valor={<Money valor={totales.subtotal} cero="" />} compacto />
+        <KPI titulo="IVA" valor={<Money valor={totales.iva} cero="" />} compacto />
+      </TiraTotales>
 
       {sinVincular > 0 && !filtros.soloSinVincular && (
         <Aviso
@@ -150,22 +161,44 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
       )}
 
       <Card padding="p-3">
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
+        {/* El buscador siempre a la vista; lo demás, detrás de un botón en el
+            teléfono. Desplegados, los dos selectores y las dos casillas ocupan
+            media pantalla antes de que aparezca la primera factura, y de cada
+            diez veces que se entra aquí nueve son a buscar un número. */}
+        <div className="grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
           <Buscador
             value={filtros.busqueda}
             onChange={(v) => cambiar("busqueda", v)}
-            placeholder="Cliente, número, producto u observación"
+            placeholder="Cliente, número, producto…"
           />
-          <Select value={filtros.estado} onChange={(e) => cambiar("estado", e.target.value)} aria-label="Estado de pago">
+          <Button
+            variant={hayFiltro ? "accent" : "secondary"}
+            onClick={() => setFiltrosAbiertos((v) => !v)}
+            aria-expanded={filtrosAbiertos}
+            className="md:hidden whitespace-nowrap"
+          >
+            Filtros{hayFiltro ? " •" : ""}
+          </Button>
+          <Select
+            value={filtros.estado}
+            onChange={(e) => cambiar("estado", e.target.value)}
+            aria-label="Estado de pago"
+            className={filtrosAbiertos ? "col-span-2 md:col-span-1" : "hidden md:block"}
+          >
             <option value="">Todos los estados</option>
             {ESTADOS_PAGO.map((e) => <option key={e.valor} value={e.valor}>{e.label}</option>)}
           </Select>
-          <Select value={filtros.tipo} onChange={(e) => cambiar("tipo", e.target.value)} aria-label="Tipo de documento">
+          <Select
+            value={filtros.tipo}
+            onChange={(e) => cambiar("tipo", e.target.value)}
+            aria-label="Tipo de documento"
+            className={filtrosAbiertos ? "col-span-2 md:col-span-1" : "hidden md:block"}
+          >
             <option value="">Facturas y notas</option>
             {TIPOS_DOCUMENTO.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
           </Select>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className={`mt-2 md:mt-3 flex-wrap items-center gap-x-4 gap-y-1 ${filtrosAbiertos ? "flex" : "hidden md:flex"}`}>
           <Casilla checked={filtros.soloVencidas} onChange={(e) => cambiar("soloVencidas", e.target.checked)}>
             Solo vencidas
           </Casilla>
@@ -177,9 +210,9 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
               Quitar filtros
             </Button>
           )}
-          <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
-            {filtrados.length} de {liquidados.length} documentos de {anio}
-          </span>
+        </div>
+        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 md:text-right">
+          {filtrados.length} de {liquidados.length} documentos de {anio}
         </div>
       </Card>
 
@@ -268,7 +301,9 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
             </tbody>
           </Tabla>
 
-          {/* Tarjetas en pantallas angostas: la tabla de doce columnas no cabe. */}
+          {/* Tarjetas en pantallas angostas: la tabla de doce columnas no cabe.
+              El saldo manda —es lo que se viene a mirar— y por eso va grande y
+              solo; el neto y lo abonado quedan de contexto debajo. */}
           <div className="lg:hidden grid gap-2">
             {filtrados.map((doc) => {
               const { resumen } = doc;
@@ -277,8 +312,14 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                 <Card key={doc.id} padding="p-3" className={doc.anulado ? "opacity-50" : ""}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{doc.clienteNombre || "—"}</div>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => onEditar(doc)}
+                        className="text-left font-semibold text-[15px] leading-snug break-words w-full"
+                      >
+                        {doc.clienteNombre || "—"}
+                      </button>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
                         {insignia && <Badge tone={insignia.tono}>{insignia.texto}</Badge>}
                         {doc.numero || "sin número"} · {doc.fecha || "sin fecha"}
                       </div>
@@ -288,32 +329,35 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                     </div>
                     <Badge tone={tonoEstado(resumen.estado)}>{etiquetaEstado(resumen.estado)}</Badge>
                   </div>
-                  <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">Neto</div>
-                      <Money valor={resumen.neto} />
+
+                  <div className="mt-2.5 flex items-end justify-between gap-3 border-t border-gray-100 dark:border-gris-700/60 pt-2.5">
+                    <div className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      <div>Neto <Money valor={resumen.neto} className="text-gray-800 dark:text-gray-100" /></div>
+                      <div>
+                        Abonado{" "}
+                        <Money valor={resumen.abonado} className="text-emerald-600 dark:text-emerald-400" />
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">Abonado</div>
-                      <Money valor={resumen.abonado} className="text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
+                    <div className="text-right shrink-0">
                       <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">Saldo</div>
-                      <Money valor={resumen.saldo} fuerte />
+                      <div className="text-lg font-bold tabular-nums leading-none mt-0.5">
+                        <Money valor={resumen.saldo} cero="0" />
+                      </div>
                     </div>
                   </div>
+
                   {resumen.vencida && (
-                    <div className="mt-2 text-[11px] text-red-600 dark:text-red-400">
+                    <div className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
                       Vencida hace {resumen.diasMora} días ({resumen.vencimiento})
                     </div>
                   )}
-                  <div className="mt-2.5">{acciones(doc)}</div>
+                  <div className="mt-2.5">{acciones(doc, { repartidas: true })}</div>
                 </Card>
               );
             })}
           </div>
 
-          <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
+          <div className="text-xs text-gray-500 dark:text-gray-400 sm:text-right">
             Total filtrado: <strong className="text-gray-900 dark:text-white">{formatCOP(totales.neto)}</strong> facturados ·{" "}
             <strong className="text-gray-900 dark:text-white">{formatCOP(totales.saldo)}</strong> por cobrar
           </div>

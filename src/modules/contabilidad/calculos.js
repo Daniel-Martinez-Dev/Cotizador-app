@@ -12,10 +12,12 @@
 import {
   ESTADO_ABONADA,
   ESTADO_ANULADA,
+  ESTADO_APLICADA,
   ESTADO_PAGADA,
   ESTADO_PENDIENTE,
   IVA_POR_DEFECTO,
   PLAZO_POR_DEFECTO,
+  esNotaCredito,
   signoDocumento,
 } from "./catalogos";
 
@@ -209,9 +211,14 @@ export function totalSinAplicar(pagos = []) {
  * `notasCredito` son las notas que apuntan a esta factura (docAfectadoId): una
  * devolución baja el saldo igual que un pago, y en el Excel eso quedaba como
  * una fila suelta que nadie cruzaba con la factura original.
+ *
+ * Una nota crédito nunca tiene saldo: no se cobra, anula. Mientras el saldo de
+ * la nota era su propio neto, el cliente figuraba debiéndola —y encima la
+ * factura que ya estaba anulada figuraba en cero, así que el único documento
+ * "pendiente" del cliente era la nota—.
  */
 export function saldoDocumento(doc = {}, pagos = [], notasCredito = []) {
-  if (doc.anulado) return 0;
+  if (doc.anulado || esNotaCredito(doc)) return 0;
   const neto = netoDocumento(doc);
   const acreditado = (notasCredito || []).reduce((acc, nc) => acc + netoDocumento(nc), 0);
   return redondear(neto - totalPagos(pagos) - acreditado);
@@ -223,6 +230,8 @@ export const estaSaldado = (saldo) => Math.abs(aNumero(saldo)) < TOLERANCIA_SALD
 
 export function estadoDocumento(doc = {}, pagos = [], notasCredito = []) {
   if (doc.anulado) return ESTADO_ANULADA;
+  // La nota crédito no pasa por pendiente → abonada → pagada: nace aplicada.
+  if (esNotaCredito(doc)) return ESTADO_APLICADA;
   const saldo = saldoDocumento(doc, pagos, notasCredito);
   if (estaSaldado(saldo)) return ESTADO_PAGADA;
   const abonado = totalPagos(pagos) + (notasCredito || []).reduce((a, nc) => a + netoDocumento(nc), 0);
@@ -236,12 +245,16 @@ export function estadoDocumento(doc = {}, pagos = [], notasCredito = []) {
  */
 export function resumenDocumento(doc = {}, pagos = [], notasCredito = [], hoy = hoyISO()) {
   const liquidacion = calcularDocumento(doc);
+  const nota = esNotaCredito(doc);
   const neto = netoDocumento(doc);
   const abonado = totalPagos(pagos);
-  const acreditado = redondear((notasCredito || []).reduce((a, nc) => a + netoDocumento(nc), 0));
-  const saldo = doc.anulado ? 0 : redondear(neto - abonado - acreditado);
+  const acreditado = nota ? 0 : redondear((notasCredito || []).reduce((a, nc) => a + netoDocumento(nc), 0));
+  const saldo = doc.anulado || nota ? 0 : redondear(neto - abonado - acreditado);
   const estado = estadoDocumento(doc, pagos, notasCredito);
-  const mora = estado === ESTADO_PAGADA || estado === ESTADO_ANULADA ? 0 : diasMora(doc, hoy);
+  const mora = nota || estado === ESTADO_PAGADA || estado === ESTADO_ANULADA ? 0 : diasMora(doc, hoy);
+  // Lo que la nota descuenta. Si señala una factura, ese valor ya salió del
+  // saldo de esa factura (llega aquí como `acreditado` de la factura).
+  const credito = nota && !doc.anulado ? neto : 0;
 
   return {
     ...liquidacion,
@@ -249,9 +262,20 @@ export function resumenDocumento(doc = {}, pagos = [], notasCredito = [], hoy = 
     netoConSigno: netoConSigno(doc),
     abonado,
     acreditado,
+    credito,
     saldo,
+    // Lo que el documento le suma al saldo del cliente. La factura aporta lo
+    // que le falte por cobrar; la nota crédito enlazada, nada —ya bajó el
+    // saldo de su factura, y contarla otra vez restaba dos veces—; la nota que
+    // no señala ninguna factura descuenta del saldo general del cliente.
+    aporteSaldo: nota ? (doc.docAfectadoId ? 0 : -credito) : saldo,
+    // Abonos aplicados a una nota crédito. No debería haberlos —una nota no se
+    // cobra— pero el formulario los permitía, así que hay que poder verlos
+    // para quitarlos.
+    abonosIndebidos: nota && abonado > 0,
     estado,
-    vencimiento: fechaVencimiento(doc),
+    // Una nota crédito no vence: no hay nada que cobrar ni plazo que correr.
+    vencimiento: nota ? "" : fechaVencimiento(doc),
     diasMora: mora,
     vencida: mora > 0,
   };

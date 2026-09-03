@@ -7,7 +7,15 @@
 // documentos y sus pagos.
 
 import { normalizarNombreCliente } from "../../utils/clienteVinculo";
-import { DESTINO_DOCUMENTO, DESTINO_SALDO, ESTADO_ANULADA, TIPO_NOTA_CREDITO, rangoDeMora } from "./catalogos";
+import {
+  DESTINO_DOCUMENTO,
+  DESTINO_SALDO,
+  ESTADO_ANULADA,
+  TIPO_NOTA_CREDITO,
+  esNotaCredito,
+  rangoDeMora,
+  signoDocumento,
+} from "./catalogos";
 import { anioDe, aNumero, aplicacionesDe, estaSaldado, hoyISO, redondear, resumenDocumento, sinAplicar } from "./calculos";
 
 // Con qué llave se agrupan las facturas de un mismo cliente. El id de la
@@ -43,11 +51,21 @@ export function aplicacionesPorDestino(pagos = []) {
   return mapa;
 }
 
-// Abonos que todavía no se imputaron a nada: plata del cliente a su favor.
-export function anticiposPorCliente(pagos = []) {
+/**
+ * Abonos que todavía no se imputaron a nada: plata del cliente a su favor.
+ *
+ * `noCobrables` son los ids de las notas crédito. Un abono aplicado a una nota
+ * no paga nada —la nota no se cobra— pero la plata sí entró al banco, así que
+ * no puede desaparecer de la cartera: vuelve a ser anticipo del cliente hasta
+ * que alguien lo impute a una factura de verdad.
+ */
+export function anticiposPorCliente(pagos = [], noCobrables = new Set()) {
   const mapa = new Map();
   for (const pago of pagos || []) {
-    const sobra = sinAplicar(pago);
+    const malAplicado = aplicacionesDe(pago)
+      .filter((ap) => (ap?.tipo || DESTINO_DOCUMENTO) === DESTINO_DOCUMENTO && noCobrables.has(ap?.id))
+      .reduce((acc, ap) => acc + aNumero(ap.valor), 0);
+    const sobra = redondear(sinAplicar(pago) + malAplicado);
     if (sobra <= 0) continue;
     const clave = claveCliente(pago);
     mapa.set(clave, redondear((mapa.get(clave) || 0) + sobra));
@@ -100,11 +118,6 @@ export function liquidarSaldos(saldosIniciales = [], pagos = [], porDestino = nu
   });
 }
 
-// Una nota crédito aplicada a una factura ya bajó el saldo de esa factura; si
-// además contara por su cuenta, restaría dos veces.
-const cuentaEnCartera = (doc) =>
-  !doc.anulado && !(doc.tipo === TIPO_NOTA_CREDITO && doc.docAfectadoId);
-
 /**
  * Cartera por cliente. `saldosIniciales` son los arrastres de años anteriores,
  * que en el Excel vivían como cuatro filas falsas dentro de la tabla de
@@ -116,7 +129,8 @@ export function construirCartera(documentos = [], pagos = [], { saldosIniciales 
   const porDestino = aplicacionesPorDestino(pagos);
   const liquidados = liquidarDocumentos(documentos, pagos, hoy);
   const saldosLiquidados = liquidarSaldos(saldosIniciales, pagos, porDestino);
-  const anticipos = anticiposPorCliente(pagos);
+  const notas = new Set((documentos || []).filter(esNotaCredito).map((d) => d.id));
+  const anticipos = anticiposPorCliente(pagos, notas);
   const clientes = new Map();
 
   const asegurar = (clave, datos) => {
@@ -159,16 +173,21 @@ export function construirCartera(documentos = [], pagos = [], { saldosIniciales 
     if (doc.resumen.estado === ESTADO_ANULADA) continue;
     const cliente = asegurar(claveCliente(doc), doc);
     cliente.documentos.push(doc);
-    if (!cuentaEnCartera(doc)) continue;
 
-    const signo = doc.tipo === TIPO_NOTA_CREDITO ? -1 : 1;
-    cliente.neto = redondear(cliente.neto + signo * doc.resumen.neto);
-    cliente.abonado = redondear(cliente.abonado + signo * doc.resumen.abonado);
-    cliente.saldo = redondear(cliente.saldo + signo * doc.resumen.saldo);
-    if (doc.resumen.vencida) cliente.vencido = redondear(cliente.vencido + signo * doc.resumen.saldo);
+    // Lo facturado sí lleva signo: la nota crédito cancela el valor de la
+    // factura que anula, que es exactamente para lo que se emite.
+    cliente.neto = redondear(cliente.neto + signoDocumento(doc.tipo) * doc.resumen.neto);
+    // Una nota crédito no recibe abonos. Si trae alguno mal aplicado, ya se
+    // contó como anticipo del cliente y sumarlo aquí lo contaría dos veces.
+    if (!esNotaCredito(doc)) cliente.abonado = redondear(cliente.abonado + doc.resumen.abonado);
+
+    // `aporteSaldo` ya sabe que una nota enlazada no aporta nada (bajó el
+    // saldo de su factura) y que una nota suelta descuenta en negativo.
+    cliente.saldo = redondear(cliente.saldo + doc.resumen.aporteSaldo);
+    if (doc.resumen.vencida) cliente.vencido = redondear(cliente.vencido + doc.resumen.saldo);
 
     const rango = rangoDeMora(doc.resumen.diasMora).clave;
-    cliente.porRango[rango] = redondear((cliente.porRango[rango] || 0) + signo * doc.resumen.saldo);
+    cliente.porRango[rango] = redondear((cliente.porRango[rango] || 0) + doc.resumen.aporteSaldo);
   }
 
   // Un anticipo sin aplicar puede ser de un cliente que no tiene ni facturas ni
@@ -221,15 +240,18 @@ export function totalesDocumentos(liquidados = []) {
   const totales = { subtotal: 0, iva: 0, retenciones: 0, neto: 0, abonado: 0, saldo: 0, cantidad: 0, vencido: 0 };
   for (const doc of liquidados) {
     if (!doc?.resumen || doc.resumen.estado === ESTADO_ANULADA) continue;
-    const signo = doc.tipo === TIPO_NOTA_CREDITO ? -1 : 1;
+    const signo = signoDocumento(doc.tipo);
     totales.cantidad += 1;
     totales.subtotal = redondear(totales.subtotal + signo * doc.resumen.subtotal);
     totales.iva = redondear(totales.iva + signo * doc.resumen.iva);
     totales.retenciones = redondear(totales.retenciones + signo * doc.resumen.totalRetenciones);
     totales.neto = redondear(totales.neto + signo * doc.resumen.neto);
-    totales.abonado = redondear(totales.abonado + signo * doc.resumen.abonado);
-    totales.saldo = redondear(totales.saldo + signo * doc.resumen.saldo);
-    if (doc.resumen.vencida) totales.vencido = redondear(totales.vencido + signo * doc.resumen.saldo);
+    // Igual que en la cartera: la nota crédito no aporta abonos ni saldo por
+    // cobrar. Restarle su neto al "por cobrar" —lo que se hacía antes— dejaba
+    // el total en negativo cuando la nota ya había anulado su factura.
+    if (!esNotaCredito(doc)) totales.abonado = redondear(totales.abonado + doc.resumen.abonado);
+    totales.saldo = redondear(totales.saldo + doc.resumen.aporteSaldo);
+    if (doc.resumen.vencida) totales.vencido = redondear(totales.vencido + doc.resumen.saldo);
   }
   return totales;
 }

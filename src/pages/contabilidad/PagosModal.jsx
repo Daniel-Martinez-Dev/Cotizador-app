@@ -4,8 +4,14 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatCOP } from "../inventario/inventarioUtils";
-import { Campo, Input, InputNumero, KPI, Modal, Money, Seccion, Select, Tabla, Td, Th, Tr } from "./ui";
-import { BANCOS_POR_DEFECTO, DESTINO_DOCUMENTO, etiquetaEstado, tonoEstado } from "../../modules/contabilidad/catalogos";
+import { Aviso, Campo, Card, Input, InputNumero, KPI, Modal, Money, Seccion, Select, Tabla, Td, Th, Tr } from "./ui";
+import {
+  BANCOS_POR_DEFECTO,
+  DESTINO_DOCUMENTO,
+  esNotaCredito,
+  etiquetaEstado,
+  tonoEstado,
+} from "../../modules/contabilidad/catalogos";
 import { aNumero, estaSaldado, hoyISO, netoDocumento, redondear } from "../../modules/contabilidad/calculos";
 import {
   actualizarPago,
@@ -54,6 +60,10 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
 
   React.useEffect(() => { cargar(); }, [cargar]);
 
+  // Una nota crédito no se cobra: anula la factura que señala. No recibe
+  // abonos, así que aquí no hay formulario —solo la lista, para poder quitar
+  // los que se hubieran registrado antes de que la app lo impidiera—.
+  const nota = esNotaCredito(documento);
   const neto = netoDocumento(documento);
   const abonado = redondear(pagos.reduce((acc, p) => acc + aplicadoAqui(p, documento.id), 0));
   // Las notas crédito aplicadas ya vienen descontadas en el resumen que calculó
@@ -85,6 +95,7 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
 
   const guardar = async (e) => {
     e.preventDefault();
+    if (nota) { toast.error("Una nota crédito no recibe abonos."); return; }
     const valor = aNumero(form.valor);
     if (valor <= 0) { toast.error("El abono debe ser mayor que cero."); return; }
     if (!form.fecha) { toast.error("Falta la fecha del abono."); return; }
@@ -154,26 +165,46 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
 
   return (
     <Modal
-      titulo={`Abonos de ${documento.numero || "documento sin número"}`}
+      titulo={`${nota ? "Nota crédito" : "Abonos de"} ${documento.numero || "documento sin número"}`}
       subtitulo={`${documento.clienteNombre || "sin cliente"} · ${documento.fecha || "sin fecha"}`}
-      insignia={estaSaldado(saldo) ? <Badge tone={tonoEstado("pagada")}>{etiquetaEstado("pagada")}</Badge> : null}
+      insignia={
+        nota ? (
+          <Badge tone={tonoEstado("aplicada")}>{etiquetaEstado("aplicada")}</Badge>
+        ) : estaSaldado(saldo) ? (
+          <Badge tone={tonoEstado("pagada")}>{etiquetaEstado("pagada")}</Badge>
+        ) : null
+      }
       ancho="max-w-4xl"
       onCerrar={onCerrar}
       pie={<Button variant="secondary" onClick={onCerrar}>Cerrar</Button>}
     >
       <div className="grid gap-4">
-        <div className={`grid grid-cols-2 ${acreditado > 0 ? "md:grid-cols-4" : "md:grid-cols-3"} gap-2`}>
+        <div className={`grid grid-cols-2 ${acreditado > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-2`}>
           <KPI titulo="Neto" valor={<Money valor={neto} cero="0" />} compacto />
           <KPI titulo="Abonado" valor={<Money valor={abonado} cero="0" />} tono="bueno" compacto />
           {acreditado > 0 && <KPI titulo="Notas crédito" valor={<Money valor={acreditado} />} compacto />}
           <KPI
-            titulo="Saldo"
-            valor={<Money valor={saldo} cero="0" />}
-            tono={estaSaldado(saldo) ? "bueno" : "aviso"}
+            titulo={nota ? "Descuenta" : "Saldo"}
+            valor={<Money valor={nota ? neto : saldo} cero="0" />}
+            tono={nota || estaSaldado(saldo) ? "bueno" : "aviso"}
             compacto
           />
         </div>
 
+        {nota ? (
+          <Aviso tono={abonado > 0 ? "malo" : "info"} titulo="Una nota crédito no recibe abonos">
+            {documento.docAfectadoId
+              ? "Su valor descuenta directamente de la factura que corrige, así que no queda nada por cobrar."
+              : "No señala ninguna factura, así que su valor descuenta del saldo general del cliente."}
+            {abonado > 0 && (
+              <>
+                {" "}Tiene <strong>{formatCOP(abonado)}</strong> en abonos aplicados de antes; quítalos desde la
+                lista de abajo y esa plata vuelve a quedar como anticipo del cliente, lista para imputarla a una
+                factura de verdad.
+              </>
+            )}
+          </Aviso>
+        ) : (
         <Seccion
           titulo={editando ? "Editar abono" : "Registrar abono"}
           descripcion={
@@ -190,7 +221,7 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
           }
         >
           <form onSubmit={guardar} className="grid gap-3">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 [&>*:nth-child(n+3)]:col-span-2 md:[&>*:nth-child(n+3)]:col-span-1">
               <Campo label="Fecha">
                 <Input type="date" value={form.fecha} onChange={(e) => editar("fecha", e.target.value)} />
               </Campo>
@@ -216,7 +247,7 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
                 <Input value={form.observaciones} onChange={(e) => editar("observaciones", e.target.value)} />
               </Campo>
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
               {editando && <Button variant="secondary" onClick={cancelarEdicion}>Cancelar edición</Button>}
               <Button type="submit" variant="primary" disabled={guardando}>
                 {guardando ? "Guardando…" : editando ? "Guardar cambios" : "Agregar abono"}
@@ -224,55 +255,119 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
             </div>
           </form>
         </Seccion>
+        )}
 
         {cargando ? (
           <EmptyState icon="⏳" title="Cargando abonos…" />
         ) : !pagos.length ? (
-          <EmptyState icon="💵" title="Sin abonos" description="Esta factura no tiene ningún pago registrado." />
+          <EmptyState
+            icon={nota ? "✅" : "💵"}
+            title="Sin abonos"
+            description={nota ? "Correcto: una nota crédito no se cobra." : "Esta factura no tiene ningún pago registrado."}
+          />
         ) : (
-          <Tabla>
-            <thead>
-              <tr>
-                <Th>#</Th>
-                <Th>Fecha</Th>
-                <Th align="right">Aplicado aquí</Th>
-                <Th>Banco</Th>
-                <Th>Referencia</Th>
-                <Th>Observaciones</Th>
-                <Th align="right">Acciones</Th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <Tabla className="hidden md:block">
+              <thead>
+                <tr>
+                  <Th>#</Th>
+                  <Th>Fecha</Th>
+                  <Th align="right">Aplicado aquí</Th>
+                  <Th>Banco</Th>
+                  <Th>Referencia</Th>
+                  <Th>Observaciones</Th>
+                  <Th align="right">Acciones</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagos.map((pago, idx) => {
+                  const otras = otrosDestinos(pago, documento.id);
+                  return (
+                    <Tr key={pago.id} className={editando?.id === pago.id ? "bg-amber-50 dark:bg-amber-900/20" : ""}>
+                      <Td className="text-gray-400">{idx + 1}</Td>
+                      <Td className="whitespace-nowrap">{pago.fecha || "—"}</Td>
+                      <Td align="right">
+                        <Money valor={aplicadoAqui(pago, documento.id)} fuerte />
+                        {otras > 0 && (
+                          <div className="text-[10px] font-normal text-blue-600 dark:text-blue-400">
+                            de {formatCOP(pago.valor)} · cubre {otras + 1} documentos
+                          </div>
+                        )}
+                      </Td>
+                      <Td>{pago.bancoNombre || "—"}</Td>
+                      <Td>{pago.referencia || "—"}</Td>
+                      <Td className="max-w-[20ch] truncate" title={pago.observaciones || ""}>{pago.observaciones || "—"}</Td>
+                      <Td align="right">
+                        <div className="flex gap-1.5 justify-end">
+                          {!nota && (
+                            <Button size="sm" variant="secondary" onClick={() => empezarEdicion(pago)}>Editar</Button>
+                          )}
+                          <Button size="sm" variant="danger" onClick={() => borrar(pago)}>
+                            {otras > 0 ? "Desaplicar" : "Borrar"}
+                          </Button>
+                        </div>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Tabla>
+
+            {/* Los mismos abonos en el teléfono. Siete columnas dentro de un
+                modal angosto dejaban el valor aplicado fuera de la vista, que
+                es justamente lo que se viene a comprobar aquí. */}
+            <div className="md:hidden grid gap-2">
               {pagos.map((pago, idx) => {
                 const otras = otrosDestinos(pago, documento.id);
                 return (
-                  <Tr key={pago.id} className={editando?.id === pago.id ? "bg-amber-50 dark:bg-amber-900/20" : ""}>
-                    <Td className="text-gray-400">{idx + 1}</Td>
-                    <Td className="whitespace-nowrap">{pago.fecha || "—"}</Td>
-                    <Td align="right">
-                      <Money valor={aplicadoAqui(pago, documento.id)} fuerte />
-                      {otras > 0 && (
-                        <div className="text-[10px] font-normal text-blue-600 dark:text-blue-400">
-                          de {formatCOP(pago.valor)} · cubre {otras + 1} documentos
+                  <Card
+                    key={pago.id}
+                    padding="p-3"
+                    className={editando?.id === pago.id ? "ring-2 ring-amber-400 dark:ring-amber-500/60" : ""}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">
+                          Abono {idx + 1}
+                          <span className="text-gray-500 dark:text-gray-400 font-normal"> · {pago.fecha || "sin fecha"}</span>
                         </div>
-                      )}
-                    </Td>
-                    <Td>{pago.bancoNombre || "—"}</Td>
-                    <Td>{pago.referencia || "—"}</Td>
-                    <Td className="max-w-[20ch] truncate" title={pago.observaciones || ""}>{pago.observaciones || "—"}</Td>
-                    <Td align="right">
-                      <div className="flex gap-1.5 justify-end">
-                        <Button size="sm" variant="secondary" onClick={() => empezarEdicion(pago)}>Editar</Button>
-                        <Button size="sm" variant="danger" onClick={() => borrar(pago)}>
-                          {otras > 0 ? "Desaplicar" : "Borrar"}
-                        </Button>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          {pago.bancoNombre || "sin banco"}
+                          {pago.referencia ? ` · ${pago.referencia}` : ""}
+                        </div>
+                        {pago.observaciones && (
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 break-words">
+                            {pago.observaciones}
+                          </div>
+                        )}
                       </div>
-                    </Td>
-                  </Tr>
+                      <div className="text-right shrink-0">
+                        <div className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Aplicado aquí
+                        </div>
+                        <div className="text-base font-bold tabular-nums leading-none mt-0.5">
+                          <Money valor={aplicadoAqui(pago, documento.id)} cero="0" />
+                        </div>
+                        {otras > 0 && (
+                          <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-1">
+                            de {formatCOP(pago.valor)} · {otras + 1} documentos
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2.5 flex gap-1.5 [&>button]:flex-1">
+                      {!nota && (
+                        <Button size="sm" variant="secondary" onClick={() => empezarEdicion(pago)}>Editar</Button>
+                      )}
+                      <Button size="sm" variant="danger" onClick={() => borrar(pago)}>
+                        {otras > 0 ? "Desaplicar" : "Borrar"}
+                      </Button>
+                    </div>
+                  </Card>
                 );
               })}
-            </tbody>
-          </Tabla>
+            </div>
+          </>
         )}
       </div>
     </Modal>

@@ -11,9 +11,13 @@ const VARIANTS = {
   brand: "bg-trafico text-black hover:opacity-90",
 };
 
+// Más alto en el teléfono que en el escritorio: con el dedo, un botón de 28 px
+// se falla, y la sección de contabilidad se usa desde Android. Desde `sm` vuelve
+// a la altura compacta, que es la que deja caber una fila de acciones dentro de
+// una celda de tabla.
 const SIZES = {
-  sm: "px-3 py-1.5 text-xs",
-  md: "px-4 py-2 text-sm",
+  sm: "px-3 py-2 sm:py-1.5 text-xs",
+  md: "px-4 py-2.5 sm:py-2 text-sm",
 };
 
 export default function Button({ variant = "secondary", size = "md", className = "", ...props }) {

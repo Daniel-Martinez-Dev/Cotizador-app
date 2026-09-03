@@ -2,6 +2,7 @@ import React from "react";
 import EmptyState from "../../components/ui/EmptyState";
 import Badge from "../../components/ui/Badge";
 import { formatCOP, formatMovimientoFecha } from "./inventarioUtils";
+import { valorNumerico } from "../../utils/campoNumero";
 
 // Pestaña "Movimientos (general)": historial de entradas/salidas de todos los
 // items, con edición en línea del último movimiento de cada item. El estado
@@ -124,7 +125,7 @@ export default function MovimientosTab({
                             type="number"
                             min={1}
                             value={editingMovForm.cantidad}
-                            onChange={(e) => setEditingMovForm((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                            onChange={(e) => setEditingMovForm((p) => ({ ...p, cantidad: valorNumerico(e.target.value) }))}
                             disabled={!isLatest}
                             className="w-24 px-2 py-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
                           />
@@ -216,7 +217,7 @@ export default function MovimientosTab({
                               type="number"
                               min={1}
                               value={editingMovForm.cantidad}
-                              onChange={(e) => setEditingMovForm((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                              onChange={(e) => setEditingMovForm((p) => ({ ...p, cantidad: valorNumerico(e.target.value) }))}
                               disabled={!isLatest}
                               className="w-20 px-2 py-1.5 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-900 text-xs"
                             />

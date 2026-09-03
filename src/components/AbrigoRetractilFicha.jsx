@@ -13,6 +13,7 @@ import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { valorNumerico, conDefectosNumericos } from "../utils/campoNumero";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -45,6 +46,17 @@ const INITIAL_FORM = {
   llevaBanda:        true,
 };
 
+// Lo que vale un campo numérico que se dejó en blanco. El formulario admite ""
+// para que se pueda borrar y reescribir sin pelear con un 0 (ver
+// utils/campoNumero.js); el cálculo y lo que se guarda usan estos defectos, que
+// además son los que se ven de placeholder.
+const DEFECTOS_NUM = {
+  cantidad:   1,
+  travesanos: 910,
+};
+
+const conDefectos = (form) => conDefectosNumericos(form, DEFECTOS_NUM);
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGuardada }) {
@@ -59,7 +71,7 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
   // ── Cálculo reactivo ─────────────────────────────────────────────────────
 
   const calculo = React.useMemo(
-    () => calcularAbrigoRetractil(form),
+    () => calcularAbrigoRetractil(conDefectos(form)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [form.ancho, form.alto, form.travesanos, form.cantidad, form.llevaBanda, form.fechaOrden]
   );
@@ -84,7 +96,7 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
   const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
-  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: Number(e.target.value) }));
+  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: valorNumerico(e.target.value) }));
   const setBool = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value === "true" }));
 
   const handleSubmit = async (e) => {
@@ -98,7 +110,7 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
 
     setSaving(true);
     try {
-      const datos = { ...form, ancho: Number(form.ancho), alto: Number(form.alto) };
+      const datos = { ...conDefectos(form), ancho: Number(form.ancho), alto: Number(form.alto) };
       if (editingId) {
         await actualizarFichaAbrigoRetractil(editingId, {
           ...datos,
@@ -130,13 +142,13 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
       codigoFicha:       codigoDeFicha(f, "abrigoretractil"),
       numeroOrdenCompra: f.numeroOrdenCompra || "",
       ...clienteDeFicha(f),
-      cantidad:          f.cantidad ?? 1,
+      cantidad:          f.cantidad ?? DEFECTOS_NUM.cantidad,
       fechaOrden:        f.fechaOrden || hoy(),
       fechaEntrega:      f.fechaEntrega || "",
       auxiliarEncargado: f.auxiliarEncargado || "TODOS",
       ancho:             f.ancho ?? "",
       alto:              f.alto ?? "",
-      travesanos:        f.travesanos ?? 910,
+      travesanos:        f.travesanos ?? DEFECTOS_NUM.travesanos,
       color:             f.color || "NEGRO",
       acabado:           f.acabado || "PINTADO",
       llevaBanda:        f.llevaBanda !== false,
@@ -195,7 +207,8 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
               <div>
                 <label className={labelCls}>Cantidad</label>
                 <input type="number" min={1} step={1} value={form.cantidad}
-                  onChange={setNum("cantidad")} className={inputCls} />
+                  onChange={setNum("cantidad")} placeholder={String(DEFECTOS_NUM.cantidad)}
+                  className={inputCls} />
               </div>
               <div className="col-span-2">
                 <ClienteSelector
@@ -243,7 +256,7 @@ export default function AbrigoRetractilFicha({ encargo, onEncargoAtendido, onGua
                 <div>
                   <label className={labelCls}>Travesaños (mm)</label>
                   <input type="number" min={1} value={form.travesanos}
-                    onChange={setNum("travesanos")}
+                    onChange={setNum("travesanos")} placeholder={String(DEFECTOS_NUM.travesanos)}
                     className={`${inputCls} font-mono`} />
                 </div>
               </div>

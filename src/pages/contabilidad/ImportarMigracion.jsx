@@ -8,6 +8,7 @@ import { importarMigracion } from "../../modules/contabilidad/importarMigracion"
 import { importarMigracionLote } from "../../utils/firebaseContabilidad";
 import { resolverEmpresa } from "../../utils/empresaIdentidad";
 import { resolverOCrearEmpresa } from "../../utils/firebaseCompanies";
+import { valorNumerico, numeroODefecto } from "../../utils/campoNumero";
 
 function Dato({ titulo, valor, tono = "" }) {
   return (
@@ -74,7 +75,7 @@ export default function ImportarMigracion({ texto, empresas, onImportado, onDesc
   const [guardando, setGuardando] = React.useState(false);
   const [progreso, setProgreso] = React.useState({ hechos: 0, total: 0 });
 
-  const analisis = React.useMemo(() => importarMigracion(texto, { plazoDias: plazo }), [texto, plazo]);
+  const analisis = React.useMemo(() => importarMigracion(texto, { plazoDias: numeroODefecto(plazo, PLAZO_POR_DEFECTO) }), [texto, plazo]);
 
   // Cada cliente del archivo contra la base de empresas, con el mismo criterio
   // que usa el resto de la app.
@@ -143,14 +144,17 @@ export default function ImportarMigracion({ texto, empresas, onImportado, onDesc
             <span className="text-sm font-medium">Migración del libro {r.periodo}</span>
             <Badge tone="info" className="ml-2">JSON</Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 dark:text-gray-400" htmlFor="plazo-mig">Plazo (días)</label>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0" htmlFor="plazo-mig">Plazo (días)</label>
             <input
               id="plazo-mig" type="number" min={0} value={plazo}
-              onChange={(e) => setPlazo(Math.max(0, Number(e.target.value) || 0))}
-              className="w-20 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700"
+              onChange={(e) => setPlazo(valorNumerico(e.target.value))}
+              placeholder={String(PLAZO_POR_DEFECTO)}
+              className="w-20 h-11 sm:h-auto px-2 py-1 text-base sm:text-sm rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700"
             />
-            <Button variant="secondary" size="sm" onClick={onDescartar} disabled={guardando}>Descartar</Button>
+            <Button variant="secondary" size="sm" onClick={onDescartar} disabled={guardando} className="ml-auto sm:ml-0">
+              Descartar
+            </Button>
           </div>
         </div>
 
@@ -300,7 +304,7 @@ export default function ImportarMigracion({ texto, empresas, onImportado, onDesc
             No se importa mientras el cuadre no dé: revisa el archivo.
           </div>
         )}
-        <Button variant="primary" onClick={confirmar} disabled={guardando || !cuadraTodo} className="md:ml-auto">
+        <Button variant="primary" onClick={confirmar} disabled={guardando || !cuadraTodo} className="w-full md:w-auto md:ml-auto">
           {guardando ? "Migrando…" : `Migrar ${r.documentos} documentos, ${r.saldos} saldos y ${r.pagos} abonos`}
         </Button>
       </div>

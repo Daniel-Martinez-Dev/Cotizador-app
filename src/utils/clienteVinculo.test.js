@@ -219,4 +219,31 @@ describe("aliasManual", () => {
     expect(datos.usarAlias).toBe(false);
     expect(nombreClienteImpreso(datos)).toBe("Taller Nuevo");
   });
+
+  it("con recortar:false conserva el espacio recién tecleado", () => {
+    // Escribiendo "CI ANDINA" letra a letra, el estado intermedio es "CI ".
+    // Recortarlo devolvía "CI" y la siguiente pulsación de espacio se perdía
+    // otra vez, así que el alias no podía tener más de una palabra.
+    const datos = aliasManual({ cliente: "Taller" }, "CI ", { recortar: false });
+    expect(datos.clienteAlias).toBe("CI ");
+  });
+});
+
+// El campo del cliente se escribe letra a letra, y en cada pulsación se vuelve
+// a construir el estado. Recortarlo ahí borraba el espacio en el mismo momento
+// de teclearlo: en varias fichas no había forma de escribir un cliente de dos
+// palabras.
+describe("escribir el cliente sin perder los espacios", () => {
+  it("con recortar:false conserva el espacio final mientras se teclea", () => {
+    expect(clienteSinVincular("Frigorífico ", { recortar: false }).cliente).toBe("Frigorífico ");
+  });
+
+  it("por defecto sigue recortando, que es lo que se guarda", () => {
+    expect(clienteSinVincular("  Frigorífico Norte  ").cliente).toBe("Frigorífico Norte");
+  });
+
+  it("lo tecleado con espacios de más se recorta al guardar", () => {
+    const enElFormulario = clienteSinVincular("Frigorífico Norte ", { recortar: false });
+    expect(camposClienteFicha(enElFormulario).cliente).toBe("Frigorífico Norte");
+  });
 });

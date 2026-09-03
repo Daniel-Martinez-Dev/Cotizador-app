@@ -20,6 +20,7 @@ import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { valorNumerico, conDefectosNumericos } from "../utils/campoNumero";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 const en5dias = () => {
@@ -58,6 +59,20 @@ const INITIAL_FORM = {
   bandaSuperior:     "",
 };
 
+// Lo que vale un campo numérico que se dejó en blanco. El formulario admite ""
+// para que se pueda borrar y reescribir sin pelear con un 0 (ver
+// utils/campoNumero.js); el cálculo y lo que se guarda usan estos defectos, que
+// además son los que se ven de placeholder.
+const DEFECTOS_NUM = {
+  cantidad:          1,
+  espesorSello:      PARAMETROS_SELLO.ESPESOR_SELLO_DEFAULT_MM,
+  espesorPoste:      PARAMETROS_SELLO.ESPESOR_POSTE_DEFAULT_MM,
+  espesorTravesano:  PARAMETROS_SELLO.ESPESOR_TRAVESANO_DEFAULT_MM,
+  despliegueCortina: PARAMETROS_SELLO.DESPLIEGUE_CORTINA_DEFAULT_MM,
+};
+
+const conDefectos = (form) => conDefectosNumericos(form, DEFECTOS_NUM);
+
 // Las medidas de corte del sello nunca son 0 legítimamente: se tratan como "—".
 const fmtMm = (n) => fmtMmBase(n, { hideZero: true });
 
@@ -83,7 +98,7 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
   const formRef = React.useRef(null);
 
   const calculo = React.useMemo(
-    () => calcularSello(form),
+    () => calcularSello(conDefectos(form)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       form.anchoVano, form.altoVano,
@@ -97,7 +112,7 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
   const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
-  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: Number(e.target.value) }));
+  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: valorNumerico(e.target.value) }));
   const setBool = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value === "true" }));
 
   const handleSubmit = async (e) => {
@@ -110,7 +125,7 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
     setSaving(true);
     try {
       const datos = {
-        ...form,
+        ...conDefectos(form),
         anchoVano: Number(form.anchoVano),
         altoVano:  Number(form.altoVano),
       };
@@ -221,7 +236,8 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
               <div>
                 <label className={labelCls}>Cantidad</label>
                 <input type="number" min={1} step={1} value={form.cantidad}
-                  onChange={setNum("cantidad")} className={inputCls} />
+                  onChange={setNum("cantidad")} placeholder={String(DEFECTOS_NUM.cantidad)}
+                  className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>Fecha orden</label>
@@ -259,17 +275,20 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
                 <div>
                   <label className={labelCls}>Sello principal</label>
                   <input type="number" min={1} value={form.espesorSello}
-                    onChange={setNum("espesorSello")} className={`${inputCls} font-mono`} />
+                    onChange={setNum("espesorSello")} placeholder={String(DEFECTOS_NUM.espesorSello)}
+                    className={`${inputCls} font-mono`} />
                 </div>
                 <div>
                   <label className={labelCls}>Postes laterales</label>
                   <input type="number" min={1} value={form.espesorPoste}
-                    onChange={setNum("espesorPoste")} className={`${inputCls} font-mono`} />
+                    onChange={setNum("espesorPoste")} placeholder={String(DEFECTOS_NUM.espesorPoste)}
+                    className={`${inputCls} font-mono`} />
                 </div>
                 <div>
                   <label className={labelCls}>Travesaño</label>
                   <input type="number" min={1} value={form.espesorTravesano}
-                    onChange={setNum("espesorTravesano")} className={`${inputCls} font-mono`} />
+                    onChange={setNum("espesorTravesano")} placeholder={String(DEFECTOS_NUM.espesorTravesano)}
+                    className={`${inputCls} font-mono`} />
                 </div>
               </div>
             </div>
@@ -303,7 +322,8 @@ export default function SelloAndenFicha({ encargo, onEncargoAtendido, onGuardada
                   <div>
                     <label className={labelCls}>Despliegue cortina (mm)</label>
                     <input type="number" min={1} value={form.despliegueCortina}
-                      onChange={setNum("despliegueCortina")} className={`${inputCls} font-mono`} />
+                      onChange={setNum("despliegueCortina")} placeholder={String(DEFECTOS_NUM.despliegueCortina)}
+                      className={`${inputCls} font-mono`} />
                   </div>
                 )}
                 <div>

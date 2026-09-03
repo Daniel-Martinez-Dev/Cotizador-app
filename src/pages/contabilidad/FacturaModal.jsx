@@ -33,12 +33,14 @@ import {
   anioDe,
   calcularDocumento,
   hoyISO,
+  redondear,
   subtotalItem,
   sumarDias,
 } from "../../modules/contabilidad/calculos";
 import { actualizarDocumento, buscarPorNumero, crearDocumento } from "../../utils/firebaseContabilidad";
 import { buscarPosiblesDuplicados, resolverEmpresa } from "../../utils/empresaIdentidad";
 import { resolverOCrearEmpresa } from "../../utils/firebaseCompanies";
+import { valorNumerico, numeroODefecto } from "../../utils/campoNumero";
 
 const itemVacio = () => ({ producto: "", descripcion: "", cantidad: 1, unidad: UNIDAD_POR_DEFECTO, valorUnitario: 0 });
 
@@ -73,6 +75,26 @@ function estadoInicial(documento, config) {
 }
 
 const esNota = (tipo) => tipo === TIPO_NOTA_CREDITO || tipo === TIPO_NOTA_DEBITO;
+
+/**
+ * Campo de la rejilla de conceptos con su nombre encima, pero solo mientras la
+ * cabecera de columnas no esté.
+ *
+ * En escritorio los conceptos son una tabla y las columnas se rotulan una vez
+ * arriba. En el teléfono esa cabecera se oculta —no caben seis columnas— y las
+ * celdas se quedaban desnudas: cuatro cajas seguidas sin decir cuál era la
+ * cantidad y cuál el valor unitario, que en una factura no es un detalle.
+ */
+function RotuloMovil({ texto, children, className = "" }) {
+  return (
+    <div className={`grid gap-1 min-w-0 ${className}`}>
+      <span className="md:hidden text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {texto}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 export default function FacturaModal({ modo, documento, empresas, documentos, config, onCerrar, onGuardado }) {
   const [form, setForm] = React.useState(() => estadoInicial(documento, config));
@@ -140,6 +162,13 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
         (form.empresaId ? d.empresaId === form.empresaId : d.clienteNombre === form.clienteNombre)
     );
   }, [documentos, form.tipo, form.empresaId, form.clienteNombre, form.id]);
+
+  // La factura que la nota crédito anula. Una nota crédito existe para eso: se
+  // emite por el valor de la factura y lo cancela al totalizar.
+  const facturaAfectada = React.useMemo(
+    () => facturasDelCliente.find((f) => f.id === form.docAfectadoId) || null,
+    [facturasDelCliente, form.docAfectadoId]
+  );
 
   const elegirEmpresa = (op) => {
     const empresa = op?.empresa;
@@ -212,7 +241,7 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
 
   const cambiarValorRetencion = (codigo, valor) => setForm((p) => ({
     ...p,
-    retenciones: p.retenciones.map((r) => (r.codigo === codigo ? { ...r, valor: aNumero(valor) } : r)),
+    retenciones: p.retenciones.map((r) => (r.codigo === codigo ? { ...r, valor: valorNumerico(valor) } : r)),
   }));
 
   // El número repetido casi siempre es la misma factura digitada dos veces, así
@@ -251,11 +280,23 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
 
     setGuardando(true);
     try {
+      // Los campos numéricos admiten "" mientras se teclean (ver
+      // utils/campoNumero.js). Lo que sale a Firestore vuelve a ser número.
+      const documentoAGuardar = {
+        ...form,
+        ivaPorcentaje: numeroODefecto(form.ivaPorcentaje, 0),
+        items: form.items.map((it) => ({
+          ...it,
+          cantidad: numeroODefecto(it.cantidad, 0),
+          valorUnitario: numeroODefecto(it.valorUnitario, 0),
+        })),
+        retenciones: form.retenciones.map((r) => ({ ...r, valor: numeroODefecto(r.valor, 0) })),
+      };
       if (modo === "editar" && form.id) {
-        await actualizarDocumento(form.id, form, { netoImportado: conservaNeto });
+        await actualizarDocumento(form.id, documentoAGuardar, { netoImportado: conservaNeto });
         toast.success("Documento actualizado.");
       } else {
-        await crearDocumento(form);
+        await crearDocumento(documentoAGuardar);
         toast.success(form.tipo === TIPO_NOTA_CREDITO ? "Nota crédito registrada." : "Documento registrado.");
       }
       onGuardado();
@@ -288,8 +329,13 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
       }
       pie={
         <>
-          <div className="mr-auto text-sm text-gray-600 dark:text-gray-300">
-            Neto a pagar <strong className="text-base text-gray-900 dark:text-white ml-1"><Money valor={liquidacion.neto} cero="" /></strong>
+          {/* El neto va arriba del todo en el teléfono (el pie se apila al
+              revés) para que se lea antes de pulsar Guardar. */}
+          <div className="order-first sm:order-none sm:mr-auto flex items-baseline justify-between sm:block text-sm text-gray-600 dark:text-gray-300">
+            <span>Neto a pagar</span>
+            <strong className="text-lg sm:text-base text-gray-900 dark:text-white sm:ml-1 tabular-nums">
+              <Money valor={liquidacion.neto} cero="" />
+            </strong>
           </div>
           <Button variant="secondary" onClick={onCerrar}>Cancelar</Button>
           <Button type="submit" variant="primary" disabled={guardando}>
@@ -420,6 +466,14 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                 </Select>
               </Campo>
             )}
+
+            {form.tipo === TIPO_NOTA_CREDITO && !form.docAfectadoId && (
+              <Aviso tono="aviso" titulo="Sin factura que anular">
+                Una nota crédito se emite para anular una factura. Sin señalar cuál, su valor descuenta del saldo
+                general del cliente y no queda claro qué factura quedó cancelada.
+                {!facturasDelCliente.length && " Este cliente no tiene facturas del año seleccionado."}
+              </Aviso>
+            )}
           </div>
         </Seccion>
 
@@ -443,45 +497,74 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
             {form.items.map((item, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-2 md:grid-cols-[2fr_0.7fr_0.8fr_1.1fr_1.1fr_auto] gap-2 items-center rounded-lg bg-gray-50 dark:bg-gris-900/40 md:bg-transparent md:dark:bg-transparent p-2 md:p-0"
+                className="grid grid-cols-2 md:grid-cols-[2fr_0.7fr_0.8fr_1.1fr_1.1fr_auto] gap-2 md:items-center rounded-lg border border-gray-200 dark:border-gris-700 md:border-0 bg-gray-50 dark:bg-gris-900/40 md:bg-transparent md:dark:bg-transparent p-2.5 md:p-0"
               >
-                <Combobox
-                  value={item.producto}
-                  onChange={(v) => cambiarItem(idx, "producto", v)}
-                  onSelect={(op) => cambiarItem(idx, "producto", op.label)}
-                  options={opcionesProducto}
-                  placeholder="Concepto"
-                  className="col-span-2 md:col-span-1"
-                  inputClassName={claseControl}
-                />
-                <InputNumero
-                  step="0.01"
-                  value={item.cantidad}
-                  onChange={(e) => cambiarItem(idx, "cantidad", aNumero(e.target.value))}
-                  aria-label={`Cantidad del concepto ${idx + 1}`}
-                />
-                <Select
-                  value={item.unidad}
-                  onChange={(e) => cambiarItem(idx, "unidad", e.target.value)}
-                  aria-label={`Unidad del concepto ${idx + 1}`}
-                >
-                  {UNIDADES.map((u) => <option key={u.valor} value={u.valor}>{u.label}</option>)}
-                </Select>
-                <InputNumero
-                  step="0.01"
-                  value={item.valorUnitario}
-                  onChange={(e) => cambiarItem(idx, "valorUnitario", aNumero(e.target.value))}
-                  aria-label={`Valor unitario del concepto ${idx + 1}`}
-                />
-                <div className="h-9 px-3 flex items-center justify-end text-sm font-medium rounded-md bg-gray-100 dark:bg-gris-900 text-gray-800 dark:text-gray-100">
-                  <Money valor={subtotalItem(item)} cero="0" />
+                {/* Número de línea y botón de quitar, solo en el teléfono: sin
+                    la cabecera de columnas hay que decir dónde empieza cada
+                    concepto, y el aspa de 32 px de la fila de escritorio no se
+                    acierta con el dedo. */}
+                <div className="col-span-2 flex items-center justify-between md:hidden">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Concepto {idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => quitarItem(idx)}
+                    disabled={form.items.length === 1}
+                    className="text-xs font-medium text-red-600 dark:text-red-400 disabled:opacity-30 px-2 py-1 -mr-1"
+                  >
+                    Quitar
+                  </button>
                 </div>
+
+                <RotuloMovil texto="Producto" className="col-span-2 md:col-span-1">
+                  <Combobox
+                    value={item.producto}
+                    onChange={(v) => cambiarItem(idx, "producto", v)}
+                    onSelect={(op) => cambiarItem(idx, "producto", op.label)}
+                    options={opcionesProducto}
+                    placeholder="Concepto"
+                    inputClassName={claseControl}
+                  />
+                </RotuloMovil>
+                <RotuloMovil texto="Cantidad">
+                  <InputNumero
+                    step="0.01"
+                    value={item.cantidad}
+                    onChange={(e) => cambiarItem(idx, "cantidad", valorNumerico(e.target.value))}
+                    placeholder="0"
+                    aria-label={`Cantidad del concepto ${idx + 1}`}
+                  />
+                </RotuloMovil>
+                <RotuloMovil texto="Unidad">
+                  <Select
+                    value={item.unidad}
+                    onChange={(e) => cambiarItem(idx, "unidad", e.target.value)}
+                    aria-label={`Unidad del concepto ${idx + 1}`}
+                  >
+                    {UNIDADES.map((u) => <option key={u.valor} value={u.valor}>{u.label}</option>)}
+                  </Select>
+                </RotuloMovil>
+                <RotuloMovil texto="Valor unitario">
+                  <InputNumero
+                    step="0.01"
+                    value={item.valorUnitario}
+                    onChange={(e) => cambiarItem(idx, "valorUnitario", valorNumerico(e.target.value))}
+                    placeholder="0"
+                    aria-label={`Valor unitario del concepto ${idx + 1}`}
+                  />
+                </RotuloMovil>
+                <RotuloMovil texto="Subtotal">
+                  <div className="h-11 sm:h-9 px-3 flex items-center justify-end text-sm font-semibold rounded-md bg-gray-100 dark:bg-gris-900 text-gray-800 dark:text-gray-100">
+                    <Money valor={subtotalItem(item)} cero="0" />
+                  </div>
+                </RotuloMovil>
                 <button
                   type="button"
                   onClick={() => quitarItem(idx)}
                   disabled={form.items.length === 1}
                   aria-label={`Quitar concepto ${idx + 1}`}
-                  className="h-9 w-8 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 focus:outline-none focus:ring-2 focus:ring-trafico/50"
+                  className="hidden md:inline-flex h-9 w-8 items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 focus:outline-none focus:ring-2 focus:ring-trafico/50"
                 >
                   ✕
                 </button>
@@ -500,7 +583,8 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                   min={0}
                   step="0.01"
                   value={form.ivaPorcentaje}
-                  onChange={(e) => editar("ivaPorcentaje", aNumero(e.target.value))}
+                  onChange={(e) => editar("ivaPorcentaje", valorNumerico(e.target.value))}
+                  placeholder="0"
                 />
               </Campo>
               {retencionesDisponibles.map((ret) => {
@@ -509,27 +593,33 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                 return (
                   <div
                     key={ret.codigo}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${puesta ? "bg-gray-100 dark:bg-gris-900/60" : ""}`}
+                    className={`flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 transition-colors ${puesta ? "bg-gray-100 dark:bg-gris-900/60" : ""}`}
                   >
-                    <Casilla checked={Boolean(puesta)} onChange={() => alternarRetencion(ret)} className="flex-1 min-w-0">
-                      <span className="truncate">{ret.nombre}</span>
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 ml-1">
-                        {ret.base === "manual" ? "(valor digitado)" : `(${ret.porcentaje} % sobre ${ret.base === "iva" ? "el IVA" : "el subtotal"})`}
+                    {/* La base de cálculo baja de renglón en el teléfono: en una
+                        sola línea, el nombre de la retención se cortaba y no se
+                        distinguía la de IVA de la de subtotal. */}
+                    <Casilla checked={Boolean(puesta)} onChange={() => alternarRetencion(ret)} className="flex-1 min-w-0 basis-full sm:basis-auto">
+                      <span className="min-w-0">
+                        <span className="block sm:inline truncate">{ret.nombre}</span>
+                        <span className="block sm:inline text-[11px] text-gray-500 dark:text-gray-400 sm:ml-1">
+                          {ret.base === "manual" ? "(valor digitado)" : `(${ret.porcentaje} % sobre ${ret.base === "iva" ? "el IVA" : "el subtotal"})`}
+                        </span>
                       </span>
                     </Casilla>
                     {puesta && ret.base === "manual" ? (
                       // El ancho va en el contenedor: la w-full del control
                       // gana a una w-32 en la misma especificidad.
-                      <div className="w-32 shrink-0">
+                      <div className="w-full sm:w-32 shrink-0">
                         <InputNumero
                           step="0.01"
-                          value={puesta.valor || 0}
+                          value={puesta.valor ?? ""}
                           onChange={(e) => cambiarValorRetencion(ret.codigo, e.target.value)}
+                          placeholder="0"
                           aria-label={`Valor de ${ret.nombre}`}
                         />
                       </div>
                     ) : (
-                      <span className="w-32 text-right text-xs tabular-nums text-gray-600 dark:text-gray-300">
+                      <span className="w-full sm:w-32 text-right text-xs tabular-nums text-gray-600 dark:text-gray-300">
                         {puesta ? formatCOP(calculada?.valor || 0) : "—"}
                       </span>
                     )}
@@ -560,11 +650,31 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                 </span>
               </div>
 
-              {form.tipo === TIPO_NOTA_CREDITO && (
-                <Aviso tono="info" className="mt-1">
-                  Al ser nota crédito, este valor <strong>resta</strong> de la cartera del cliente.
-                </Aviso>
-              )}
+              {form.tipo === TIPO_NOTA_CREDITO && (() => {
+                const netoFactura = aNumero(facturaAfectada?.resumen?.neto ?? facturaAfectada?.neto);
+                // Un peso de diferencia es ruido de redondeo, no un descuadre.
+                const descuadre = facturaAfectada ? redondear(liquidacion.neto - netoFactura) : 0;
+                return (
+                  <Aviso tono={Math.abs(descuadre) >= 1 ? "aviso" : "info"} className="mt-1">
+                    {facturaAfectada ? (
+                      <>
+                        Este valor <strong>cancela</strong> el de la factura {facturaAfectada.numero || "seleccionada"}
+                        {" "}({formatCOP(netoFactura)}) y la deja sin nada por cobrar.
+                        {Math.abs(descuadre) >= 1 && (
+                          <>
+                            {" "}Hoy no coinciden: {descuadre > 0
+                              ? `la nota se pasa por ${formatCOP(descuadre)} y le dejaría saldo a favor al cliente`
+                              : `quedarían ${formatCOP(-descuadre)} por cobrar de esa factura`}.
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>Al ser nota crédito, este valor <strong>resta</strong> de la cartera del cliente.</>
+                    )}
+                    {" "}Una nota crédito no recibe abonos.
+                  </Aviso>
+                );
+              })()}
               {form.tipo === TIPO_NOTA_DEBITO && (
                 <Aviso tono="info" className="mt-1">
                   La nota débito <strong>suma</strong> a la cartera igual que una factura, y admite abonos.

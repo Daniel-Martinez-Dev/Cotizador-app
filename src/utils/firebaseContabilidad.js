@@ -346,8 +346,15 @@ export const listarPagosDeDocumento = (documentoId) => listarPagosDeDestino(docu
 /**
  * Registra un abono. Si se llama desde una factura llega con esa única
  * aplicación; desde tesorería puede llegar repartido entre varias.
+ *
+ * Una nota crédito no se cobra: anula una factura. Aceptarle abonos era lo que
+ * dejaba clientes debiendo notas crédito, así que se rechaza aquí y no solo en
+ * el formulario.
  */
 export async function registrarPago(data, documento = null) {
+  if (documento?.tipo === TIPO_NOTA_CREDITO) {
+    throw new Error("Una nota crédito no recibe abonos: descuenta de la factura que anula.");
+  }
   await waitForAuth();
   const ref = await addDoc(collection(db, PAGOS_COL), {
     ...construirPago({

@@ -3,7 +3,12 @@ import React from "react";
 // Barra de pestañas accesible (role=tablist/tab, aria-selected, navegación con flechas).
 // variant="underline" → estilo subrayado (ver Usuarios).
 // variant="boxed" → estilo de pestaña de carpeta (ver Producción).
-export default function Tabs({ items, active, onChange, variant = "underline" }) {
+//
+// `deslizable` cambia el reparto en pantalla angosta: en vez de repartirse en
+// varias líneas —cinco pestañas ocupaban tres renglones y empujaban la tabla
+// fuera de la vista— quedan en una sola que se corre con el dedo, como los
+// filtros del panel de planta.
+export default function Tabs({ items, active, onChange, variant = "underline", deslizable = false }) {
   const refs = React.useRef([]);
 
   const focusTab = (idx) => {
@@ -30,9 +35,12 @@ export default function Tabs({ items, active, onChange, variant = "underline" })
     }
   };
 
+  const reparto = deslizable
+    ? "flex-nowrap overflow-x-auto no-scrollbar [&>button]:shrink-0"
+    : "flex-wrap";
   const wrapCls = variant === "boxed"
-    ? "flex flex-wrap items-center gap-0.5 border-b border-gray-200 dark:border-gris-700"
-    : "flex gap-1 border-b border-gray-200 dark:border-gris-700";
+    ? `flex ${reparto} items-center gap-0.5 border-b border-gray-200 dark:border-gris-700`
+    : `flex ${deslizable ? reparto : ""} gap-1 border-b border-gray-200 dark:border-gris-700`;
 
   return (
     <div className={wrapCls} role="tablist">
@@ -40,12 +48,12 @@ export default function Tabs({ items, active, onChange, variant = "underline" })
         const isActive = active === t.key;
         const showDivider = variant === "boxed" && t.legacy && !items[idx - 1]?.legacy;
         const tabCls = variant === "boxed"
-          ? `px-4 py-2 text-sm font-medium rounded-t-md transition-colors border border-b-0 inline-flex items-center gap-1.5 ${
+          ? `px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-md transition-colors border border-b-0 inline-flex items-center gap-1.5 ${
               isActive
                 ? "bg-white dark:bg-gris-800 border-gray-200 dark:border-gris-700 text-blue-600 dark:text-blue-400 -mb-px"
                 : "bg-transparent border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
             }`
-          : `px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+          : `px-4 py-2.5 sm:py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
               isActive
                 ? "border-trafico text-gray-900 dark:text-white"
                 : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"

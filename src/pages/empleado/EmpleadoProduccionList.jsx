@@ -1,19 +1,15 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import {
-  FaSearch, FaSyncAlt, FaChevronRight, FaTimes, FaRulerCombined,
-  FaLayerGroup, FaCalendarAlt, FaExclamationCircle, FaCheck, FaCheckDouble,
-} from "react-icons/fa";
+import { FaSearch, FaSyncAlt, FaTimes, FaCheckDouble } from "react-icons/fa";
 import { listarTodasFichasProduccion, FICHA_TIPOS } from "../../utils/firebaseFichas";
-import EstadoBadge from "../../components/fichas/EstadoBadge";
 import BarraLoteFichas from "../../components/fichas/BarraLoteFichas";
 import useSeleccionFichas from "../../components/fichas/useSeleccionFichas";
 import { aplicarResultadosLote } from "../../components/fichas/loteFichas";
 import EmptyState from "../../components/ui/EmptyState";
-import { codigoFicha as codigoDeFicha, codigoFichaOFallback } from "../../utils/codigoFicha";
-import { medidasFichaTexto, coincideMedida } from "../../utils/medidasFicha";
-import { nombreClienteImpreso } from "../../utils/clienteVinculo";
+import { codigoFicha as codigoDeFicha } from "../../utils/codigoFicha";
+import { coincideMedida } from "../../utils/medidasFicha";
+import { getImpresionComponent } from "../../components/fichas/impresionPorTipo";
+import OrdenPlantaCard from "../../components/empleado/OrdenPlantaCard";
 
 const ESTADO_TABS = [
   { key: "en_produccion", label: "En producción" },
@@ -21,46 +17,6 @@ const ESTADO_TABS = [
   { key: "entregado", label: "Entregadas" },
   { key: "todos", label: "Todas" },
 ];
-
-function aFecha(f) {
-  if (!f) return null;
-  try {
-    const m = typeof f === "string" && /^(\d{4})-(\d{2})-(\d{2})$/.exec(f);
-    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(f);
-    return Number.isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-}
-
-function fmtFecha(f) {
-  const d = aFecha(f);
-  return d ? d.toLocaleDateString("es-CO") : "—";
-}
-
-// Días que faltan para la entrega (negativo = vencida). Se compara a
-// medianoche: una entrega de hoy no está vencida por la hora que sea.
-function diasParaEntrega(f) {
-  const d = aFecha(f);
-  if (!d) return null;
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  d.setHours(0, 0, 0, 0);
-  return Math.round((d - hoy) / 86400000);
-}
-
-// La urgencia solo aplica mientras la ficha esté en planta: una entregada tarde
-// ya no es una alarma, es historia.
-function urgenciaEntrega(ficha) {
-  if ((ficha.estado || "en_produccion") === "entregado") return null;
-  const dias = diasParaEntrega(ficha.fechaEntrega);
-  if (dias === null) return null;
-  if (dias < 0) return { texto: `Vencida hace ${Math.abs(dias)} d`, cls: "text-red-700 dark:text-red-400 font-semibold", alerta: true };
-  if (dias === 0) return { texto: "Entrega hoy", cls: "text-red-700 dark:text-red-400 font-semibold", alerta: true };
-  if (dias === 1) return { texto: "Entrega mañana", cls: "text-amber-700 dark:text-amber-400 font-semibold", alerta: true };
-  if (dias <= 3) return { texto: `En ${dias} días`, cls: "text-amber-700 dark:text-amber-400 font-medium", alerta: false };
-  return null;
-}
 
 export default function EmpleadoProduccionList() {
   const [fichas, setFichas] = React.useState([]);
@@ -110,7 +66,9 @@ export default function EmpleadoProduccionList() {
         if (!term) return true;
         // El alias entra en la búsqueda junto al nombre completo: en planta se
         // busca por el que salió impreso, pero desde oficina se pregunta por el otro.
-        const blob = `${f.cliente || ""} ${f.clienteAlias || ""} ${f.ordenProduccion || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
+        // La orden de compra va en la tarjeta, así que también tiene que
+        // encontrarse aquí: es el número con el que llama el cliente.
+        const blob = `${f.cliente || ""} ${f.clienteAlias || ""} ${f.ordenProduccion || ""} ${f.numeroOrdenCompra || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
         // La medida es el otro dato con el que planta busca una ficha.
         return blob.includes(term) || coincideMedida(f, term);
       });
@@ -122,6 +80,13 @@ export default function EmpleadoProduccionList() {
   // selección la tarjeta deja de abrir el detalle y solo marca, para poder
   // firmarlas todas con un formulario (ver BarraLoteFichas).
   const seleccion = useSeleccionFichas(filtradas);
+
+  // La ficha impresa se abre desde el propio listado. En planta lo que se hace
+  // con una orden, nueve de cada diez veces, es mirar la ficha: obligar a
+  // entrar al detalle y pulsar otro botón eran dos toques para llegar a lo de
+  // siempre, con un teléfono en la mano y guantes puestos.
+  const [fichaImpresa, setFichaImpresa] = React.useState(null);
+  const ImpresionComponent = fichaImpresa ? getImpresionComponent(fichaImpresa.tipo) : null;
 
   return (
     <div className="pt-4 pb-4">
@@ -167,7 +132,7 @@ export default function EmpleadoProduccionList() {
             onChange={(e) => setSearch(e.target.value)}
             type="search"
             inputMode="search"
-            placeholder="Buscar por cliente, medida u orden…"
+            placeholder="Buscar por cliente, medida, orden u OC…"
             className="w-full pl-8 pr-10 py-2.5 rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-sm"
           />
           {search && (
@@ -253,98 +218,25 @@ export default function EmpleadoProduccionList() {
         />
       ) : (
         <div className="space-y-2">
-          {filtradas.map((f) => {
-            const medida = medidasFichaTexto(f);
-            const urgencia = urgenciaEntrega(f);
-            const cantidad = Number(f.cantidad || 0);
-            const marcada = seleccion.estaSeleccionada(f);
-            const tarjetaCls = `flex items-center gap-3 w-full text-left rounded-xl border px-3 py-3 active:scale-[0.99] transition ${
-              marcada
-                ? "border-green-500 bg-green-50 dark:bg-green-900/20"
-                : "border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800"
-            }`;
-            const contenido = (
-              <>
-                {seleccion.modo && (
-                  <span
-                    aria-hidden="true"
-                    className={`h-6 w-6 shrink-0 rounded-md border flex items-center justify-center ${
-                      marcada
-                        ? "bg-green-600 border-green-600 text-white"
-                        : "border-gray-300 dark:border-gris-600"
-                    }`}
-                  >
-                    {marcada && <FaCheck className="text-[11px]" />}
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{f.tipoLabel}</span>
-                    <span className="text-[10px] text-gray-400 font-mono">{codigoFichaOFallback(f)}</span>
-                  </div>
-
-                  {/* Cliente y medida juntos: cuando un mismo cliente tiene varias
-                      órdenes abiertas, la medida es lo que las distingue en planta. */}
-                  <div className="font-semibold text-[15px] leading-snug break-words mt-0.5">{nombreClienteImpreso(f) || "Sin cliente"}</div>
-
-                  <div className="flex items-center gap-2 flex-wrap mt-1">
-                    {medida ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-900 text-white dark:bg-gris-700 dark:text-gray-100 px-2 py-1 font-mono font-bold text-sm leading-none">
-                        <FaRulerCombined className="text-[10px] opacity-70" aria-hidden="true" />
-                        {medida}
-                        <span className="text-[10px] font-sans font-normal opacity-70">mm</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 dark:bg-gris-700 text-gray-600 dark:text-gray-300 px-2 py-1 text-xs leading-none">
-                        <FaLayerGroup className="text-[10px] opacity-70" aria-hidden="true" />
-                        {(f.items?.length || 0) > 0 ? `${f.items.length} ítems` : "Sin medidas"}
-                      </span>
-                    )}
-                    {cantidad > 1 && (
-                      <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">×{cantidad}</span>
-                    )}
-                  </div>
-
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 inline-flex items-center gap-1.5 flex-wrap">
-                    <FaCalendarAlt className="text-[10px]" aria-hidden="true" />
-                    Entrega: {fmtFecha(f.fechaEntrega)}
-                    {urgencia && (
-                      <span className={`inline-flex items-center gap-1 ${urgencia.cls}`}>
-                        {urgencia.alerta && <FaExclamationCircle className="text-[10px]" aria-hidden="true" />}
-                        {urgencia.texto}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <EstadoBadge estado={f.estado} />
-                  {!seleccion.modo && <FaChevronRight className="text-gray-400 text-xs" />}
-                </div>
-              </>
-            );
-
-            return seleccion.modo ? (
-              <button
-                key={`${f.tipo}-${f.id}`}
-                type="button"
-                onClick={() => seleccion.alternar(f)}
-                aria-pressed={marcada}
-                className={tarjetaCls}
-              >
-                {contenido}
-              </button>
-            ) : (
-              <Link
-                key={`${f.tipo}-${f.id}`}
-                to={`/planta/produccion/${f.tipo}/${f.id}`}
-                className={tarjetaCls}
-              >
-                {contenido}
-              </Link>
-            );
-          })}
+          {filtradas.map((f) => (
+            <OrdenPlantaCard
+              key={`${f.tipo}-${f.id}`}
+              ficha={f}
+              seleccionable={seleccion.modo}
+              marcada={seleccion.estaSeleccionada(f)}
+              onAlternar={seleccion.alternar}
+              onVerFicha={getImpresionComponent(f.tipo) ? setFichaImpresa : null}
+            />
+          ))}
         </div>
+      )}
+
+      {fichaImpresa && ImpresionComponent && (
+        <ImpresionComponent
+          ficha={fichaImpresa}
+          numero={fichaImpresa.ordenProduccion}
+          onClose={() => setFichaImpresa(null)}
+        />
       )}
 
       {/* Por encima del tab bar de planta, que es fijo y mide 56 px. */}

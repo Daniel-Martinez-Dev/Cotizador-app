@@ -25,6 +25,7 @@ import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { valorNumerico, conDefectosNumericos } from "../utils/campoNumero";
 
 const OPCIONES = {
   tipo:  PARAMETROS_PUERTA_SECCIONAL.TIPOS,
@@ -60,6 +61,18 @@ const INITIAL_FORM = {
   adicional:         "",
 };
 
+// Lo que vale un campo numérico que se dejó en blanco. El formulario admite ""
+// para que se pueda borrar y reescribir sin pelear con un 0 (ver
+// utils/campoNumero.js); el cálculo y lo que se guarda usan estos defectos, que
+// además son los que se ven de placeholder.
+const DEFECTOS_NUM = {
+  cantidad: 1,
+  ventanas: 0,
+  resortes: PARAMETROS_PUERTA_SECCIONAL.RESORTES_DEFAULT,
+};
+
+const conDefectos = (form) => conDefectosNumericos(form, DEFECTOS_NUM);
+
 const inputCls = "mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
 // Variante sin margen superior, para filas repetidas sin label propio (p. ej. lista de empaque).
 const rowInputCls = "w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-sm";
@@ -84,13 +97,13 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
   const formRef = React.useRef(null);
 
   const calculo = React.useMemo(
-    () => calcularPuertaSeccional(form),
+    () => calcularPuertaSeccional(conDefectos(form)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [form.anchoVano, form.altoVano, form.cantidad, form.tipo, form.motor, form.resortes, form.ventanas, form.tambor]
   );
 
   const fechaEntrega = React.useMemo(
-    () => calcularFechaEntrega(form.fechaOrden, form.cantidad),
+    () => calcularFechaEntrega(form.fechaOrden, conDefectos(form).cantidad),
     [form.fechaOrden, form.cantidad]
   );
 
@@ -142,7 +155,7 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
   const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
-  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: Number(e.target.value) }));
+  const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: valorNumerico(e.target.value) }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -164,11 +177,9 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
             : { cantidad: Number(it.cantidad) || 0 }),
         }));
       const datos = {
-        ...form,
+        ...conDefectos(form),
         anchoVano: Number(form.anchoVano),
         altoVano:  Number(form.altoVano),
-        ventanas:  Number(form.ventanas),
-        resortes:  Number(form.resortes),
         fechaEntrega,
       };
       if (editingId) {
@@ -280,7 +291,8 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
               <div>
                 <label className={labelCls}>Cantidad</label>
                 <input type="number" min={1} step={1} value={form.cantidad}
-                  onChange={setNum("cantidad")} className={inputCls} />
+                  onChange={setNum("cantidad")} placeholder={String(DEFECTOS_NUM.cantidad)}
+                  className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>Fecha orden</label>
@@ -343,7 +355,8 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
                 <div>
                   <label className={labelCls}>Ventanas</label>
                   <input type="number" min={0} step={1} value={form.ventanas}
-                    onChange={setNum("ventanas")} className={`${inputCls} font-mono`} />
+                    onChange={setNum("ventanas")} placeholder={String(DEFECTOS_NUM.ventanas)}
+                    className={`${inputCls} font-mono`} />
                 </div>
                 <div>
                   <label className={labelCls}>
@@ -373,7 +386,8 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
                 <div>
                   <label className={labelCls}>Cantidad</label>
                   <input type="number" min={1} step={1} value={form.resortes}
-                    onChange={setNum("resortes")} className={`${inputCls} font-mono`} />
+                    onChange={setNum("resortes")} placeholder={String(DEFECTOS_NUM.resortes)}
+                    className={`${inputCls} font-mono`} />
                 </div>
                 <div>
                   <label className={labelCls}>Calibre</label>

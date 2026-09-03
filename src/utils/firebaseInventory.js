@@ -449,11 +449,16 @@ export async function eliminarProveedor(id) {
 }
 
 // Núcleo compartido por los tres flujos que mueven stock: oficina
-// (admin/inventario, costo obligatorio en ingresos), almacén (el almacenista,
-// que sí registra el precio de la factura aunque no lo pueda consultar después)
-// y planta (nunca fija costo). En salidas, los dos flujos de planta exigen
-// quedar ligados a una orden de producción vía extraMovimientoFields.
-async function registrarMovimientoInventarioCore(itemId, data, { requireCosto, extraMovimientoFields = {} }) {
+// (admin/inventario, proveedor y costo obligatorios en ingresos), almacén (el
+// almacenista, que sí registra el precio de la factura aunque no lo pueda
+// consultar después) y planta (nunca fija costo). En salidas, los dos flujos de
+// planta exigen quedar ligados a una orden de producción vía
+// extraMovimientoFields.
+async function registrarMovimientoInventarioCore(
+  itemId,
+  data,
+  { requireCosto, requireProveedor = true, extraMovimientoFields = {} },
+) {
   await waitForAuth();
   const tipo = data?.tipo === "salida" ? "salida" : "ingreso";
   const cantidad = Number(data?.cantidad || 0);
@@ -464,7 +469,7 @@ async function registrarMovimientoInventarioCore(itemId, data, { requireCosto, e
   const costoProvisto = data?.costoUnitario != null;
   const costoUnitario = Number(data?.costoUnitario || 0);
   if (tipo === "ingreso") {
-    if (!proveedorId) throw new Error("proveedorId requerido");
+    if (requireProveedor && !proveedorId) throw new Error("proveedorId requerido");
     if (requireCosto && (Number.isNaN(costoUnitario) || costoUnitario <= 0)) {
       throw new Error("Costo unitario inválido");
     }
@@ -525,8 +530,19 @@ async function registrarMovimientoInventarioCore(itemId, data, { requireCosto, e
   return movRef.id;
 }
 
-export async function registrarMovimientoInventario(itemId, data) {
-  return registrarMovimientoInventarioCore(itemId, data, { requireCosto: true });
+// Ingreso desde la oficina. Una entrada aquí es una compra, así que el
+// proveedor y el precio se exigen: son lo que sostiene el costo del material.
+//
+// `sinFactura` es la excepción del arranque y de los ajustes de conteo — cargar
+// el stock que ya estaba en bodega, cuadrar una diferencia de inventario—, donde
+// no hay factura que copiar y exigirla solo consigue que se invente un dato.
+// Es una decisión de quien registra, no un descuido: por eso viaja explícita
+// desde la pantalla y no como un valor por defecto.
+export async function registrarMovimientoInventario(itemId, data, { sinFactura = false } = {}) {
+  return registrarMovimientoInventarioCore(itemId, data, {
+    requireCosto: !sinFactura,
+    requireProveedor: !sinFactura,
+  });
 }
 
 // Toda salida desde planta queda ligada a una orden de producción: es lo que
@@ -550,6 +566,11 @@ function camposSalidaPlanta(data) {
 // Que pueda escribir el precio no significa que pueda consultarlo: el valor de
 // la materia prima no se muestra en ninguna pantalla de planta (ver
 // EmpleadoInventarioList y MovimientoModal).
+//
+// El proveedor es opcional en este flujo, y el costo también. La razón es el
+// arranque: el stock que ya está en bodega entra sin factura ni proveedor que
+// recordar, y obligarlos solo conseguía que se inventaran. El ingreso de
+// oficina sí los sigue exigiendo, porque ahí la entrada es una compra.
 export async function registrarMovimientoInventarioAlmacen(itemId, data) {
   const tipo = data?.tipo === "salida" ? "salida" : "ingreso";
   return registrarMovimientoInventarioCore(
@@ -557,6 +578,7 @@ export async function registrarMovimientoInventarioAlmacen(itemId, data) {
     tipo === "ingreso" ? data : { ...data, costoUnitario: undefined },
     {
       requireCosto: false,
+      requireProveedor: false,
       extraMovimientoFields: tipo === "salida" ? camposSalidaPlanta(data) : {},
     },
   );

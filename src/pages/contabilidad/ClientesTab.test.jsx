@@ -1,81 +1,74 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
 import ClientesTab from "./ClientesTab.jsx";
 
-// Prueba de humo: que la pantalla se pinte y muestre lo que decide la
-// vinculación. No hace falta jsdom —se renderiza a texto— y con eso alcanza
-// para que un error de sintaxis o un campo renombrado no llegue a la oficina.
+// Prueba de humo del tablero. Se renderiza a texto —sin jsdom— así que el
+// histórico no se pide: la pestaña tiene que servir con lo que la sección ya
+// tiene cargado del año, que es justo lo que se comprueba aquí.
 
-const doc = (extra = {}) => ({
-  id: extra.id || "d1",
+const factura = (extra = {}) => ({
+  id: "d1",
   tipo: "factura",
   numero: "J-1001",
   fecha: "2026-03-04",
-  clienteNombre: "AXIONLOG",
-  clienteNit: "",
-  empresaId: "",
-  neto: 1_000_000,
-  resumen: { neto: 1_000_000, saldo: 400_000 },
+  fechaVencimiento: "2026-04-03",
+  periodoContable: 2026,
+  empresaId: "e1",
+  clienteNombre: "AXIONLOG COLOMBIA S.A.S.",
+  clienteNit: "9001234567",
+  items: [{ producto: "Puertas Rápidas", cantidad: 1, unidad: "und", valorUnitario: 40_000_000 }],
+  ivaPorcentaje: 0,
+  retenciones: [],
+  neto: 40_000_000,
   ...extra,
 });
 
-const pintar = (props) =>
+const pintar = (props = {}) =>
   renderToStaticMarkup(
-    <MemoryRouter>
-      <ClientesTab
-        liquidados={[]}
-        empresas={[]}
-        cargando={false}
-        anio={2026}
-        recargar={() => {}}
-        {...props}
-      />
-    </MemoryRouter>
+    <ClientesTab
+      documentos={[factura()]}
+      pagos={[]}
+      empresas={[{ id: "e1", nombre: "AXIONLOG COLOMBIA S.A.S.", ciudad: "Funza" }]}
+      cargando={false}
+      anio={2026}
+      recargar={() => {}}
+      {...props}
+    />
   );
 
 describe("ClientesTab", () => {
-  it("felicita cuando no hay nada suelto", () => {
-    const html = pintar({ liquidados: [doc({ empresaId: "e1" })] });
-    expect(html).toContain("Todas las facturas tienen su cliente");
+  it("muestra el cliente con sus ventas sin esperar al histórico", () => {
+    const html = pintar();
+    expect(html).toContain("AXIONLOG COLOMBIA S.A.S.");
+    expect(html).toContain("Ventas");
+    expect(html).toContain("Ticket promedio");
+    expect(html).toContain("trayendo el histórico completo");
   });
 
-  it("agrupa lo suelto y ofrece la empresa que coincide por nombre", () => {
-    const html = pintar({
-      liquidados: [doc(), doc({ id: "d2" })],
-      empresas: [{ id: "e1", nombre: "AXIONLOG", nit: "9001234567" }],
-    });
-    expect(html).toContain("Mismo nombre");
-    expect(html).toContain("2 documentos");
-    expect(html).toContain("Aplicar 1 sugerencias");
+  it("pinta las tres gráficas del tablero", () => {
+    const html = pintar();
+    expect(html).toContain("Ventas por mes");
+    expect(html).toContain("Qué se vende");
+    expect(html).toContain("Clientes que más compran");
   });
 
-  it("ofrece crear el cliente cuando no hay con quién casarlo", () => {
-    const html = pintar({ liquidados: [doc({ clienteNombre: "Cliente nuevo" })] });
-    expect(html).toContain("Crear cliente");
-    expect(html).not.toContain("Aplicar");
+  it("propone al cliente como distribuidor del producto que compra", () => {
+    const html = pintar();
+    expect(html).toContain("Candidatos a distribuidor");
+    expect(html).toContain("Puertas Rápidas");
   });
 
-  it("cuenta el saldo que está quedando fuera de su cliente", () => {
-    const html = pintar({ liquidados: [doc(), doc({ id: "d2", clienteNombre: "Otro" })] });
-    expect(html).toContain("Saldo suelto");
-    expect(html).toContain("2 clientes distintos");
+  it("avisa de los documentos que no cuelgan de un cliente", () => {
+    const html = pintar({ documentos: [factura(), factura({ id: "d2", empresaId: "", clienteNombre: "Suelto" })] });
+    expect(html).toContain("1 documento sin cliente vinculado");
+    expect(html).toContain("Vincular ahora");
   });
 
-  it("avisa de los clientes que quedaron repetidos en la base", () => {
-    const html = pintar({
-      liquidados: [doc({ empresaId: "e1" })],
-      empresas: [
-        { id: "e1", nombre: "AXIONLOG COLOMBIA S.A.S.", nit: "9001234567" },
-        { id: "e2", nombre: "AXIONLOG" },
-      ],
-    });
-    expect(html).toContain("aparece repetido en la base");
-    expect(html).toContain("Fusionar en Empresas");
-  });
-
-  it("no avisa de duplicados cuando la base está limpia", () => {
-    const html = pintar({ empresas: [{ id: "e1", nombre: "Colanta" }, { id: "e2", nombre: "Alpina" }] });
-    expect(html).not.toContain("Fusionar en Empresas");
+  it("no inventa un tablero vacío mientras no hay datos", () => {
+    // Sin documentos y con el histórico todavía en camino se espera, no se
+    // afirma que el cliente no tiene ventas.
+    const html = pintar({ documentos: [], pagos: [] });
+    expect(html).toContain("Reuniendo el histórico de clientes");
+    expect(html).not.toContain("Ticket promedio");
   });
 });

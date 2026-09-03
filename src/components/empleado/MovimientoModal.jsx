@@ -1,18 +1,25 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { FaTimes, FaBarcode, FaFileInvoiceDollar, FaPlus } from "react-icons/fa";
+import { FaTimes, FaBarcode, FaFileInvoiceDollar, FaPlus, FaChevronDown } from "react-icons/fa";
 import { listarProveedores, registrarMovimientoInventarioAlmacen } from "../../utils/firebaseInventory";
 import { formatCOP } from "../../pages/inventario/inventarioUtils";
 import OrdenProduccionPicker from "./OrdenProduccionPicker";
 import ProveedorFormModal from "../almacen/ProveedorFormModal";
+import ProveedorSelector from "../almacen/ProveedorSelector";
 
 // Entrada o salida de materia prima desde el almacén.
 //
-// La entrada lleva los datos de la compra —proveedor, número de factura, ítem
-// y precio unitario—: el almacenista es quien tiene el papel del proveedor en
-// la mano cuando descarga. Que pueda escribir el precio no significa que lo
+// La entrada puede llevar los datos de la compra —proveedor, número de factura,
+// ítem y precio unitario—: el almacenista es quien tiene el papel del proveedor
+// en la mano cuando descarga. Que pueda escribir el precio no significa que lo
 // pueda consultar: aquí no se muestra el costo que ya tenga el material, ni su
 // valor en inventario. Eso vive en el módulo de oficina.
+//
+// Ninguno de esos datos es obligatorio, y la cantidad es lo único que se pide.
+// El caso que manda es el arranque: cargar el stock que ya está en bodega, que
+// no tiene factura ni proveedor que recordar. Exigirlos convertía el conteo
+// inicial en una invención de datos, y un dato inventado en contabilidad es
+// peor que un campo vacío.
 //
 // La salida exige la orden de producción, que es lo que permite saber después
 // en qué se gastó el material.
@@ -34,6 +41,7 @@ export default function MovimientoModal({ item, tipo, codigoLeido = "", onClose,
   const [costoUnitario, setCostoUnitario] = React.useState("");
   const [orden, setOrden] = React.useState(null);
   const [nota, setNota] = React.useState("");
+  const [compraAbierta, setCompraAbierta] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   const cargarProveedores = React.useCallback(async () => {
@@ -58,7 +66,6 @@ export default function MovimientoModal({ item, tipo, codigoLeido = "", onClose,
     const cant = Number(cantidad || 0);
     if (Number.isNaN(cant) || cant <= 0) return toast.error("Cantidad inválida");
     if (esSalida && cant > Number(item.stockActual || 0)) return toast.error("No hay stock suficiente");
-    if (!esSalida && !proveedorId) return toast.error("Selecciona el proveedor");
     if (esSalida && !orden) return toast.error("Selecciona la orden de producción");
 
     setSaving(true);
@@ -88,7 +95,20 @@ export default function MovimientoModal({ item, tipo, codigoLeido = "", onClose,
     }
   };
 
-  const inputCls = "mt-1 w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-900 text-sm";
+  // Lo que se ve del bloque de compra cuando está plegado, para no tener que
+  // abrirlo solo para comprobar qué quedó escrito.
+  const resumenCompra = React.useMemo(() => {
+    const proveedor = proveedores.find((p) => p.id === proveedorId);
+    const partes = [
+      proveedor ? (proveedor.razonSocial || proveedor.nombre) : null,
+      facturaNumero.trim() || null,
+      costoUnitario !== "" ? formatCOP(Number(costoUnitario)) : null,
+    ].filter(Boolean);
+    return partes.length ? partes.join(" · ") : "Sin datos";
+  }, [proveedores, proveedorId, facturaNumero, costoUnitario]);
+
+  const controlCls = "w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-900 text-sm";
+  const inputCls = `mt-1 ${controlCls}`;
   const labelCls = "text-xs text-gray-600 dark:text-gray-300";
 
   return (
@@ -133,62 +153,82 @@ export default function MovimientoModal({ item, tipo, codigoLeido = "", onClose,
             </div>
 
             {!esSalida && (
-              <>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className={labelCls}>Proveedor</label>
-                    <button type="button" onClick={() => setNuevoProveedor(true)}
-                      className="text-[11px] text-blue-600 dark:text-blue-400 inline-flex items-center gap-1">
-                      <FaPlus className="text-[9px]" /> Nuevo
-                    </button>
-                  </div>
-                  <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} className={inputCls}>
-                    <option value="">Selecciona proveedor</option>
-                    {proveedores.map((p) => (
-                      <option key={p.id} value={p.id}>{p.razonSocial || p.nombre || p.id}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="rounded-lg border border-gray-200 dark:border-gris-600">
+                {/* Plegado por defecto: la entrada corriente es cantidad y ya.
+                    Quien tenga la factura en la mano lo abre y la registra. */}
+                <button
+                  type="button"
+                  onClick={() => setCompraAbierta((v) => !v)}
+                  aria-expanded={compraAbierta}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
+                >
+                  <FaFileInvoiceDollar className="text-gray-400 shrink-0" />
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Datos de compra</span>
+                  <span className="text-[10px] text-gray-400">(opcional)</span>
+                  <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[45%]">
+                    {!compraAbierta && resumenCompra}
+                  </span>
+                  <FaChevronDown
+                    className={`text-[10px] text-gray-400 shrink-0 transition-transform ${compraAbierta ? "rotate-180" : ""}`}
+                  />
+                </button>
 
-                <div className="rounded-lg border border-gray-200 dark:border-gris-600 p-3 space-y-3">
-                  <div className="inline-flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                    <FaFileInvoiceDollar className="text-gray-400" /> Factura de compra
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                {compraAbierta && (
+                  <div className="px-3 pb-3 space-y-3 border-t border-gray-200 dark:border-gris-600 pt-3">
                     <div>
-                      <label className={labelCls}>N.° de factura</label>
-                      <input
-                        value={facturaNumero}
-                        onChange={(e) => setFacturaNumero(e.target.value)}
-                        placeholder="FV-1234"
-                        className={`${inputCls} font-mono`}
-                      />
+                      <div className="flex items-center justify-between">
+                        <label className={labelCls}>Proveedor</label>
+                        <button type="button" onClick={() => setNuevoProveedor(true)}
+                          className="text-[11px] text-blue-600 dark:text-blue-400 inline-flex items-center gap-1">
+                          <FaPlus className="text-[9px]" /> Nuevo
+                        </button>
+                      </div>
+                      <div className="mt-1">
+                        <ProveedorSelector
+                          proveedores={proveedores}
+                          value={proveedorId}
+                          onChange={setProveedorId}
+                          inputCls={controlCls}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>N.° de factura</label>
+                        <input
+                          value={facturaNumero}
+                          onChange={(e) => setFacturaNumero(e.target.value)}
+                          placeholder="FV-1234"
+                          className={`${inputCls} font-mono`}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Precio unitario</label>
+                        <input
+                          value={costoUnitario === "" ? "" : formatCOP(Number(costoUnitario))}
+                          onChange={(e) => setCostoUnitario(soloDigitos(e.target.value))}
+                          inputMode="numeric"
+                          placeholder="$ 0"
+                          className={inputCls}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Precio unitario</label>
+                      <label className={labelCls}>Ítem / descripción en la factura</label>
                       <input
-                        value={costoUnitario === "" ? "" : formatCOP(Number(costoUnitario))}
-                        onChange={(e) => setCostoUnitario(soloDigitos(e.target.value))}
-                        inputMode="numeric"
-                        placeholder="$ 0"
+                        value={facturaItem}
+                        onChange={(e) => setFacturaItem(e.target.value)}
+                        placeholder="Como aparece en el documento del proveedor"
                         className={inputCls}
                       />
                     </div>
+                    <div className="text-[10px] text-gray-400">
+                      Estos datos quedan para contabilidad. El valor del material no se consulta desde el almacén.
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>Ítem / descripción en la factura</label>
-                    <input
-                      value={facturaItem}
-                      onChange={(e) => setFacturaItem(e.target.value)}
-                      placeholder="Como aparece en el documento del proveedor"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div className="text-[10px] text-gray-400">
-                    Estos datos quedan para contabilidad. El valor del material no se consulta desde el almacén.
-                  </div>
-                </div>
-              </>
+                )}
+              </div>
             )}
 
             {esSalida && (
@@ -235,6 +275,7 @@ export default function MovimientoModal({ item, tipo, codigoLeido = "", onClose,
             setNuevoProveedor(false);
             await cargarProveedores();
             setProveedorId(id);
+            setCompraAbierta(true);
           }}
         />
       )}

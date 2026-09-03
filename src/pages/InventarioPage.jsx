@@ -34,6 +34,7 @@ import CodigoBarrasMaterial from "../components/inventario/CodigoBarrasMaterial"
 import { buscarItemPorCodigoEnLista, itemNecesitaCodigos } from "../utils/codigoMaterial";
 
 import PageHeader from "../components/ui/PageHeader";
+import { valorNumerico } from "../utils/campoNumero";
 
 // Cuántas materias primas se pintan a la vez en el selector del proveedor.
 const MAX_MATERIAS_VISIBLES = 200;
@@ -79,7 +80,7 @@ export default function InventarioPage() {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [itemsSearch, setItemsSearch] = React.useState("");
-  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "" });
+  const [mov, setMov] = React.useState({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "", sinFactura: false });
   const [movimientosOpenItemId, setMovimientosOpenItemId] = React.useState("");
   const [movimientosLoadingItemId, setMovimientosLoadingItemId] = React.useState("");
   const [movimientosCache, setMovimientosCache] = React.useState({}); // itemId -> movimientos[]
@@ -818,14 +819,20 @@ export default function InventarioPage() {
       cantidad: 1,
       nota: "",
       proveedorId: ids[0] || "",
-      costoUnitario: tipo === "ingreso" ? String(Number(item.costoUnitario ?? "")) : "",
+      // Solo se precarga un costo que exista: `Number(undefined)` dejaba "NaN"
+      // en el campo, y un material sin costo lo abría en "$ 0", que hay que
+      // borrar antes de escribir el precio de la factura.
+      costoUnitario: tipo === "ingreso" && Number(item.costoUnitario) > 0
+        ? String(Number(item.costoUnitario))
+        : "",
       codigoLeido,
+      sinFactura: false,
     });
     setShowMovimientoModal(true);
   };
 
   const cancelMovimiento = () => {
-    setMov({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "" });
+    setMov({ itemId: "", tipo: "", cantidad: 1, nota: "", proveedorId: "", costoUnitario: "", codigoLeido: "", sinFactura: false });
     setShowMovimientoModal(false);
   };
 
@@ -892,19 +899,29 @@ export default function InventarioPage() {
       if (!mov.itemId) return;
       const cantidad = Number(mov.cantidad || 0);
       if (Number.isNaN(cantidad) || cantidad <= 0) return toast.error("Cantidad inválida");
-      if (mov.tipo === "ingreso") {
-        if (!mov.proveedorId) return toast.error("Selecciona el proveedor");
+      // Un ingreso normal es una compra y se le piden proveedor y precio. El
+      // stock inicial y los ajustes de conteo no tienen factura detrás, así que
+      // se marcan como tales y entran solo con la cantidad.
+      if (mov.tipo === "ingreso" && !mov.sinFactura) {
+        if (!mov.proveedorId) return toast.error("Selecciona el proveedor, o marca que es stock inicial");
         const costoUnitario = Number(mov.costoUnitario || 0);
         if (Number.isNaN(costoUnitario) || costoUnitario <= 0) return toast.error("Costo unitario inválido");
       }
-      await registrarMovimientoInventario(mov.itemId, {
-        tipo: mov.tipo,
-        cantidad,
-        nota: mov.nota,
-        proveedorId: mov.tipo === "ingreso" ? mov.proveedorId : "",
-        costoUnitario: mov.tipo === "ingreso" ? Number(mov.costoUnitario || 0) : 0,
-        codigoLeido: mov.codigoLeido,
-      });
+      const conFactura = mov.tipo === "ingreso" && !mov.sinFactura;
+      await registrarMovimientoInventario(
+        mov.itemId,
+        {
+          tipo: mov.tipo,
+          cantidad,
+          nota: mov.nota,
+          proveedorId: conFactura ? mov.proveedorId : "",
+          // Sin factura no se toca el costo que el material ya tenga: un stock
+          // inicial no vale 0, simplemente todavía no se sabe cuánto vale.
+          costoUnitario: conFactura ? Number(mov.costoUnitario || 0) : undefined,
+          codigoLeido: mov.codigoLeido,
+        },
+        { sinFactura: mov.tipo === "ingreso" && Boolean(mov.sinFactura) },
+      );
       toast.success(mov.tipo === 'salida' ? 'Salida registrada' : 'Ingreso registrado');
       // refrescar historial si está abierto
       if (movimientosOpenItemId === mov.itemId) {
@@ -1197,35 +1214,55 @@ export default function InventarioPage() {
                     type="number"
                     min={1}
                     value={mov.cantidad}
-                    onChange={(e) => setMov((p) => ({ ...p, cantidad: Number(e.target.value) }))}
+                    onChange={(e) => setMov((p) => ({ ...p, cantidad: valorNumerico(e.target.value) }))}
                     className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
                   />
                 </div>
                 {mov.tipo === "ingreso" && (
                   <>
-                    <div>
-                      <label className="text-xs text-gray-600 dark:text-gray-300">Proveedor</label>
-                      <select
-                        value={mov.proveedorId}
-                        onChange={(e) => setMov((p) => ({ ...p, proveedorId: e.target.value }))}
-                        className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
-                      >
-                        <option value="">Selecciona proveedor</option>
-                        {proveedores.map((p) => (
-                          <option key={p.id} value={p.id}>{p.razonSocial || p.nombre || p.id}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 dark:text-gray-300">Costo unitario</label>
+                    {/* Cargar lo que ya estaba en bodega, o cuadrar un conteo:
+                        no hay factura que copiar, y pedirla solo consigue que
+                        se invente un proveedor y un precio. */}
+                    <label className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
                       <input
-                        type="text"
-                        inputMode="numeric"
-                        value={mov.costoUnitario === "" ? "" : formatCOP(Number(mov.costoUnitario))}
-                        onChange={(e) => setMov((p) => ({ ...p, costoUnitario: parseDigits(e.target.value) }))}
-                        className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                        type="checkbox"
+                        checked={Boolean(mov.sinFactura)}
+                        onChange={(e) => setMov((p) => ({ ...p, sinFactura: e.target.checked }))}
+                        className="mt-0.5 accent-trafico"
                       />
-                    </div>
+                      <span>
+                        Stock inicial o ajuste de conteo
+                        <span className="block text-[10px] opacity-70">Sin factura: entra solo con la cantidad.</span>
+                      </span>
+                    </label>
+                    {!mov.sinFactura && (
+                      <>
+                        <div>
+                          <label className="text-xs text-gray-600 dark:text-gray-300">Proveedor</label>
+                          <select
+                            value={mov.proveedorId}
+                            onChange={(e) => setMov((p) => ({ ...p, proveedorId: e.target.value }))}
+                            className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                          >
+                            <option value="">Selecciona proveedor</option>
+                            {proveedores.map((p) => (
+                              <option key={p.id} value={p.id}>{p.razonSocial || p.nombre || p.id}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 dark:text-gray-300">Costo unitario</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={mov.costoUnitario === "" ? "" : formatCOP(Number(mov.costoUnitario))}
+                            onChange={(e) => setMov((p) => ({ ...p, costoUnitario: parseDigits(e.target.value) }))}
+                            placeholder="$ 0"
+                            className="mt-1 w-full px-3 py-2 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800"
+                          />
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
                 <div>

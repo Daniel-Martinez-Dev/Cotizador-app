@@ -71,8 +71,16 @@ export default function ClienteSelector({
   // equivocado es peor que dejarla suelta.
   const handleTexto = (texto) => {
     const { empresa, coincidencias } = resolverEmpresa({ nombre: texto }, lista);
-    if (empresa && coincidencias === 1) onChange(clienteDesdeEmpresa(empresa, { usarAlias: value.usarAlias }));
-    else onChange(aliasManual(clienteSinVincular(texto), alias));
+    if (empresa && coincidencias === 1) {
+      const datos = clienteDesdeEmpresa(empresa, { usarAlias: value.usarAlias });
+      // Se conserva lo tecleado cuando solo difiere en espacios del nombre de
+      // la empresa: si no, el espacio con el que se empieza a escribir el
+      // segundo apellido del cliente desaparece en la misma pulsación, porque
+      // el nombre canónico —ya recortado— vuelve a pisar el campo.
+      onChange(texto.trim() === datos.cliente ? { ...datos, cliente: texto } : datos);
+    } else {
+      onChange(aliasManual(clienteSinVincular(texto, { recortar: false }), alias, { recortar: false }));
+    }
   };
 
   const handleElegir = (opcion) => onChange(clienteDesdeEmpresa(opcion.data));
@@ -189,7 +197,7 @@ export default function ClienteSelector({
         </label>
         <input
           value={alias}
-          onChange={(e) => onChange(aliasManual(value, e.target.value))}
+          onChange={(e) => onChange(aliasManual(value, e.target.value, { recortar: false }))}
           placeholder="Alias en la orden (opcional)"
           title="Abreviación con la que sale el cliente en la orden de producción. Solo afecta a esta ficha."
           className="min-w-0 flex-1 rounded border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 px-2 py-1 text-[11px] uppercase"
