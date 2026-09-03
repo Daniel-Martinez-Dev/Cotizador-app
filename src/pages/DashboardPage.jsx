@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ENABLE_INVENTARIO, ENABLE_PRODUCCION } from "../utils/featureFlags";
+import { ENABLE_CONTABILIDAD, ENABLE_INVENTARIO, ENABLE_PRODUCCION } from "../utils/featureFlags";
 import { useAuth } from "../context/AuthContext";
 
 import PageHeader from "../components/ui/PageHeader";
@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const isAdmin = isMainAdmin || hasRole("admin");
   const showProduccion = ENABLE_PRODUCCION && (isAdmin || hasRole("produccion"));
   const showInventario = ENABLE_INVENTARIO && (isAdmin || hasRole("inventario"));
+  const showContabilidad = ENABLE_CONTABILIDAD && (isAdmin || hasRole("contabilidad"));
 
   return (
     <div className="relative">
@@ -121,6 +122,14 @@ export default function DashboardPage() {
             enabled={showInventario}
             icon="📦"
             tone="from-emerald-500/20 via-emerald-400/10 to-transparent"
+          />
+          <Card
+            title="Contabilidad"
+            desc="Facturas, abonos y cartera por cliente"
+            to="/contabilidad"
+            enabled={showContabilidad}
+            icon="🧮"
+            tone="from-violet-500/20 via-violet-400/10 to-transparent"
           />
         </div>
       </div>

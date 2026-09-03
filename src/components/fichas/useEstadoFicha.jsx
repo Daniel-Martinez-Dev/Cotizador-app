@@ -6,6 +6,7 @@ import { firmaDeEtapa } from "../../utils/firmasFicha";
 import { codigoFicha as codigoDeFicha } from "../../utils/codigoFicha";
 import { crearNotificacionFichaEnProduccion } from "../../utils/firebaseNotificaciones";
 import { useAuth } from "../../context/AuthContext";
+import { aplicarResultadosLote } from "./loteFichas";
 import EntregaModal from "./EntregaModal";
 import FirmaModal from "./FirmaModal";
 
@@ -127,25 +128,26 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
     else setEntregaAbierta({ ficha, notaInicial: "" });
   }, [fichas]);
 
+  // Los dos modales trabajan por lista de fichas (ver loteFichas.js); desde
+  // aquí siempre es una sola, y el resultado se vuelca en memoria igual que un
+  // lote de una.
   const modales = (
     <>
       {firmaAbierta && (
         <FirmaModal
           tipo={tipoDe(firmaAbierta.ficha)}
-          ficha={firmaAbierta.ficha}
+          fichas={[firmaAbierta.ficha]}
           notaInicial={firmaAbierta.notaInicial}
           onClose={() => setFirmaAbierta(null)}
-          onDone={({ firma, nota }) => {
+          onDone={(resultados) => {
             const { ficha, entregaDespues } = firmaAbierta;
-            const firmas = { ...(ficha.firmas || {}), alistado: firma };
-            const estado = ficha.estado === "entregado" ? ficha.estado : "terminado";
-            anexarNota(ficha.id, nota, { estado, firmas });
+            setFichas((prev) => aplicarResultadosLote(prev, resultados));
             setFirmaAbierta(null);
             // Venía de un salto directo a "entregada": sigue el formulario de
             // entrega sobre la ficha ya firmada.
             if (entregaDespues != null) {
               setEntregaAbierta({
-                ficha: { ...ficha, estado, firmas },
+                ficha: { ...ficha, ...(resultados[0]?.parche || {}) },
                 notaInicial: entregaDespues,
               });
             }
@@ -156,16 +158,11 @@ export default function useEstadoFicha(tipo, fichas, setFichas) {
       {entregaAbierta && (
         <EntregaModal
           tipo={tipoDe(entregaAbierta.ficha)}
-          ficha={entregaAbierta.ficha}
+          fichas={[entregaAbierta.ficha]}
           notaInicial={entregaAbierta.notaInicial}
           onClose={() => setEntregaAbierta(null)}
-          onDone={({ entrega, firma, nota }) => {
-            const { ficha } = entregaAbierta;
-            anexarNota(ficha.id, nota, {
-              estado: "entregado",
-              entrega,
-              firmas: { ...(ficha.firmas || {}), revisado: firma },
-            });
+          onDone={(resultados) => {
+            setFichas((prev) => aplicarResultadosLote(prev, resultados));
             setEntregaAbierta(null);
           }}
         />

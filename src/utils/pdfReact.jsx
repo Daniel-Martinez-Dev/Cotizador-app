@@ -22,7 +22,7 @@ import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { parseHtmlToPDFComponents } from "./htmlToReactPDFParser";
-import imagenesPorProducto from "../data/imagenesPorProducto";
+import { resolverImagenCotizacion } from "./imagenesCotizacion";
 import logoPng from "../assets/imagenes/logo.png";
 import { compressImageToDataURL } from './pdfImageCompression';
 import { resolverVigencia, fraseOfertaValida } from './vigencia';
@@ -72,8 +72,6 @@ async function ensureFontsRegistered() {
   return _fontsLoadPromise;
 }
 
-// Extra top padding added to page, also needed by the header accent bar to bleed to page edge.
-const PAGE_TOP_EXTRA = 4;
 const yieldToMainThread = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function normalizarTitulo(txt) {
@@ -85,12 +83,25 @@ function normalizarTitulo(txt) {
     .join('') || 'Valor';
 }
 
-const T = pdfTheme;
+// Los estilos dependen del tema, así que se construyen bajo demanda en vez de
+// una sola vez al cargar el módulo: es lo que permite que el panel de ajustes
+// del preview mueva márgenes y tamaños y se vea al instante. Se cachean por
+// identidad del objeto tema (memoizarlo en el llamador evita rehacerlos).
+const _cacheEstilos = new WeakMap();
 
-const styles = StyleSheet.create({
+function crearEstilos(T) {
+  const cacheado = _cacheEstilos.get(T);
+  if (cacheado) return cacheado;
+  const estilos = _construirEstilos(T);
+  _cacheEstilos.set(T, estilos);
+  return estilos;
+}
+
+function _construirEstilos(T) {
+  return StyleSheet.create({
   page: {
     paddingHorizontal: T.page.marginHorizontal,
-    paddingTop: T.page.marginVertical + PAGE_TOP_EXTRA,
+    paddingTop: T.page.marginVertical + T.page.topExtra,
     paddingBottom: 10,
     fontSize: T.font.base,
     fontFamily: 'Helvetica',
@@ -134,13 +145,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   logoBox: {
-    width: 130,
+    width: T.layout.logoBoxWidth,
     justifyContent: 'center',
     alignItems: 'center'
   },
   logoImg: {
-    width: 118,
-    height: 44,
+    width: T.layout.logoWidth,
+    height: T.layout.logoHeight,
     objectFit: 'contain'
   },
   companyBlock: {
@@ -163,7 +174,7 @@ const styles = StyleSheet.create({
     borderRadius: T.radius.md,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    minWidth: 170,
+    minWidth: T.layout.quoteMetaMinWidth,
     borderLeftWidth: 3,
     borderLeftColor: T.colors.accent,
   },
@@ -240,12 +251,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   mainColumn: {
-    width: '66%',
+    width: T.layout.columnaPrincipal,
     flexGrow: 0,
     flexShrink: 0,
   },
   sideColumn: {
-    width: '32%',
+    width: T.layout.columnaLateral,
     flexGrow: 0,
     flexShrink: 0,
   },
@@ -276,7 +287,7 @@ const styles = StyleSheet.create({
   },
   sideImage: {
     width: '100%',
-    height: 110,
+    height: T.layout.asideAltura,
     objectFit: 'contain',
   },
   sideImageCaption: {
@@ -317,9 +328,10 @@ const styles = StyleSheet.create({
     color: T.colors.text,
     letterSpacing: 0.1,
   },
-});
+  });
+}
 
-function SeccionHTML({ titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null, noWrap = false }) {
+function SeccionHTML({ T, styles, titulo, contenido, compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null, noWrap = false }) {
   return (
     <View wrap={!noWrap}>
       <Text
@@ -332,13 +344,13 @@ function SeccionHTML({ titulo, contenido, compact = false, dense = false, readab
         {titulo}
       </Text>
       <View style={compact ? styles.htmlContentCompact : styles.htmlContent}>
-        {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems, fontScale, paragraphSpacing })}
+        {parseHtmlToPDFComponents(contenido, { compact, dense, readable, onlyBoldHeadings, compressShortItems, fontScale, paragraphSpacing, theme: T })}
       </View>
     </View>
   );
 }
 
-function PdfHeader({ tipoProducto, numeroCotizacion, fecha, vigencia }) {
+function PdfHeader({ T, styles, tipoProducto, numeroCotizacion, fecha, vigencia }) {
   return (
     <View style={styles.header}>
       {/* Barra de acento de marca */}
@@ -346,7 +358,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha, vigencia }) {
         height: T.page.headerAccentHeight,
         backgroundColor: T.colors.accent,
         marginHorizontal: -T.page.marginHorizontal,
-        marginTop: -(T.page.marginVertical + PAGE_TOP_EXTRA),
+        marginTop: -(T.page.marginVertical + T.page.topExtra),
         marginBottom: 12,
       }} />
       <View style={styles.headerTop}>
@@ -375,7 +387,7 @@ function PdfHeader({ tipoProducto, numeroCotizacion, fecha, vigencia }) {
   );
 }
 
-function PdfFooter({ numeroCotizacion, pageNumber, totalPages }) {
+function PdfFooter({ styles, numeroCotizacion, pageNumber, totalPages }) {
   return (
     <View style={styles.footerContainer} wrap={false}>
       <View style={styles.footerAccent} />
@@ -386,18 +398,19 @@ function PdfFooter({ numeroCotizacion, pageNumber, totalPages }) {
   );
 }
 
-function ImageSection({ imagenSeleccionada, imagenesMulti, titulo, tipoProducto }) {
+function ImageSection({ T, styles, imagenSeleccionada, imagenesMulti, titulo, tipoProducto }) {
   if (!imagenSeleccionada && imagenesMulti.length === 0) return null;
   const extras = imagenesMulti.slice(0, 2);
   const total = (imagenSeleccionada ? 1 : 0) + extras.length;
-  let widthPct;
-  if (total === 1) widthPct = '60%';
-  else if (total === 2) widthPct = '48%';
-  else widthPct = '32%';
+  let anchoPct;
+  if (total === 1) anchoPct = T.layout.imagenAnchoUna;
+  else if (total === 2) anchoPct = T.layout.imagenAnchoDos;
+  else anchoPct = T.layout.imagenAnchoTres;
+  const widthPct = typeof anchoPct === 'number' ? `${anchoPct}%` : anchoPct;
 
   const tipoLower = (tipoProducto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const esPuertaRapida = tipoLower.includes('rapida') || tipoLower.includes('puertas rapidas');
-  const imgHeight = esPuertaRapida ? 120 : 190;
+  const imgHeight = esPuertaRapida ? T.layout.imagenAlturaPuertaRapida : T.layout.imagenAltura;
 
   return (
     <View wrap={false}>
@@ -420,7 +433,7 @@ function ImageSection({ imagenSeleccionada, imagenesMulti, titulo, tipoProducto 
   );
 }
 
-function ImageAside({ imagenSeleccionada, titulo }) {
+function ImageAside({ styles, imagenSeleccionada, titulo }) {
   if (!imagenSeleccionada) return null;
   return (
     <View style={styles.sideColumn}>
@@ -433,7 +446,7 @@ function ImageAside({ imagenSeleccionada, titulo }) {
   );
 }
 
-function ValidityCallout({ vigencia }) {
+function ValidityCallout({ T, vigencia }) {
   return (
     <>
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, marginBottom: 4 }}>
@@ -455,7 +468,7 @@ function ValidityCallout({ vigencia }) {
   );
 }
 
-function SignatureBlock() {
+function SignatureBlock({ T }) {
   return (
     <View wrap={false} minPresenceAhead={8} style={{ marginTop: T.spacing.sm, paddingTop: 4, borderTopWidth: 2, borderTopColor: T.colors.accent }}>
       <View style={{
@@ -477,7 +490,7 @@ function SignatureBlock() {
             backgroundColor: T.colors.signatureBoxBg,
             padding: 6,
             marginBottom: 6,
-            height: 44,
+            height: T.layout.firmaCajaAltura,
           }} />
           <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 3 }}>Firma y sello — Cold Chain Services S.A.S.</Text>
           <Text style={{ fontSize: 7.5, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
@@ -491,7 +504,7 @@ function SignatureBlock() {
             backgroundColor: T.colors.signatureBoxBg,
             padding: 6,
             marginBottom: 6,
-            height: 44,
+            height: T.layout.firmaCajaAltura,
           }} />
           <Text style={{ fontSize: 8, fontWeight: 'bold', color: T.colors.headerBg, marginBottom: 3 }}>Firma y sello — Cliente</Text>
           <Text style={{ fontSize: 7.5, color: T.colors.subtleText, marginBottom: 2 }}>Nombre: _________________________________</Text>
@@ -503,7 +516,9 @@ function SignatureBlock() {
   );
 }
 
-function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorProducto }) {
+function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorProducto, theme }) {
+  const T = theme || pdfTheme;
+  const styles = crearEstilos(T);
   const {
     nombreCliente,
     cliente,
@@ -517,7 +532,14 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
     seccionesPorProducto = [],
     tituloCotizacion,
     total,
+    incluirSecciones = {},
   } = cotizacion;
+
+  // Hay cotizaciones básicas que no llevan descripción, especificaciones ni
+  // términos. Se comparan contra `false` a propósito: una cotización guardada
+  // antes de que existiera esta opción no trae banderas y debe seguir saliendo
+  // completa.
+  const incluye = (valor) => valor !== false;
 
   const fecha = new Date().toLocaleDateString("es-CO");
   const vigencia = resolverVigencia(cotizacion);
@@ -571,7 +593,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
 
   return (
     <Document>
-      <Page size="A4" style={[styles.page, { fontFamily: PDF_FONT_FAMILY, paddingBottom: 38 }]} wrap>
+      <Page size="A4" style={[styles.page, { fontFamily: PDF_FONT_FAMILY, paddingBottom: T.page.footerSpace }]} wrap>
 
         {/* Footer fijo en todas las páginas con paginación real */}
         <View
@@ -598,7 +620,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
         </View>
 
         {/* Encabezado (solo aparece en página 1 por estar al inicio del flujo) */}
-        <PdfHeader tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} vigencia={vigencia} />
+        <PdfHeader T={T} styles={styles} tipoProducto={tiposProducto} numeroCotizacion={numeroCotizacion} fecha={fecha} vigencia={vigencia} />
         <ClienteBlock />
 
         {/* Secciones de productos — fluyen naturalmente */}
@@ -606,7 +628,9 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
           const imgOpt = imagenesOptimizadasPorProducto?.[idx] || {};
           const imagenPrincipal = imgOpt.principal || null;
           const imagenesExtras = imgOpt.extras || [];
-          const hasAnyImage = seccion.esNuevoTipo && (Boolean(imagenPrincipal) || imagenesExtras.length > 0);
+          const hasAnyImage = seccion.esNuevoTipo
+            && incluye(seccion.incluirImagenes)
+            && (Boolean(imagenPrincipal) || imagenesExtras.length > 0);
 
           return (
             <View key={idx}>
@@ -615,16 +639,18 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
                   {(seccion.tipo || 'PRODUCTO').toUpperCase()}
                 </Text>
               )}
-              {seccion.esNuevoTipo && seccion.descripcionHTML ? (
+              {seccion.esNuevoTipo && incluye(seccion.incluirDescripcion) && seccion.descripcionHTML ? (
                 <View wrap={false} style={styles.htmlContentCompact}>
-                  {parseHtmlToPDFComponents(seccion.descripcionHTML, { compact: true, dense: true, fontScale: 0.9 })}
+                  {parseHtmlToPDFComponents(seccion.descripcionHTML, { compact: true, dense: true, fontScale: T.layout.escalaDescripcion, theme: T })}
                 </View>
               ) : null}
-              {seccion.esNuevoTipo && seccion.especificacionesHTML ? (
-                <SeccionHTML titulo="Especificaciones Técnicas" contenido={seccion.especificacionesHTML} compact dense fontScale={0.9} noWrap />
+              {seccion.esNuevoTipo && incluye(seccion.incluirEspecificaciones) && seccion.especificacionesHTML ? (
+                <SeccionHTML T={T} styles={styles} titulo="Especificaciones Técnicas" contenido={seccion.especificacionesHTML} compact dense fontScale={T.layout.escalaEspecificaciones} noWrap />
               ) : null}
               {hasAnyImage && (
                 <ImageSection
+                  T={T}
+                  styles={styles}
                   titulo="Imágenes de Referencia"
                   imagenSeleccionada={imagenPrincipal}
                   imagenesMulti={imagenesExtras}
@@ -643,6 +669,7 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
             zebra: true,
             currencyOptions: { locale: 'es-CO', currency: 'COP', forceTwoDecimals: true },
             total,
+            theme: T,
             leftPanel: (
               <View style={{
                 backgroundColor: T.colors.calloutBg,
@@ -659,42 +686,124 @@ function PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorPro
           })}
         </View>
 
-        <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
-
         {/* Condiciones comerciales */}
-        <SeccionHTML
-          titulo="Condiciones Comerciales"
-          contenido={condicionesHTML}
-          compact
-          dense
-          fontScale={0.9}
-          noWrap
-        />
+        {incluye(incluirSecciones.condiciones) && condicionesHTML ? (
+          <>
+            <View style={{ height: 1, backgroundColor: T.colors.sectionDivider, marginVertical: T.spacing.sm }} />
+            <SeccionHTML
+              T={T}
+              styles={styles}
+              titulo="Condiciones Comerciales"
+              contenido={condicionesHTML}
+              compact
+              dense
+              fontScale={T.layout.escalaCondiciones}
+              noWrap
+            />
+          </>
+        ) : null}
 
-        {/* Términos y condiciones — siempre en página nueva */}
-        <View break style={{ flexDirection: 'row', marginBottom: 4 }}>
-          <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
-              DOCUMENTO LEGAL — LEER ANTES DE FIRMAR
-            </Text>
-          </View>
-        </View>
-        <SeccionHTML
-          titulo="Términos y Condiciones Generales"
-          contenido={terminosHTML}
-          compact
-          dense
-          fontScale={0.78}
-        />
+        {/* Términos y condiciones — siempre en página nueva.
+            El salto va con la sección: sin términos, forzarlo dejaría una
+            página en blanco con solo el bloque de firmas. */}
+        {incluye(incluirSecciones.terminos) && terminosHTML ? (
+          <>
+            <View break style={{ flexDirection: 'row', marginBottom: 4 }}>
+              <View style={{ backgroundColor: T.colors.accent, borderRadius: T.radius.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 7, color: '#FFFFFF', fontWeight: 'bold', letterSpacing: 0.8 }}>
+                  DOCUMENTO LEGAL — LEER ANTES DE FIRMAR
+                </Text>
+              </View>
+            </View>
+            <SeccionHTML
+              T={T}
+              styles={styles}
+              titulo="Términos y Condiciones Generales"
+              contenido={terminosHTML}
+              compact
+              dense
+              fontScale={T.layout.escalaTerminos}
+            />
+          </>
+        ) : null}
 
-        <SignatureBlock />
+        {incluye(incluirSecciones.firmas) && <SignatureBlock T={T} />}
 
       </Page>
     </Document>
   );
 }
 
-export async function generarPDFReact(cotizacion, estaEditando, { mode = 'download', onBlobReady } = {}) {
+// Resuelve y comprime las imágenes de cada producto. Sin efectos en Firestore,
+// para que la vista previa pueda reutilizarla en cada re-render (las imágenes ya
+// vienen cacheadas desde compressImageToDataURL).
+export async function prepararImagenesCotizacion(cotizacion) {
+  // Nuevo formato: cotizacion.imagenesSeleccionadasPorProducto = [{principal, adicionales}]
+  // Backward compat: si no existe, usar imagenSeleccionada + imagenesSeleccionadas del primer producto
+  let seleccionesPorProd = cotizacion.imagenesSeleccionadasPorProducto;
+  if (!Array.isArray(seleccionesPorProd) || seleccionesPorProd.length === 0) {
+    const nombreImagen = cotizacion.imagenSeleccionada || cotizacion.productos?.[0]?.imagen || '';
+    const adicionales = Array.isArray(cotizacion.imagenesSeleccionadas) ? cotizacion.imagenesSeleccionadas : [];
+    seleccionesPorProd = [{ principal: nombreImagen || null, adicionales }];
+  }
+
+  const opts = { maxWidth: 1000, maxHeight: 760, quality: 0.55, mimeType: 'image/jpeg' };
+  try {
+    await yieldToMainThread();
+    return await Promise.all(
+      seleccionesPorProd.map(async ({ principal, adicionales = [] }) => {
+        const principalSrc = resolverImagenCotizacion(principal);
+        const adicionalesSrc = adicionales.slice(0, 2).map(resolverImagenCotizacion).filter(Boolean);
+        const [principalComp, ...extrasComp] = await Promise.all([
+          principalSrc ? compressImageToDataURL(principalSrc, opts) : Promise.resolve(null),
+          ...adicionalesSrc.map(src => compressImageToDataURL(src, opts)),
+        ]);
+        return { principal: principalComp, extras: extrasComp };
+      })
+    );
+  } catch (e) {
+    console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
+    return [];
+  }
+}
+
+// Arma el documento react-pdf listo para renderizar. No reserva consecutivo ni
+// escribe en Firestore: es lo que permite que la vista previa muestre el PDF
+// real sin quemar un número de cotización en cada tecleo.
+//
+// `theme` (opcional) permite aplicar los ajustes de maquetación del usuario;
+// tanto el preview como la descarga pasan el mismo objeto, así lo que se ve es
+// exactamente lo que se descarga.
+export async function construirDocumentoCotizacion(cotizacion, numeroCotizacion, { theme, imagenesOptimizadasPorProducto } = {}) {
+  // Las fuentes deben estar registradas ANTES del primer render: si no, la
+  // primera pasada sale en Helvetica y el texto se recoloca cuando entra Inter.
+  await ensureFontsRegistered();
+  const imagenes = imagenesOptimizadasPorProducto || await prepararImagenesCotizacion(cotizacion);
+  return PDFCotizacion({
+    cotizacion,
+    numeroCotizacion,
+    imagenesOptimizadasPorProducto: imagenes,
+    theme: theme || pdfTheme,
+  });
+}
+
+// Nombre de archivo de la cotización: CT#123_Producto_Empresa_dd-mm-yyyy.pdf
+export function nombreArchivoCotizacion(cotizacion, numeroCotizacion) {
+  const ahora = new Date();
+  const dd = String(ahora.getDate()).padStart(2,'0');
+  const mm = String(ahora.getMonth()+1).padStart(2,'0');
+  const yyyy = String(ahora.getFullYear());
+  const fechaCompacta = `${dd}-${mm}-${yyyy}`;
+  const productos = cotizacion.productos || [];
+  const prodNorm = productos.length > 1
+    ? productos.slice(0, 3).map(p => normalizarTitulo(p.tipo || 'Producto')).join('_')
+    : normalizarTitulo(productos[0]?.tipo || 'Producto');
+  const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
+  const empresaNorm = normalizarTitulo(empresaBase);
+  return `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
+}
+
+export async function generarPDFReact(cotizacion, estaEditando, { mode = 'download', onBlobReady, theme } = {}) {
   let numeroCotizacion = cotizacion.numero;
 
   if (!estaEditando || !cotizacion.id) {
@@ -709,54 +818,13 @@ export async function generarPDFReact(cotizacion, estaEditando, { mode = 'downlo
     }
   }
 
-  // Construir lista de imágenes por producto
-  // Nuevo formato: cotizacion.imagenesSeleccionadasPorProducto = [{principal, adicionales}]
-  // Backward compat: si no existe, usar imagenSeleccionada + imagenesSeleccionadas del primer producto
-  let seleccionesPorProd = cotizacion.imagenesSeleccionadasPorProducto;
-  if (!Array.isArray(seleccionesPorProd) || seleccionesPorProd.length === 0) {
-    const nombreImagen = cotizacion.imagenSeleccionada || cotizacion.productos?.[0]?.imagen || '';
-    const adicionales = Array.isArray(cotizacion.imagenesSeleccionadas) ? cotizacion.imagenesSeleccionadas : [];
-    seleccionesPorProd = [{ principal: nombreImagen || null, adicionales }];
-  }
-
-  const opts = { maxWidth: 1000, maxHeight: 760, quality: 0.55, mimeType: 'image/jpeg' };
-  let imagenesOptimizadasPorProducto = [];
-  try {
-    await yieldToMainThread();
-    imagenesOptimizadasPorProducto = await Promise.all(
-      seleccionesPorProd.map(async ({ principal, adicionales = [] }) => {
-        const principalSrc = principal ? (imagenesPorProducto[principal] || null) : null;
-        const adicionalesSrc = adicionales.slice(0, 2).map(k => imagenesPorProducto[k]).filter(Boolean);
-        const [principalComp, ...extrasComp] = await Promise.all([
-          principalSrc ? compressImageToDataURL(principalSrc, opts) : Promise.resolve(null),
-          ...adicionalesSrc.map(src => compressImageToDataURL(src, opts)),
-        ]);
-        return { principal: principalComp, extras: extrasComp };
-      })
-    );
-  } catch (e) {
-    console.warn('[PDF] Falló compresión de imágenes, se usarán originales.', e);
-  }
-
-  await ensureFontsRegistered();
-  const doc = PDFCotizacion({ cotizacion, numeroCotizacion, imagenesOptimizadasPorProducto });
+  const doc = await construirDocumentoCotizacion(cotizacion, numeroCotizacion, { theme });
   const asPdf = pdf();
   asPdf.updateContainer(doc);
   await yieldToMainThread();
   const blob = await asPdf.toBlob();
 
-  const ahora = new Date();
-  const dd = String(ahora.getDate()).padStart(2,'0');
-  const mm = String(ahora.getMonth()+1).padStart(2,'0');
-  const yyyy = String(ahora.getFullYear());
-  const fechaCompacta = `${dd}-${mm}-${yyyy}`;
-  const productos = cotizacion.productos || [];
-  const prodNorm = productos.length > 1
-    ? productos.slice(0, 3).map(p => normalizarTitulo(p.tipo || 'Producto')).join('_')
-    : normalizarTitulo(productos[0]?.tipo || 'Producto');
-  const empresaBase = cotizacion.nombreCliente || cotizacion.cliente || 'Empresa';
-  const empresaNorm = normalizarTitulo(empresaBase);
-  const nombreArchivo = `CT#${numeroCotizacion}_${prodNorm}_${empresaNorm}_${fechaCompacta}.pdf`;
+  const nombreArchivo = nombreArchivoCotizacion(cotizacion, numeroCotizacion);
 
   if (onBlobReady) onBlobReady({ blob, nombreArchivo });
   await entregarPDFBlob(blob, nombreArchivo, mode);

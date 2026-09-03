@@ -5,7 +5,7 @@ import AppHeader from "./AppHeader.jsx";
 import AppSidebar from "./AppSidebar.jsx";
 import { gruposVisibles, seccionDe, seccionesVisibles } from "./navSections.js";
 
-const TODO = { canProduccion: true, canInventario: true, isAdminUser: true };
+const TODO = { canProduccion: true, canInventario: true, canContabilidad: true, isAdminUser: true };
 
 const HEADER = {
   permisos: TODO,
@@ -40,7 +40,7 @@ describe("menú lateral", () => {
     const porTitulo = Object.fromEntries(grupos.map((g) => [g.titulo, g.secciones.map((s) => s.to)]));
     expect(porTitulo[null]).toEqual(["/dashboard"]);
     expect(porTitulo["Cotizaciones"]).toEqual(["/cotizar", "/productos", "/historial", "/empresas"]);
-    expect(porTitulo["Operación"]).toEqual(["/produccion", "/inventario"]);
+    expect(porTitulo["Operación"]).toEqual(["/produccion", "/inventario", "/contabilidad"]);
     expect(porTitulo["Administración"]).toEqual(["/usuarios"]);
   });
 
@@ -64,13 +64,14 @@ describe("menú lateral", () => {
   });
 
   it("oculta las secciones sin permiso y descarta el grupo que queda vacío", () => {
-    const solos = { canProduccion: false, canInventario: false, isAdminUser: false };
+    const solos = { canProduccion: false, canInventario: false, canContabilidad: false, isAdminUser: false };
     const grupos = gruposVisibles(solos);
     expect(grupos.map((g) => g.titulo)).not.toContain("Administración");
     expect(grupos.map((g) => g.titulo)).not.toContain("Operación");
     const html = lateral("/cotizar", { permisos: solos });
     expect(html).not.toContain('href="/usuarios"');
     expect(html).not.toContain('href="/produccion"');
+    expect(html).not.toContain('href="/contabilidad"');
     expect(html).toContain('href="/historial"');
   });
 
@@ -83,7 +84,7 @@ describe("menú lateral", () => {
 
   it("da a cada sección un ícono y una descripción", () => {
     const todas = seccionesVisibles(TODO);
-    expect(todas).toHaveLength(8);
+    expect(todas).toHaveLength(9);
     todas.forEach((s) => {
       expect(s.icon, `${s.label} sin ícono`).toBeTruthy();
       expect(s.desc, `${s.label} sin descripción`).toBeTruthy();

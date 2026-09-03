@@ -4,6 +4,9 @@ import { FaThLarge, FaTable } from "react-icons/fa";
 import { listarTodasFichasProduccion, eliminarFichaProduccion } from "../../utils/firebaseFichas";
 import { getImpresionComponent } from "../fichas/impresionPorTipo";
 import useEstadoFicha from "../fichas/useEstadoFicha";
+import useSeleccionFichas from "../fichas/useSeleccionFichas";
+import BarraLoteFichas from "../fichas/BarraLoteFichas";
+import { aplicarResultadosLote } from "../fichas/loteFichas";
 import EmptyState from "../ui/EmptyState";
 import { useQuote } from "../../context/QuoteContext";
 import OrdenesFiltros from "./OrdenesFiltros";
@@ -28,6 +31,10 @@ import {
 // El filtrado es en memoria a propósito: las 6 colecciones ya se traen enteras
 // (tope de 200 por línea, ver listarTodasFichasProduccion) y cruzarlas en
 // Firestore exigiría un índice por cada combinación de filtros.
+//
+// Las casillas de cada orden son para cerrar un pedido completo de una vez: un
+// mismo cliente suele tener la puerta, el sello y el abrigo en órdenes
+// distintas, y se alistan y despachan juntos (ver BarraLoteFichas).
 
 const VISTAS = [
   { key: "tablero", label: "Tablero", icon: FaThLarge },
@@ -81,6 +88,8 @@ export default function OrdenesProduccionList({ onNuevaFicha, onEditarFicha }) {
     [indexadas, filtros, hoy]
   );
 
+  const seleccion = useSeleccionFichas(visibles, { modoInicial: true });
+
   const detalle = React.useMemo(
     () => fichas.find((f) => f.id === detalleId) || null,
     [fichas, detalleId]
@@ -117,6 +126,9 @@ export default function OrdenesProduccionList({ onNuevaFicha, onEditarFicha }) {
     onAbrir: (f) => setDetalleId(f.id),
     onCambiarEstado: cambiarEstado,
     onVerFicha: setPrintFicha,
+    estaSeleccionada: seleccion.estaSeleccionada,
+    onSeleccionar: seleccion.alternar,
+    onSeleccionarTodas: (todas) => (todas ? seleccion.todas() : seleccion.limpiar()),
   };
 
   return (
@@ -177,6 +189,12 @@ export default function OrdenesProduccionList({ onNuevaFicha, onEditarFicha }) {
       ) : (
         <VistaActual ordenes={visibles} {...accionesLista} />
       )}
+
+      <BarraLoteFichas
+        fichas={seleccion.seleccionadas}
+        onAplicar={(resultados) => setFichas((prev) => aplicarResultadosLote(prev, resultados))}
+        onLimpiar={seleccion.limpiar}
+      />
 
       <OrdenDetallePanel
         ficha={detalle}

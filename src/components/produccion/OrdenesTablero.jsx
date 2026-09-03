@@ -9,7 +9,7 @@ import { ESTADOS_FICHA, ESTADO_LABEL, ESTADO_DOT } from "../fichas/estadoFicha";
 //
 // Las columnas se dibujan siempre, incluso vacías: una columna que desaparece
 // esconde que no hay nada en ese estado, que es justo lo que hay que ver.
-export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado, onVerFicha }) {
+export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado, onVerFicha, estaSeleccionada, onSeleccionar }) {
   const grupos = React.useMemo(() => agruparPorEstado(ordenes), [ordenes]);
 
   return (
@@ -45,6 +45,8 @@ export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado,
                     onAbrir={onAbrir}
                     onCambiarEstado={onCambiarEstado}
                     onVerFicha={onVerFicha}
+                    seleccionada={estaSeleccionada?.(f)}
+                    onSeleccionar={onSeleccionar}
                   />
                 ))
               )}

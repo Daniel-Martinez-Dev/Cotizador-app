@@ -46,9 +46,9 @@ export function comprimirImagen(file, { maxLado = LADO_MAXIMO, calidad = CALIDAD
   });
 }
 
-// Sube las fotos y devuelve lo que se guarda en la ficha: la URL para mostrarla
-// y el identificador del archivo en Cloudinary.
-export async function subirFotosFicha(coleccion, fichaId, carpeta, archivos, onProgreso) {
+// Sube las fotos a una ruta de Cloudinary y devuelve lo que se guarda en la
+// ficha: la URL para mostrarla y el identificador del archivo.
+async function subirFotos(ruta, archivos, onProgreso) {
   const lista = Array.from(archivos || []);
   if (lista.length === 0) return [];
 
@@ -60,10 +60,23 @@ export async function subirFotosFicha(coleccion, fichaId, carpeta, archivos, onP
       throw new Error(`La foto "${archivo.name}" es demasiado grande`);
     }
     const { url, publicId } = await subirImagenCloudinary(comprimida, {
-      carpeta: `fichas/${coleccion}/${fichaId}/${carpeta}`,
+      carpeta: ruta,
       nombre: `${Date.now()}-${i}.jpg`,
     });
     subidas.push({ url, publicId, nombre: archivo.name });
   }
   return subidas;
+}
+
+export async function subirFotosFicha(coleccion, fichaId, carpeta, archivos, onProgreso) {
+  return subirFotos(`fichas/${coleccion}/${fichaId}/${carpeta}`, archivos, onProgreso);
+}
+
+// Fotos de un lote de fichas (un pedido que se firma o se entrega de una vez).
+// Se suben UNA sola vez y la misma URL queda guardada en todas las fichas del
+// lote: son literalmente la misma foto, y repetir la subida por ficha
+// multiplicaría el tiempo y los datos móviles de planta sin cambiar nada de lo
+// que se ve después. Por eso no cuelgan de una ficha concreta.
+export async function subirFotosLote(carpeta, archivos, onProgreso) {
+  return subirFotos(`fichas/lotes/${carpeta}/${Date.now()}`, archivos, onProgreso);
 }

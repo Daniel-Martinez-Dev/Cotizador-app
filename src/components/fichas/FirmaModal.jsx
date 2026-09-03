@@ -1,24 +1,38 @@
 import React from "react";
 import toast from "react-hot-toast";
-import { FaTimes, FaCheckCircle, FaLock } from "react-icons/fa";
+import { FaTimes, FaCheckCircle, FaLock, FaLayerGroup } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { getFichaTipoConfig, registrarFirmaAlistado } from "../../utils/firebaseFichas";
-import { subirFotosFicha } from "../../utils/fotosFicha";
+import { subirFotosFicha, subirFotosLote } from "../../utils/fotosFicha";
 import { ETAPAS_FIRMA, ROL_CORRIGE_FIRMAS, firmaDeEtapa, hoyISO } from "../../utils/firmasFicha";
+import { claveFicha } from "./loteFichas";
 import PersonasFirmaPicker from "./PersonasFirmaPicker";
 import FotosFichaPicker from "./FotosFichaPicker";
+import ListaFichasLote from "./ListaFichasLote";
 
 // Paso obligatorio para pasar una ficha a "Terminada": quién alistó y empacó
 // el pedido, con qué fecha, y las fotos de respaldo. Los nombres salen
 // impresos en el pie de la ficha (ver FichaVisualKit → Firmas), así que esto
 // no es un registro interno: es la firma del formato.
+//
+// Recibe SIEMPRE una lista de fichas. Con una sola es el formulario de toda la
+// vida; con varias es el mismo formulario diligenciado una vez y aplicado a
+// todas: un pedido son varias órdenes que se alistan juntas y se firman con la
+// misma gente y la misma fecha (ver loteFichas.js). Las fotos se suben una vez
+// y su URL queda en todas.
 
 const inputCls = "mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-900 text-sm";
 const labelCls = "text-xs font-medium text-gray-600 dark:text-gray-300";
 
-export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onDone }) {
+export default function FirmaModal({ tipo, fichas, notaInicial = "", onClose, onDone }) {
   const { user, profile, roles, hasRole } = useAuth();
-  const previa = firmaDeEtapa(ficha, "alistado");
+  const lista = React.useMemo(() => (Array.isArray(fichas) ? fichas : [fichas]).filter(Boolean), [fichas]);
+  const esLote = lista.length > 1;
+  // Con una sola ficha se puede partir de lo ya firmado (es también el camino
+  // de corrección); en lote no, porque cada ficha tiene su propia evidencia.
+  const unica = esLote ? null : lista[0];
+  const previa = unica ? firmaDeEtapa(unica, "alistado") : null;
+  const corrigiendo = !!unica && unica.estado === "entregado";
   // Quitar una foto ya guardada es corregir evidencia: producción/admin.
   const puedeCorregir = hasRole(ROL_CORRIGE_FIRMAS);
 
@@ -41,6 +55,7 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
   const [existentes, setExistentes] = React.useState(previa?.fotos || []);
   const [guardando, setGuardando] = React.useState(false);
   const [progreso, setProgreso] = React.useState(null);
+  const [firmando, setFirmando] = React.useState(null);
 
   // Quitar una foto la saca de la ficha al guardar; el archivo se queda en
   // Cloudinary, que no permite borrar sin firma (ver cloudinary.js). Para la
@@ -52,33 +67,84 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
   const confirmar = async () => {
     if (personas.length === 0) return toast.error("Indica quién alistó y empacó el pedido");
     if (!fecha) return toast.error("Indica la fecha");
+    if (lista.length === 0) return;
     setGuardando(true);
     try {
-      const { col } = getFichaTipoConfig(tipo);
-      const subidas = await subirFotosFicha(col, ficha.id, ETAPAS_FIRMA.alistado.carpeta, archivos, setProgreso);
+      // Una sola subida para todo el lote: son la misma foto en todas las
+      // órdenes y planta trabaja con datos móviles.
+      const subidas = esLote
+        ? await subirFotosLote(ETAPAS_FIRMA.alistado.carpeta, archivos, setProgreso)
+        : await subirFotosFicha(
+            getFichaTipoConfig(tipo || unica.tipo).col,
+            unica.id,
+            ETAPAS_FIRMA.alistado.carpeta,
+            archivos,
+            setProgreso
+          );
       setProgreso(null);
-      const resultado = await registrarFirmaAlistado(tipo, ficha.id, {
-        personas,
-        fecha,
-        fotos: [...existentes, ...subidas],
-        nota,
-        estadoAnterior: ficha.estado,
-        // Corregir la firma de una ficha ya entregada no la devuelve a
-        // "terminada": solo reemplaza el bloque de firma.
-        marcarTerminada: ficha.estado !== "entregado",
-        autorNombre: yo,
-        autorUid: user?.uid || "",
-      });
-      toast.success(ficha.estado === "entregado" ? "Firma actualizada" : "Ficha marcada como terminada");
-      onDone?.(resultado);
+
+      const fotos = esLote ? subidas : [...existentes, ...subidas];
+      const resultados = [];
+      const fallidas = [];
+
+      // De a una y en serie: son documentos de colecciones distintas, no cabe
+      // un batch, y así se sabe exactamente cuál falló si se cae la red.
+      for (const [i, f] of lista.entries()) {
+        setFirmando({ actual: i + 1, total: lista.length });
+        try {
+          // Corregir la firma de una ficha ya entregada no la devuelve a
+          // "terminada": solo reemplaza el bloque de firma.
+          const marcarTerminada = f.estado !== "entregado";
+          const { firma, nota: entrada } = await registrarFirmaAlistado(tipo || f.tipo, f.id, {
+            personas,
+            fecha,
+            fotos,
+            nota,
+            estadoAnterior: f.estado,
+            marcarTerminada,
+            autorNombre: yo,
+            autorUid: user?.uid || "",
+          });
+          resultados.push({
+            clave: claveFicha(f),
+            id: f.id,
+            nota: entrada,
+            parche: {
+              ...(marcarTerminada ? { estado: "terminado" } : null),
+              firmas: { ...(f.firmas || {}), alistado: firma },
+            },
+          });
+        } catch (e) {
+          console.error(e);
+          fallidas.push(f);
+        }
+      }
+
+      if (fallidas.length > 0) {
+        toast.error(`No se pudo firmar ${fallidas.length} de ${lista.length} órdenes`);
+      }
+      if (resultados.length === 0) return; // el formulario queda abierto para reintentar
+      if (fallidas.length === 0) {
+        toast.success(
+          corrigiendo ? "Firma actualizada"
+            : esLote ? `${resultados.length} órdenes marcadas como terminadas`
+              : "Ficha marcada como terminada"
+        );
+      }
+      onDone?.(resultados);
     } catch (e) {
       console.error(e);
       toast.error(e?.message || "No se pudo firmar el alistado");
     } finally {
       setGuardando(false);
       setProgreso(null);
+      setFirmando(null);
     }
   };
+
+  const titulo = corrigiendo
+    ? "Corregir firma de alistado"
+    : esLote ? `Marcar ${lista.length} órdenes como terminadas` : "Marcar como terminada";
 
   return (
     <div className="fixed inset-0 z-[1000]">
@@ -89,8 +155,10 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
           <div className="p-4 border-b border-gray-200 dark:border-gris-700 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold inline-flex items-center gap-2">
-                <FaCheckCircle className="text-green-600 dark:text-green-400" />
-                {ficha.estado === "entregado" ? "Corregir firma de alistado" : "Marcar como terminada"}
+                {esLote
+                  ? <FaLayerGroup className="text-green-600 dark:text-green-400" />
+                  : <FaCheckCircle className="text-green-600 dark:text-green-400" />}
+                {titulo}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {ETAPAS_FIRMA.alistado.titulo}
@@ -103,6 +171,13 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
           </div>
 
           <div className="p-4 overflow-y-auto flex-1 space-y-4">
+            {esLote && (
+              <div>
+                <div className={`${labelCls} mb-1.5`}>Se firman estas órdenes</div>
+                <ListaFichasLote fichas={lista} />
+              </div>
+            )}
+
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className={labelCls}>¿Quién alistó y empacó? *</span>
@@ -118,11 +193,13 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
             </div>
 
             <FotosFichaPicker
-              existentes={existentes}
+              existentes={esLote ? [] : existentes}
               onArchivos={setArchivos}
-              onQuitarExistente={puedeCorregir ? quitarExistente : null}
+              onQuitarExistente={!esLote && puedeCorregir ? quitarExistente : null}
               disabled={guardando}
-              ayuda="Se reducen antes de subirlas. Quedan como respaldo del alistado; en la ficha impresa salen los nombres, no las fotos."
+              ayuda={esLote
+                ? "Se suben una vez y quedan en las órdenes del lote. En la ficha impresa salen los nombres, no las fotos."
+                : "Se reducen antes de subirlas. Quedan como respaldo del alistado; en la ficha impresa salen los nombres, no las fotos."}
             />
 
             <div>
@@ -148,8 +225,10 @@ export default function FirmaModal({ tipo, ficha, notaInicial = "", onClose, onD
               className="flex-1 py-2.5 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-semibold">
               {progreso
                 ? `Subiendo ${progreso.actual}/${progreso.total}…`
-                : guardando ? "Guardando…"
-                : ficha.estado === "entregado" ? "Guardar firma" : "Firmar y terminar"}
+                : firmando && esLote ? `Firmando ${firmando.actual}/${firmando.total}…`
+                  : guardando ? "Guardando…"
+                    : corrigiendo ? "Guardar firma"
+                      : esLote ? `Firmar y terminar (${lista.length})` : "Firmar y terminar"}
             </button>
           </div>
         </div>

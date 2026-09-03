@@ -3,10 +3,13 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   FaSearch, FaSyncAlt, FaChevronRight, FaTimes, FaRulerCombined,
-  FaLayerGroup, FaCalendarAlt, FaExclamationCircle,
+  FaLayerGroup, FaCalendarAlt, FaExclamationCircle, FaCheck, FaCheckDouble,
 } from "react-icons/fa";
 import { listarTodasFichasProduccion, FICHA_TIPOS } from "../../utils/firebaseFichas";
 import EstadoBadge from "../../components/fichas/EstadoBadge";
+import BarraLoteFichas from "../../components/fichas/BarraLoteFichas";
+import useSeleccionFichas from "../../components/fichas/useSeleccionFichas";
+import { aplicarResultadosLote } from "../../components/fichas/loteFichas";
 import EmptyState from "../../components/ui/EmptyState";
 import { codigoFicha as codigoDeFicha, codigoFichaOFallback } from "../../utils/codigoFicha";
 import { medidasFichaTexto, coincideMedida } from "../../utils/medidasFicha";
@@ -115,6 +118,11 @@ export default function EmpleadoProduccionList() {
 
   const hayFiltros = search.trim() || estadoFiltro !== "en_produccion" || tipoFiltro !== "todos";
 
+  // Un pedido son varias órdenes que se alistan y se despachan juntas. En modo
+  // selección la tarjeta deja de abrir el detalle y solo marca, para poder
+  // firmarlas todas con un formulario (ver BarraLoteFichas).
+  const seleccion = useSeleccionFichas(filtradas);
+
   return (
     <div className="pt-4 pb-4">
       <div className="flex items-center justify-between gap-2">
@@ -124,15 +132,30 @@ export default function EmpleadoProduccionList() {
             {loading ? "Cargando…" : `${porEstado.en_produccion || 0} en producción · ${fichas.length} órdenes`}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          aria-label="Actualizar producción"
-          className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200 disabled:opacity-50"
-        >
-          <FaSyncAlt className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => seleccion.setModo(!seleccion.modo)}
+            aria-pressed={seleccion.modo}
+            className={`h-10 px-3 inline-flex items-center gap-1.5 rounded-lg border text-xs font-semibold ${
+              seleccion.modo
+                ? "border-green-600 bg-green-600 text-white"
+                : "border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200"
+            }`}
+          >
+            <FaCheckDouble className="text-xs" />
+            {seleccion.modo ? "Listo" : "Varias"}
+          </button>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            aria-label="Actualizar producción"
+            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-gray-700 dark:text-gray-200 disabled:opacity-50"
+          >
+            <FaSyncAlt className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </div>
 
       {/* Buscador y filtros fijos bajo el header, como en materia prima. */}
@@ -234,12 +257,26 @@ export default function EmpleadoProduccionList() {
             const medida = medidasFichaTexto(f);
             const urgencia = urgenciaEntrega(f);
             const cantidad = Number(f.cantidad || 0);
-            return (
-              <Link
-                key={`${f.tipo}-${f.id}`}
-                to={`/planta/produccion/${f.tipo}/${f.id}`}
-                className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 px-3 py-3 active:scale-[0.99] transition"
-              >
+            const marcada = seleccion.estaSeleccionada(f);
+            const tarjetaCls = `flex items-center gap-3 w-full text-left rounded-xl border px-3 py-3 active:scale-[0.99] transition ${
+              marcada
+                ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                : "border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800"
+            }`;
+            const contenido = (
+              <>
+                {seleccion.modo && (
+                  <span
+                    aria-hidden="true"
+                    className={`h-6 w-6 shrink-0 rounded-md border flex items-center justify-center ${
+                      marcada
+                        ? "bg-green-600 border-green-600 text-white"
+                        : "border-gray-300 dark:border-gris-600"
+                    }`}
+                  >
+                    {marcada && <FaCheck className="text-[11px]" />}
+                  </span>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{f.tipoLabel}</span>
@@ -282,13 +319,41 @@ export default function EmpleadoProduccionList() {
 
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <EstadoBadge estado={f.estado} />
-                  <FaChevronRight className="text-gray-400 text-xs" />
+                  {!seleccion.modo && <FaChevronRight className="text-gray-400 text-xs" />}
                 </div>
+              </>
+            );
+
+            return seleccion.modo ? (
+              <button
+                key={`${f.tipo}-${f.id}`}
+                type="button"
+                onClick={() => seleccion.alternar(f)}
+                aria-pressed={marcada}
+                className={tarjetaCls}
+              >
+                {contenido}
+              </button>
+            ) : (
+              <Link
+                key={`${f.tipo}-${f.id}`}
+                to={`/planta/produccion/${f.tipo}/${f.id}`}
+                className={tarjetaCls}
+              >
+                {contenido}
               </Link>
             );
           })}
         </div>
       )}
+
+      {/* Por encima del tab bar de planta, que es fijo y mide 56 px. */}
+      <BarraLoteFichas
+        fichas={seleccion.seleccionadas}
+        anclaje="bottom-[60px]"
+        onAplicar={(resultados) => setFichas((prev) => aplicarResultadosLote(prev, resultados))}
+        onLimpiar={seleccion.limpiar}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ export const ROL_PRODUCCION = "produccion";
 export const ROL_INVENTARIO = "inventario";
 export const ROL_EMPLEADO = "empleado";
 export const ROL_ALMACENISTA = "almacenista";
+export const ROL_CONTABILIDAD = "contabilidad";
 
 export const ROLES = [
   ROL_ADMIN,
@@ -17,6 +18,7 @@ export const ROLES = [
   ROL_INVENTARIO,
   ROL_EMPLEADO,
   ROL_ALMACENISTA,
+  ROL_CONTABILIDAD,
 ];
 
 export const ROL_LABEL = {
@@ -26,6 +28,7 @@ export const ROL_LABEL = {
   [ROL_INVENTARIO]: "Inventario",
   [ROL_EMPLEADO]: "Empleado (planta)",
   [ROL_ALMACENISTA]: "Almacenista",
+  [ROL_CONTABILIDAD]: "Contabilidad",
 };
 
 export const ROL_DESCRIPCION = {
@@ -35,6 +38,7 @@ export const ROL_DESCRIPCION = {
   [ROL_INVENTARIO]: "Administra el inventario desde el escritorio, con costos.",
   [ROL_EMPLEADO]: "Planta: ve las fichas, las firma y las cierra.",
   [ROL_ALMACENISTA]: "Almacén: única llave para entradas y salidas de materia prima.",
+  [ROL_CONTABILIDAD]: "Factura, registra los pagos y controla la cartera.",
 };
 
 // Roles cuya casa es la tablet o el celular de planta, no el escritorio: quien

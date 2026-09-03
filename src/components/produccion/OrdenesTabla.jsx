@@ -14,12 +14,26 @@ const TONO_ALERTA = {
   proxima: "text-amber-600 dark:text-amber-400 font-medium",
 };
 
-export default function OrdenesTabla({ ordenes, hoy, onAbrir, onCambiarEstado, onVerFicha }) {
+export default function OrdenesTabla({ ordenes, hoy, onAbrir, onCambiarEstado, onVerFicha, estaSeleccionada, onSeleccionar, onSeleccionarTodas }) {
+  const seleccionables = onSeleccionar ? ordenes : [];
+  const todasMarcadas = seleccionables.length > 0 && seleccionables.every((f) => estaSeleccionada?.(f));
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-gray-200 dark:border-gris-700 text-gray-500">
+            {onSeleccionar && (
+              <th className="py-2 pr-2 w-8">
+                <input
+                  type="checkbox"
+                  checked={todasMarcadas}
+                  onChange={() => onSeleccionarTodas?.(!todasMarcadas)}
+                  aria-label="Seleccionar todas las órdenes de la lista"
+                  className="h-4 w-4 accent-green-600 cursor-pointer"
+                />
+              </th>
+            )}
             <th className="text-left py-2 font-medium whitespace-nowrap">N.° ficha</th>
             <th className="text-left py-2 font-medium">Producto</th>
             <th className="text-left py-2 font-medium">Cliente</th>
@@ -37,12 +51,28 @@ export default function OrdenesTabla({ ordenes, hoy, onAbrir, onCambiarEstado, o
             const Icon = producto?.icon;
             const alerta = alertaEntrega(f, hoy);
             const AlertaIcon = alerta === "vencida" ? FaExclamationTriangle : FaRegClock;
+            const marcada = !!estaSeleccionada?.(f);
             return (
               <tr
                 key={`${f.tipo}-${f.id}`}
                 onClick={() => onAbrir(f)}
-                className="border-b border-gray-100 dark:border-gris-700/50 hover:bg-gray-50 dark:hover:bg-gris-700/40 transition-colors cursor-pointer"
+                className={`border-b border-gray-100 dark:border-gris-700/50 transition-colors cursor-pointer ${
+                  marcada
+                    ? "bg-green-50 dark:bg-green-900/20"
+                    : "hover:bg-gray-50 dark:hover:bg-gris-700/40"
+                }`}
               >
+                {onSeleccionar && (
+                  <td className="py-2 pr-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={marcada}
+                      onChange={() => onSeleccionar(f)}
+                      aria-label={`Seleccionar orden de ${f.cliente || "este cliente"}`}
+                      className="h-4 w-4 accent-green-600 cursor-pointer"
+                    />
+                  </td>
+                )}
                 <td className="py-2 font-mono text-gray-500 whitespace-nowrap">{codigoFichaOFallback(f, f.tipo)}</td>
                 <td className="py-2 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5">

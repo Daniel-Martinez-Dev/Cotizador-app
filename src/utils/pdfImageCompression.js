@@ -72,12 +72,28 @@ export function computeTargetSize(origW, origH, maxW, maxH) {
   return { width: Math.round(origW * ratio), height: Math.round(origH * ratio) };
 }
 
+// Las imágenes propias que sube el usuario viven en Cloudinary, o sea en otro
+// origen. Sin `crossOrigin` el navegador las pinta pero deja el canvas
+// "tainted", y entonces toBlob/toDataURL lanzan SecurityError: la compresión
+// fallaría y la imagen se colaría al PDF sin comprimir. Cloudinary responde con
+// Access-Control-Allow-Origin, así que pedirlo funciona.
+//
+// Solo se pide para URLs http(s) de otro origen: en las locales y en los
+// data: URI no hace falta, y exigirlo a un servidor que no manda cabeceras CORS
+// haría fallar la carga entera en vez de solo la compresión.
+function esOtroOrigen(src) {
+  if (typeof src !== 'string' || !/^https?:\/\//i.test(src)) return false;
+  try {
+    return new URL(src, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    // For local assets served by the app, crossOrigin isn't usually required.
-    // If you ever serve from another origin, uncomment next line:
-    // img.crossOrigin = 'anonymous';
+    if (esOtroOrigen(src)) img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = (e) => reject(e);
     img.src = src;

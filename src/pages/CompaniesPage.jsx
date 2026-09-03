@@ -195,10 +195,20 @@ export default function CompaniesPage(){
   async function eliminarEmpresaAccion(emp){
     let aviso = `¿Eliminar "${emp.nombre}" y sus contactos?`;
     try {
-      const { fichas, cotizaciones } = await contarRelacionesEmpresa(emp.id);
-      if(fichas || cotizaciones){
-        aviso += `\n\nQuedarían sin cliente ${fichas} ficha(s) y ${cotizaciones} cotización(es).` +
+      const c = await contarRelacionesEmpresa(emp.id);
+      if(c.total){
+        const partes = [
+          c.fichas && `${c.fichas} ficha(s)`,
+          c.cotizaciones && `${c.cotizaciones} cotización(es)`,
+          c.facturas && `${c.facturas} factura(s)`,
+          c.abonos && `${c.abonos} abono(s)`,
+          c.saldos && `${c.saldos} saldo(s) inicial(es)`,
+        ].filter(Boolean).join(', ');
+        aviso += `\n\nQuedarían sin cliente ${partes}.` +
                  '\nSi es un duplicado, usa "Revisar duplicados" para fusionarlo en lugar de borrarlo.';
+      }
+      if(c.incompleto){
+        aviso += '\n\nNo se pudo revisar la sección contable (falta permiso), así que puede haber facturas colgando de este cliente.';
       }
     } catch(e){ console.error(e); }
     const ok = await confirm(aviso);
@@ -315,19 +325,26 @@ export default function CompaniesPage(){
     try {
       setProgreso({ hechos: 0, total: planes.length, fase: 'contando' });
       const conteos = await Promise.all(planes.flatMap(p=> p.otras.map(e=> contarRelacionesEmpresa(e.id))));
-      const fichas = conteos.reduce((n,c)=> n+c.fichas, 0);
-      const cotizaciones = conteos.reduce((n,c)=> n+c.cotizaciones, 0);
+      const suma = (clave)=> conteos.reduce((n,c)=> n + (c[clave] || 0), 0);
+      const reasignado = [
+        suma('fichas') && `${suma('fichas')} ficha(s)`,
+        suma('cotizaciones') && `${suma('cotizaciones')} cotización(es)`,
+        suma('facturas') && `${suma('facturas')} factura(s)`,
+        suma('abonos') && `${suma('abonos')} abono(s)`,
+        suma('saldos') && `${suma('saldos')} saldo(s) inicial(es)`,
+      ].filter(Boolean).join(', ') || 'nada';
       const detalle = planes.slice(0, 8)
         .map(p=> `· Se conserva "${p.principal.nombre}" (se eliminan ${p.otras.length})`).join('\n');
       const ok = await confirm(
         `Se fusionan ${planes.length} grupo(s): quedan ${planes.length} empresa(s) y se eliminan ${aEliminar}.\n\n` +
         detalle + (planes.length > 8 ? `\n· … y ${planes.length - 8} grupo(s) más` : '') +
-        `\n\nSe reasignan ${fichas} ficha(s) y ${cotizaciones} cotización(es), y los contactos pasan a la empresa que se conserva.` +
+        `\n\nSe reasignan ${reasignado}, y los contactos pasan a la empresa que se conserva.` +
+        '\nLas facturas y abonos pasan a nombre de la empresa que queda, así que su cartera se suma en un solo saldo.' +
         '\nEl nombre que ya salió impreso en cada ficha no cambia. Esto no se puede deshacer.'
       );
       if(!ok) return;
 
-      const total = { empresas: 0, fichas: 0, cotizaciones: 0, contactos: 0 };
+      const total = { empresas: 0, fichas: 0, cotizaciones: 0, contactos: 0, facturas: 0, abonos: 0 };
       let fallidos = 0;
       for (const [i, plan] of planes.entries()) {
         setProgreso({ hechos: i, total: planes.length, fase: 'fusionando' });
@@ -337,11 +354,14 @@ export default function CompaniesPage(){
           total.fichas += r.fichasMovidas;
           total.cotizaciones += r.cotizacionesMovidas;
           total.contactos += r.contactosMovidos;
+          total.facturas += r.facturasMovidas;
+          total.abonos += r.abonosMovidos + r.saldosMovidos;
         } catch(e){ console.error('Error fusionando', plan.principal?.nombre, e); fallidos++; }
       }
       toast.success(
         `${total.empresas} empresa(s) eliminada(s) · ${total.contactos} contacto(s), ` +
-        `${total.fichas} ficha(s) y ${total.cotizaciones} cotización(es) reasignadas`
+        `${total.fichas} ficha(s), ${total.cotizaciones} cotización(es) y ` +
+        `${total.facturas} factura(s) reasignadas`
       );
       if(fallidos) toast.error(`${fallidos} grupo(s) no se pudieron fusionar. Revisa la lista.`);
       setSeleccion({});

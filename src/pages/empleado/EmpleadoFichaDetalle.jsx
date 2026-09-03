@@ -184,7 +184,7 @@ export default function EmpleadoFichaDetalle() {
       {showFirma && (
         <FirmaModal
           tipo={tipo}
-          ficha={ficha}
+          fichas={[ficha]}
           onClose={() => setShowFirma(false)}
           onDone={() => { setShowFirma(false); load(); }}
         />
@@ -193,7 +193,7 @@ export default function EmpleadoFichaDetalle() {
       {showEntrega && (
         <EntregaModal
           tipo={tipo}
-          ficha={ficha}
+          fichas={[ficha]}
           onClose={() => setShowEntrega(false)}
           onDone={() => { setShowEntrega(false); load(); }}
         />

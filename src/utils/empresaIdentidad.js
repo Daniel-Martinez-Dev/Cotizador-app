@@ -55,6 +55,53 @@ export function claveNombreComercial(nombre) {
   return tokens.join(" ");
 }
 
+// Palabras que no distinguen a nadie. Van además de las formas societarias:
+// media base es "… COLOMBIA S.A.S." y "GRUPO …", así que dejarlas dentro haría
+// que cualquier par de clientes pareciera el mismo.
+const RELLENO = new Set([
+  ...SUFIJOS_LEGALES,
+  "colombia", "col", "grupo", "cia", "compania", "empresa", "empresas",
+  "de", "del", "la", "las", "el", "los", "y", "e", "en",
+]);
+
+/**
+ * Tokens con los que se reconoce un nombre: sin la forma legal, sin relleno y
+ * sin palabras de menos de tres letras.
+ *
+ * "AXIONLOG COLOMBIA S.A.S." → ["axionlog"].
+ */
+export function tokensNucleo(nombre) {
+  return claveNombre(nombre)
+    .split(" ")
+    .filter((t) => t.length >= 3 && !RELLENO.has(t));
+}
+
+/**
+ * ¿Un nombre está contenido en el otro?
+ *
+ * Es el caso que dejó la migración: el Excel escribía "AXIONLOG" y la base de
+ * clientes tenía "AXIONLOG COLOMBIA S.A.S.". Ni el nombre normalizado ni el
+ * nombre sin forma legal los juntan, así que hasta ahora el detector de
+ * duplicados no los veía.
+ *
+ * Es deliberadamente estricto, porque un falso positivo aquí fusiona dos
+ * clientes que no lo son:
+ *   · los tokens del corto tienen que estar todos en el largo;
+ *   · si el corto es una sola palabra, tiene que ser la primera del largo y
+ *     medir cuatro letras o más ("NORTE" no reclama a "FRIGORÍFICO NORTE");
+ *   · y ninguno de los dos puede quedarse sin tokens propios.
+ */
+export function nombreContenido(a, b) {
+  const ta = tokensNucleo(a);
+  const tb = tokensNucleo(b);
+  if (!ta.length || !tb.length) return false;
+  const [corto, largo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  const enLargo = new Set(largo);
+  if (!corto.every((t) => enLargo.has(t))) return false;
+  if (corto.length === 1) return corto[0].length >= 4 && corto[0] === largo[0];
+  return true;
+}
+
 // Las cuatro llaves con las que se compara una empresa.
 export function clavesEmpresa(empresa = {}) {
   return {
@@ -177,6 +224,26 @@ export function agruparDuplicados(empresas = []) {
   agrupar((e) => claveNombre(e.alias), "alias idéntico", "alta");
   agrupar((e) => claveNitBase(e.nit), "NIT sin dígito de verificación", "media");
   agrupar((e) => claveNombreComercial(e.nombre), "nombre sin la forma legal", "media");
+
+  // Un nombre contenido en el otro no es igualdad de llave, así que no se puede
+  // agrupar como los demás: hay que comparar por parejas. Con unos cientos de
+  // empresas son unas decenas de miles de comparaciones, instantáneo.
+  for (let i = 0; i < validas.length; i += 1) {
+    for (let j = i + 1; j < validas.length; j += 1) {
+      const a = validas[i];
+      const b = validas[j];
+      // Dos NIT distintos son dos empresas distintas, por parecido que sea el
+      // nombre. Sin esto, una sucursal con NIT propio se tragaría a la matriz.
+      const nitA = claveNit(a.nit);
+      const nitB = claveNit(b.nit);
+      if (nitA && nitB && nitA !== nitB) continue;
+      if (!nombreContenido(a.nombre, b.nombre)) continue;
+      union.unir(a.id, b.id);
+      const raiz = union.raiz(a.id);
+      if (!motivos.has(raiz)) motivos.set(raiz, new Set());
+      motivos.get(raiz).add("un nombre contenido en el otro:media");
+    }
+  }
 
   const grupos = new Map();
   for (const empresa of validas) {

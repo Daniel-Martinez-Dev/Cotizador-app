@@ -15,7 +15,7 @@ const ALERTA = {
   proxima:  { cls: "text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-800",  icon: FaRegClock, texto: "Próxima" },
 };
 
-export default function OrdenCard({ ficha: f, hoy, onAbrir, onCambiarEstado, onVerFicha }) {
+export default function OrdenCard({ ficha: f, hoy, onAbrir, onCambiarEstado, onVerFicha, seleccionada, onSeleccionar }) {
   const producto = productoDe(f.tipo);
   const Icon = producto?.icon;
   const alerta = alertaEntrega(f, hoy);
@@ -29,9 +29,26 @@ export default function OrdenCard({ ficha: f, hoy, onAbrir, onCambiarEstado, onV
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAbrir(f); } }}
       role="button"
       tabIndex={0}
-      className="group text-left w-full min-w-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gris-600 bg-white dark:bg-gris-800 p-3 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gris-500 focus:outline-none focus:ring-2 focus:ring-trafico/60 transition cursor-pointer"
+      className={`group text-left w-full min-w-0 overflow-hidden rounded-xl border p-3 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-trafico/60 transition cursor-pointer ${
+        seleccionada
+          ? "border-green-500 dark:border-green-500 bg-green-50/70 dark:bg-green-900/20"
+          : "border-gray-200 dark:border-gris-600 bg-white dark:bg-gris-800 hover:border-gray-300 dark:hover:border-gris-500"
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
+        {/* La casilla es la única forma de marcar la orden: el resto de la
+            tarjeta sigue abriendo el detalle, que es lo que se hace el 90 %
+            de las veces. */}
+        {onSeleccionar && (
+          <input
+            type="checkbox"
+            checked={!!seleccionada}
+            onChange={() => onSeleccionar(f)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Seleccionar orden de ${f.cliente || "este cliente"}`}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-green-600 cursor-pointer"
+          />
+        )}
         <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400 truncate min-w-0">
           {codigoFichaOFallback(f, f.tipo)}
         </span>
@@ -53,9 +70,24 @@ export default function OrdenCard({ ficha: f, hoy, onAbrir, onCambiarEstado, onV
         {f.cantidad > 1 && <span className="shrink-0">· ×{f.cantidad}</span>}
       </div>
 
-      {f.fechaEntrega && (
-        <div className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400 truncate">
-          Entrega <span className="font-medium text-gray-700 dark:text-gray-300">{fmtDate(f.fechaEntrega)}</span>
+      {/* La orden de compra es la referencia con la que el cliente pregunta por
+          el pedido, así que va en la tarjeta y no solo en el detalle. Comparte
+          renglón con la entrega para no alargar el tablero. */}
+      {(f.fechaEntrega || f.numeroOrdenCompra) && (
+        <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400 min-w-0">
+          <span className="truncate min-w-0">
+            {f.fechaEntrega && (
+              <>Entrega <span className="font-medium text-gray-700 dark:text-gray-300">{fmtDate(f.fechaEntrega)}</span></>
+            )}
+          </span>
+          {f.numeroOrdenCompra && (
+            <span
+              title={`Orden de compra ${f.numeroOrdenCompra}`}
+              className="shrink-0 max-w-[60%] truncate font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded border border-gray-200 dark:border-gris-600 bg-gray-50 dark:bg-gris-700/60 text-gray-600 dark:text-gray-300"
+            >
+              OC {f.numeroOrdenCompra}
+            </span>
+          )}
         </div>
       )}
 

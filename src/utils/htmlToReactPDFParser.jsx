@@ -3,10 +3,12 @@ import React from "react";
 import { Text, View, StyleSheet } from "@react-pdf/renderer";
 import { pdfTheme } from './pdfTheme';
 
-const T = pdfTheme;
 // Estilos base unificados para todas las secciones (descripción, condiciones, términos, especificaciones)
 // Objetivo: mismo interlineado y separación vertical mínima y consistente.
-export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null } = {}) {
+// `theme` llega por parámetro (no se lee del módulo) para que los ajustes de
+// maquetación del preview se reflejen en el mismo render.
+export function parseHtmlToPDFComponents(html, { compact = false, dense = false, readable = false, onlyBoldHeadings = false, compressShortItems = false, fontScale = 1, paragraphSpacing = null, theme = pdfTheme } = {}) {
+  const T = theme || pdfTheme;
   const scale = typeof fontScale === 'number' && fontScale > 0 ? fontScale : 1;
   const baseFont = (T.font?.base || 10) * scale;
   const baseH2 = (T.font?.h2 || (T.font?.base || 10) + 1) * scale;

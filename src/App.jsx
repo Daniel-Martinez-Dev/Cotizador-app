@@ -7,6 +7,7 @@ import HistorialPage from "./pages/HistorialPage";
 import ProductsPage from "./pages/ProductsPage";
 import ProduccionPage from "./pages/ProduccionPage";
 import InventarioPage from "./pages/InventarioPage";
+import ContabilidadPage from "./pages/ContabilidadPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import UsuariosPage from "./pages/UsuariosPage";
@@ -24,7 +25,7 @@ import AppSidebar from "./components/layout/AppSidebar";
 import { seccionDe } from "./components/layout/navSections";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import { Toaster } from 'react-hot-toast';
-import { ADMIN_EMAIL, ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
+import { ADMIN_EMAIL, ENABLE_CONTABILIDAD, ENABLE_INVENTARIO, ENABLE_PRODUCCION, REQUIRE_LOGIN } from "./utils/featureFlags";
 import { ROLES_ALMACEN, ROLES_PLANTA, soloRolesDePlanta } from "./utils/roles";
 // Carga catálogo central (side-effect) para futuras referencias globales
 import './data/catalogoProductos';
@@ -45,6 +46,7 @@ function AppShell() {
   const isAdminUser = isMainAdmin || hasRole('admin');
   const canProduccion = ENABLE_PRODUCCION && (isAdminUser || hasRole('produccion'));
   const canInventario = ENABLE_INVENTARIO && (isAdminUser || hasRole('inventario'));
+  const canContabilidad = ENABLE_CONTABILIDAD && (isAdminUser || hasRole('contabilidad'));
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem('theme') === 'dark';
@@ -75,8 +77,8 @@ function AppShell() {
   });
 
   const permisos = React.useMemo(
-    () => ({ canProduccion, canInventario, isAdminUser }),
-    [canProduccion, canInventario, isAdminUser]
+    () => ({ canProduccion, canInventario, canContabilidad, isAdminUser }),
+    [canProduccion, canInventario, canContabilidad, isAdminUser]
   );
 
   const performNueva = (navigate, currentPath) => {
@@ -181,6 +183,15 @@ export default function App(){
                   path="/inventario"
                   element={ENABLE_INVENTARIO ? <InventarioPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'inventario' }} />}
                 />
+                {/* La cartera y la facturación son del rol "contabilidad" (y
+                    del admin): quien no lo tenga rebota al inicio, igual que
+                    con producción. */}
+                <Route element={<ProtectedRoute requireRole="contabilidad" />}>
+                  <Route
+                    path="/contabilidad"
+                    element={ENABLE_CONTABILIDAD ? <ContabilidadPage /> : <Navigate to="/dashboard" replace state={{ disabled: 'contabilidad' }} />}
+                  />
+                </Route>
                 <Route path="/historial" element={<HistorialPage />} />
                 <Route path="/productos" element={<ProductsPage />} />
                 <Route path="/empresas" element={<CompaniesPage />} />

@@ -10,6 +10,8 @@ import {
   planFusion,
   claveContacto,
   resolverContacto,
+  nombreContenido,
+  tokensNucleo,
 } from "./empresaIdentidad";
 
 const EMPRESAS = [
@@ -227,5 +229,74 @@ describe("planFusion", () => {
       expect(plan.otras.some((e) => e.id === plan.principal.id)).toBe(false);
       expect(plan.otras).toHaveLength(2);
     }
+  });
+});
+
+// ─── Nombre corto contra razón social ───────────────────────────────────────
+// Lo que dejó la migración del Excel: el libro escribía "AXIONLOG" y la base
+// de clientes ya tenía "AXIONLOG COLOMBIA S.A.S.". Al importar se creó un
+// cliente nuevo y quedaron dos.
+
+describe("tokensNucleo", () => {
+  it("deja solo las palabras que distinguen al cliente", () => {
+    expect(tokensNucleo("AXIONLOG COLOMBIA S.A.S.")).toEqual(["axionlog"]);
+    expect(tokensNucleo("Grupo Empresarial del Norte Ltda")).toEqual(["empresarial", "norte"]);
+    expect(tokensNucleo("S.A.S.")).toEqual([]);
+  });
+});
+
+describe("nombreContenido", () => {
+  it("reconoce el nombre corto dentro de la razón social", () => {
+    expect(nombreContenido("AXIONLOG", "AXIONLOG COLOMBIA S.A.S.")).toBe(true);
+    expect(nombreContenido("Axionlog Colombia S.A.S.", "axionlog")).toBe(true);
+  });
+
+  it("junta cuando el corto tiene varias palabras propias", () => {
+    expect(nombreContenido("ALIMENTOS CARNICOS", "Alimentos Cárnicos Zenú S.A.S.")).toBe(true);
+  });
+
+  it("no reclama por una sola palabra que no encabeza el nombre", () => {
+    expect(nombreContenido("NORTE", "FRIGORIFICO NORTE")).toBe(false);
+  });
+
+  it("no reclama por una palabra demasiado corta", () => {
+    expect(nombreContenido("ACE", "ACE Refrigeración")).toBe(false);
+  });
+
+  it("ignora las palabras de relleno, que si no juntarían media base", () => {
+    expect(nombreContenido("COLOMBIA", "AXIONLOG COLOMBIA")).toBe(false);
+    expect(nombreContenido("Grupo Andina", "Grupo Bolívar")).toBe(false);
+  });
+
+  it("no junta empresas sin nada en común", () => {
+    expect(nombreContenido("Colanta", "Alpina")).toBe(false);
+    expect(nombreContenido("", "Alpina")).toBe(false);
+  });
+});
+
+describe("agruparDuplicados con nombres contenidos", () => {
+  it("saca el par que la migración duplicó, como sospecha y no como certeza", () => {
+    const grupos = agruparDuplicados([
+      { id: "a", nombre: "AXIONLOG COLOMBIA S.A.S.", nit: "9001234567" },
+      { id: "b", nombre: "AXIONLOG" },
+      { id: "c", nombre: "Colanta" },
+    ]);
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].empresas.map((e) => e.id).sort()).toEqual(["a", "b"]);
+    expect(grupos[0].certeza).toBe("media");
+    expect(grupos[0].motivos).toContain("un nombre contenido en el otro");
+  });
+
+  it("dos NIT distintos son dos empresas por parecido que sea el nombre", () => {
+    const grupos = agruparDuplicados([
+      { id: "a", nombre: "AXIONLOG COLOMBIA S.A.S.", nit: "9001234567" },
+      { id: "b", nombre: "AXIONLOG", nit: "8009998887" },
+    ]);
+    expect(grupos).toHaveLength(0);
+  });
+
+  it("conserva a la que tiene NIT como principal al fusionar", () => {
+    const lista = [{ id: "b", nombre: "AXIONLOG" }, { id: "a", nombre: "AXIONLOG COLOMBIA S.A.S.", nit: "9001234567" }];
+    expect(planFusion(lista).principal.id).toBe("a");
   });
 });

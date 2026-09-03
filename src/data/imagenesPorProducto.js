@@ -101,6 +101,110 @@ const rutas = {
 
 const imagenesPorProducto = {};
 
+// Categorías del catálogo de imágenes.
+//
+// El selector mostraba las 36 imágenes en una sola rejilla, así que para elegir
+// la foto de una división térmica había que pasar por encima de semáforos y
+// carros jaula. Se agrupan por el mismo criterio con el que están organizadas
+// en assets/imagenes: una carpeta por familia de producto.
+export const CATEGORIAS_IMAGENES = [
+  {
+    id: "PuertaRapida",
+    etiqueta: "Puertas Rápidas",
+    claves: [
+      "Puertas Rápidas Pequeñas",
+      "Puertas Rápidas Altas",
+      "Puertas Rápidas Amarillas",
+      "Puertas Rápidas Grises",
+    ],
+  },
+  {
+    id: "AbrigoRetractil",
+    etiqueta: "Abrigos Retráctiles",
+    claves: [
+      "Abrigo Retráctil Inflable",
+      "Abrigo Retráctil Estándar",
+      "Abrigo Retráctil Estándar Tipo Túnel",
+      "Abrigo Retráctil Estándar Doble",
+      "Abrigo Retráctil General 1",
+      "Abrigos para Muelle de Carga",
+      "Abrigo Retráctil Vista Lateral",
+      "Abrigo Retráctil Túnel 2",
+      "Abrigo Retráctil Verde",
+    ],
+  },
+  {
+    id: "DivisionTermica",
+    etiqueta: "Divisiones Térmicas",
+    claves: [
+      "Divisiones Térmicas",
+      "Divisiones Térmicas con puerta",
+      "Divisiones Térmicas 3 paneles",
+      "Divisiones Térmicas con ventilador",
+    ],
+  },
+  {
+    id: "SelloDeAnden",
+    etiqueta: "Sellos de Andén",
+    claves: ["Sello de Andén", "Sello de Andén Con Inclinación"],
+  },
+  {
+    // "Puerta Seccional" y "Puertas Seccionales" apuntan al mismo archivo; se
+    // deja solo la forma en plural para no mostrar la misma foto dos veces.
+    id: "PuertaSeccional",
+    etiqueta: "Puertas Seccionales",
+    claves: [
+      "Puertas Seccionales",
+      "Puertas Seccionales con Abrigo",
+      "Puertas Seccionales Vertical",
+    ],
+  },
+  {
+    id: "SemaforosParaMuelle",
+    etiqueta: "Semáforos",
+    claves: [
+      "Semáforo para Muelles de Carga Sencillo",
+      "Semáforo para Muelles de Carga Doble",
+      "Semáforo para Muelles de Carga con Sensor",
+    ],
+  },
+  {
+    id: "CanastillaDeSeguridad",
+    etiqueta: "Canastillas",
+    claves: ["Canastilla de Seguridad", "Canastilla de Seguridad Alt"],
+  },
+  {
+    id: "CarroJaula",
+    etiqueta: "Carros Jaula",
+    claves: [
+      "Carro Jaula Manta Térmica",
+      "Carro Jaula 2",
+      "Carro Jaula 3",
+      "Carro Jaula con Manta",
+    ],
+  },
+  {
+    id: "AccesoriosMuelle",
+    etiqueta: "Accesorios de Muelle",
+    claves: ["Accesorios de Muelle", "Lámpara Industrial"],
+  },
+];
+
+// Categoría que se abre por defecto según el producto que se está cotizando,
+// para no empezar siempre desde la primera pestaña.
+export const CATEGORIA_POR_TIPO = {
+  "Divisiones Térmicas": "DivisionTermica",
+  "Puertas Rápidas": "PuertaRapida",
+  "Puertas Seccionales": "PuertaSeccional",
+  "Abrigo Retráctil Estándar": "AbrigoRetractil",
+  "Abrigo Retráctil Inflable": "AbrigoRetractil",
+  "Sello de Andén": "SelloDeAnden",
+  "Semáforo para Muelles de Carga": "SemaforosParaMuelle",
+  "Lámpara Industrial": "AccesoriosMuelle",
+  "Canastilla de Seguridad": "CanastillaDeSeguridad",
+  // "Cortina Thermofilm" no tiene fotos propias: abre en "Todas".
+};
+
 export const cargarImagenesBase64 = async () => {
   for (const [clave, ruta] of Object.entries(rutas)) {
     imagenesPorProducto[clave] = await convertirADataUrl(ruta);

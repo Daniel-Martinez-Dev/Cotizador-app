@@ -7,6 +7,7 @@ import {
   FaHistory,
   FaBuilding,
   FaUsersCog,
+  FaCalculator,
 } from "react-icons/fa";
 
 // Fuente única de las secciones de la interfaz de oficina. La consumen la
@@ -42,6 +43,13 @@ export const NAV_SECTIONS = [
     icon: FaBoxes,
     desc: "Materia prima, proveedores y movimientos de almacén.",
     permiso: "inventario",
+  },
+  {
+    to: "/contabilidad",
+    label: "Contabilidad",
+    icon: FaCalculator,
+    desc: "Facturas, abonos y cartera por cliente.",
+    permiso: "contabilidad",
   },
   {
     to: "/productos",
@@ -81,12 +89,17 @@ export const NAV_SECTIONS = [
 export const NAV_GRUPOS = [
   { titulo: null, rutas: ["/dashboard"] },
   { titulo: "Cotizaciones", rutas: ["/cotizar", "/productos", "/historial", "/empresas"] },
-  { titulo: "Operación", rutas: ["/produccion", "/inventario"] },
+  { titulo: "Operación", rutas: ["/produccion", "/inventario", "/contabilidad"] },
   { titulo: "Administración", rutas: ["/usuarios"], alPie: true },
 ];
 
-function filtro({ canProduccion, canInventario, isAdminUser }) {
-  const permitido = { produccion: canProduccion, inventario: canInventario, admin: isAdminUser };
+function filtro({ canProduccion, canInventario, canContabilidad, isAdminUser }) {
+  const permitido = {
+    produccion: canProduccion,
+    inventario: canInventario,
+    contabilidad: canContabilidad,
+    admin: isAdminUser,
+  };
   return (s) => !s.permiso || permitido[s.permiso];
 }
 

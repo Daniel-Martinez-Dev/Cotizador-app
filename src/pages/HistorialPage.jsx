@@ -4,16 +4,23 @@ import { collection, getDocs, query, orderBy, limit, deleteDoc, doc, updateDoc, 
 import { db, waitForAuth, getAuthError } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
-import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye, FaRegCommentDots } from "react-icons/fa";
+import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye, FaRegCommentDots, FaFileInvoiceDollar } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import EmptyState from "../components/ui/EmptyState";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/Combobox";
 import { normalizarNombreCliente } from "../utils/clienteVinculo";
+import { useAuth } from "../context/AuthContext";
+import { ENABLE_CONTABILIDAD } from "../utils/featureFlags";
+import { facturaDesdeCotizacion } from "../modules/contabilidad/desdeCotizacion";
 
 import PageHeader from "../components/ui/PageHeader";
 const CARGA_INICIAL = 300;
+
+// Solo se factura lo que el cliente ya aprobó: ofrecer el botón en una
+// cotización en seguimiento invita a facturar algo que todavía se negocia.
+const ESTADOS_FACTURABLES = ["APROBADA / PEND. PAGO", "VENDIDA"];
 
 export default function HistorialPage() {
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -47,6 +54,8 @@ export default function HistorialPage() {
   const [startDate, endDate] = rangoFecha;
   const navigate = useNavigate();
   const { setQuoteData, confirm } = useQuote();
+  const { hasRole, isMainAdmin } = useAuth();
+  const puedeFacturar = ENABLE_CONTABILIDAD && (isMainAdmin || hasRole('admin') || hasRole('contabilidad'));
 
   const aplicarSnapshot = (snap) => {
     const mapa = new Map();
@@ -284,6 +293,14 @@ export default function HistorialPage() {
     setQuoteData({ ...cot, modoEdicion: true, _editToken: Date.now() });
     navigate("/cotizar");
   };
+  // Lleva la cotización al formulario de factura ya diligenciado. El borrador
+  // viaja en el estado de la navegación y no se guarda: hasta que contabilidad
+  // no ponga el número de la DIAN y confirme, no existe ninguna factura.
+  const manejarFacturar = cot => {
+    setQuoteData(prev => ({ ...(prev || {}), modoEdicion: false }));
+    navigate("/contabilidad", { state: { facturarCotizacion: facturaDesdeCotizacion(cot) } });
+  };
+
   const manejarEliminar = async cot => {
     if (!(await confirm("¿Eliminar la cotización #" + cot.numero + "?"))) return;
     try {
@@ -496,6 +513,9 @@ export default function HistorialPage() {
                     <td className="border px-2 py-1 space-x-2 whitespace-nowrap">
                       <button onClick={()=>manejarVer(c)} className="text-blue-600 hover:text-blue-800" title="Ver" aria-label="Ver cotización"><FaEye /></button>
                       <button onClick={()=>manejarEditar(c)} className="text-yellow-500 hover:text-yellow-600" title="Editar" aria-label="Editar cotización"><FaEdit /></button>
+                      {puedeFacturar && ESTADOS_FACTURABLES.includes(c.estadoSeguimiento) && (
+                        <button onClick={()=>manejarFacturar(c)} className="text-green-600 hover:text-green-800" title="Facturar" aria-label="Facturar cotización"><FaFileInvoiceDollar /></button>
+                      )}
                       <button onClick={()=>manejarEliminar(c)} className="text-red-600 hover:text-red-800" title="Eliminar" aria-label="Eliminar cotización"><FaTrash /></button>
                     </td>
                   </tr>
@@ -516,6 +536,9 @@ export default function HistorialPage() {
                   <div className="flex gap-3 text-base shrink-0">
                     <button onClick={()=>manejarVer(c)} className="text-blue-600" title="Ver" aria-label="Ver cotización"><FaEye /></button>
                     <button onClick={()=>manejarEditar(c)} className="text-yellow-500" title="Editar" aria-label="Editar cotización"><FaEdit /></button>
+                    {puedeFacturar && ESTADOS_FACTURABLES.includes(c.estadoSeguimiento) && (
+                      <button onClick={()=>manejarFacturar(c)} className="text-green-600" title="Facturar" aria-label="Facturar cotización"><FaFileInvoiceDollar /></button>
+                    )}
                     <button onClick={()=>manejarEliminar(c)} className="text-red-600" title="Eliminar" aria-label="Eliminar cotización"><FaTrash /></button>
                   </div>
                 </div>

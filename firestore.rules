@@ -91,6 +91,21 @@ service cloud.firestore {
       return isAdmin() || (isActiveStaff() && hasRole('inventario')) || isAlmacenistaRole();
     }
 
+    // Quien lleva la facturación y la cartera. Es un rol de oficina y no toca
+    // nada de planta; a la inversa, planta no ve un solo peso de la cartera.
+    function isContabilidadStaff() {
+      return isAdmin() || (isActiveStaff() && hasRole('contabilidad'));
+    }
+
+    // Un documento que entró por la importación o la migración del Excel sí se
+    // puede borrar para deshacer un lote mal cargado. Una factura digitada en la app no: esa
+    // se anula (campo `anulado`), porque un número ya emitido tiene que seguir
+    // existiendo.
+    function esImportado() {
+      return resource.data.get('origen', '') == 'importacion'
+          || resource.data.get('origen', '') == 'migracion';
+    }
+
     // Un empleado solo puede tocar notas/estado/firmas/entrega/updatedAt en una
     // ficha, y nunca devolverla a borrador ni a producción.
     //
@@ -319,6 +334,32 @@ service cloud.firestore {
           !('costoUnitario' in request.resource.data) ||
           request.resource.data.costoUnitario == 0)
       );
+    }
+
+    // ─── Contabilidad: facturación y cartera ──────────────────────────────────
+    match /contabilidad_documentos/{docId} {
+      allow read: if isContabilidadStaff();
+      allow create, update: if isContabilidadStaff();
+      allow delete: if isAdmin() || (isContabilidadStaff() && esImportado());
+    }
+
+    // Los abonos sí se corrigen y se borran: registrar un pago con el valor o
+    // el banco equivocado es el error corriente, y dejarlo inmutable obligaría
+    // a inventar un contra-abono.
+    match /contabilidad_pagos/{docId} {
+      allow read: if isContabilidadStaff();
+      allow create, update, delete: if isContabilidadStaff();
+    }
+
+    match /contabilidad_saldos_iniciales/{docId} {
+      allow read: if isContabilidadStaff();
+      allow create, update, delete: if isContabilidadStaff();
+    }
+
+    // Tarifas de retención, IVA por defecto y bancos.
+    match /contabilidad_config/{docId} {
+      allow read: if isContabilidadStaff();
+      allow write: if isContabilidadStaff();
     }
 
     // ─── Configuración de precios ──────────────────────────────────────────────

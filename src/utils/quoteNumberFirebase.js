@@ -1,6 +1,6 @@
 // src/utils/quoteNumberFirebase.js
 import { db } from "../firebase";
-import { doc, runTransaction } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 
 const contadorRef = doc(db, "consecutivos", "cotizacion");
 
@@ -21,5 +21,22 @@ export async function getNextQuoteNumber() {
   } catch (error) {
     console.error("Error obteniendo número de cotización:", error);
     return Date.now(); // fallback de emergencia
+  }
+}
+
+// Lee cuál sería el próximo número SIN reservarlo. La vista previa necesita
+// mostrar el número en el encabezado y el pie, pero no puede llamar a
+// getNextQuoteNumber(): eso incrementaría el contador en cada re-render y
+// dejaría huecos en la numeración. El número definitivo se reserva al
+// descargar, así que este valor es provisional: si dos personas cotizan a la
+// vez, el que quede puede ser otro.
+export async function peekNextQuoteNumber() {
+  try {
+    const docSnap = await getDoc(contadorRef);
+    if (!docSnap.exists()) return 1;
+    return (docSnap.data().numero || 0) + 1;
+  } catch (error) {
+    console.error("Error consultando el próximo número de cotización:", error);
+    return null;
   }
 }
