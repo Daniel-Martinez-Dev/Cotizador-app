@@ -15,6 +15,7 @@
 // hacía la hoja ESTADO DE CUENTA, y por eso se desactualizaba sola.
 
 import { auth, db, waitForAuth } from "../firebase";
+import { camposCotizacionFicha, normalizarFichasFactura } from "./documentoVinculo";
 import {
   addDoc,
   collection,
@@ -133,9 +134,14 @@ export function construirDocumento(data = {}, { netoImportado = false } = {}) {
     observaciones: texto(data.observaciones),
     anulado: Boolean(data.anulado),
     motivoAnulacion: texto(data.motivoAnulacion),
-    // Rastro hacia el cotizador cuando la factura nació de una cotización.
-    cotizacionId: texto(data.cotizacionId),
-    cotizacionNumero: texto(data.cotizacionNumero),
+    // Rastro hacia el cotizador cuando la factura nació de una cotización, o
+    // cuando se vinculó a mano después (ver utils/documentoVinculo.js).
+    ...camposCotizacionFicha(data),
+    // Las fichas de fabricación que cubre esta factura. Van del lado de la
+    // factura y no de la ficha porque una factura cobra varias fichas —las de
+    // un mismo pedido— y la ficha no debe saber de dinero: planta la lee.
+    // Es una copia congelada de lo que las nombra, no un puntero a resolver.
+    fichas: normalizarFichasFactura(data.fichas),
     origen: texto(data.origen) || "manual",
   });
 }

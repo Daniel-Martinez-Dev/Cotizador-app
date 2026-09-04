@@ -10,6 +10,8 @@ import { codigoFicha as codigoDeFicha } from "../../utils/codigoFicha";
 import { coincideMedida } from "../../utils/medidasFicha";
 import { getImpresionComponent } from "../../components/fichas/impresionPorTipo";
 import OrdenPlantaCard from "../../components/empleado/OrdenPlantaCard";
+import PedidoPlantaGrupo from "../../components/empleado/PedidoPlantaGrupo";
+import { agruparPorOrdenCompra, claveEntrada } from "../../components/produccion/ordenesAgrupar";
 
 const ESTADO_TABS = [
   { key: "en_produccion", label: "En producción" },
@@ -67,8 +69,9 @@ export default function EmpleadoProduccionList() {
         // El alias entra en la búsqueda junto al nombre completo: en planta se
         // busca por el que salió impreso, pero desde oficina se pregunta por el otro.
         // La orden de compra va en la tarjeta, así que también tiene que
-        // encontrarse aquí: es el número con el que llama el cliente.
-        const blob = `${f.cliente || ""} ${f.clienteAlias || ""} ${f.ordenProduccion || ""} ${f.numeroOrdenCompra || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
+        // encontrarse aquí: es el número con el que llama el cliente. Y el
+        // detalle ("muelle 7") es como se pide la ficha de viva voz.
+        const blob = `${f.cliente || ""} ${f.clienteAlias || ""} ${f.ordenProduccion || ""} ${f.numeroOrdenCompra || ""} ${f.nombreFicha || ""} ${codigoDeFicha(f) || ""}`.toLowerCase();
         // La medida es el otro dato con el que planta busca una ficha.
         return blob.includes(term) || coincideMedida(f, term);
       });
@@ -80,6 +83,10 @@ export default function EmpleadoProduccionList() {
   // selección la tarjeta deja de abrir el detalle y solo marca, para poder
   // firmarlas todas con un formulario (ver BarraLoteFichas).
   const seleccion = useSeleccionFichas(filtradas);
+
+  // Las que vienen de la misma orden de compra del cliente salen agrupadas: en
+  // planta es lo que evita despachar media orden (ver ordenesAgrupar.js).
+  const entradas = React.useMemo(() => agruparPorOrdenCompra(filtradas), [filtradas]);
 
   // La ficha impresa se abre desde el propio listado. En planta lo que se hace
   // con una orden, nueve de cada diez veces, es mirar la ficha: obligar a
@@ -132,7 +139,7 @@ export default function EmpleadoProduccionList() {
             onChange={(e) => setSearch(e.target.value)}
             type="search"
             inputMode="search"
-            placeholder="Buscar por cliente, medida, orden u OC…"
+            placeholder="Buscar por cliente, medida, detalle, orden u OC…"
             className="w-full pl-8 pr-10 py-2.5 rounded-lg border border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-800 text-sm"
           />
           {search && (
@@ -218,16 +225,30 @@ export default function EmpleadoProduccionList() {
         />
       ) : (
         <div className="space-y-2">
-          {filtradas.map((f) => (
-            <OrdenPlantaCard
-              key={`${f.tipo}-${f.id}`}
-              ficha={f}
-              seleccionable={seleccion.modo}
-              marcada={seleccion.estaSeleccionada(f)}
-              onAlternar={seleccion.alternar}
-              onVerFicha={getImpresionComponent(f.tipo) ? setFichaImpresa : null}
-            />
-          ))}
+          {entradas.map((entrada) => {
+            const tarjeta = (f) => (
+              <OrdenPlantaCard
+                key={claveEntrada(f)}
+                ficha={f}
+                seleccionable={seleccion.modo}
+                marcada={seleccion.estaSeleccionada(f)}
+                onAlternar={seleccion.alternar}
+                onVerFicha={getImpresionComponent(f.tipo) ? setFichaImpresa : null}
+              />
+            );
+            if (!entrada.esGrupo) return tarjeta(entrada);
+            return (
+              <PedidoPlantaGrupo
+                key={claveEntrada(entrada)}
+                grupo={entrada}
+                seleccionable={seleccion.modo}
+                marcada={seleccion.estanSeleccionadas(entrada.fichas)}
+                onAlternar={() => seleccion.alternarVarias(entrada.fichas)}
+              >
+                {entrada.fichas.map(tarjeta)}
+              </PedidoPlantaGrupo>
+            );
+          })}
         </div>
       )}
 

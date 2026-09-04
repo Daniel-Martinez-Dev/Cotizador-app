@@ -1,13 +1,14 @@
 import React from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaTag } from "react-icons/fa";
 import { getDetalleComponent } from "../fichas/detallePorTipo";
+import { CotizacionBadge } from "../fichas/CotizacionSelector";
 import { productoDe } from "./productosFicha";
 
 // Panel lateral con el detalle completo de una orden. Reusa el detalle que ya
 // tenía cada línea de producto — medidas de corte, consumo, opciones y el
 // control de estado con notas, firmas y entrega — así que desde aquí se hace
 // todo lo que antes solo se podía hacer entrando a la pestaña del producto.
-export default function OrdenDetallePanel({ ficha, onCerrar, ...acciones }) {
+export default function OrdenDetallePanel({ ficha, onCerrar, onVerCotizacion, ...acciones }) {
   const Detalle = ficha ? getDetalleComponent(ficha.tipo) : null;
   const producto = ficha ? productoDe(ficha.tipo) : null;
   const Icon = producto?.icon;
@@ -28,7 +29,9 @@ export default function OrdenDetallePanel({ ficha, onCerrar, ...acciones }) {
         <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gris-700 shrink-0">
           {Icon && <Icon className={`text-base shrink-0 ${producto.tono}`} />}
           {/* El detalle ya abre con cliente, código y orden de compra; aquí
-              basta con decir de qué producto es, que es lo que no repite. */}
+              basta con decir de qué producto es, que es lo que no repite. El
+              detalle libre de la ficha sí va aquí: es lo que dice cuál de las
+              seis órdenes iguales del pedido se tiene abierta. */}
           <div className="min-w-0">
             <div className="font-semibold text-sm text-gray-900 dark:text-white truncate">
               {ficha.tipoLabel}
@@ -37,6 +40,19 @@ export default function OrdenDetallePanel({ ficha, onCerrar, ...acciones }) {
               {ficha.cliente || "Sin cliente"}
             </div>
           </div>
+          {ficha.nombreFicha && (
+            <span
+              title={ficha.nombreFicha}
+              className="min-w-0 shrink inline-flex items-center gap-1.5 rounded-md bg-gray-900 dark:bg-white px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white dark:text-gray-900"
+            >
+              <FaTag className="text-[10px] shrink-0 opacity-70" />
+              <span className="truncate min-w-0">{ficha.nombreFicha}</span>
+            </span>
+          )}
+          {/* De qué cotización salió, cuando se vinculó. Este panel es de la
+              oficina —planta tiene el suyo en pages/empleado, que no la
+              monta—, así que aquí sí se dice. */}
+          <CotizacionBadge ficha={ficha} onAbrir={onVerCotizacion ? () => onVerCotizacion(ficha) : null} />
           <button
             type="button"
             onClick={onCerrar}

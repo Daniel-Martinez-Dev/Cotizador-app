@@ -69,6 +69,7 @@ describe("construirFichaGeneral", () => {
     const doc = construirFichaGeneral({
       cliente: "  Cliente X ",
       numeroOrdenCompra: " OC-123 ",
+      nombreFicha: "  Muelle 7 ",
       responsable: " Juan ",
       fechaOrden: "2026-08-11",
       fechaEntrega: "",
@@ -82,6 +83,7 @@ describe("construirFichaGeneral", () => {
 
     expect(doc.cliente).toBe("Cliente X");
     expect(doc.numeroOrdenCompra).toBe("OC-123");
+    expect(doc.nombreFicha).toBe("Muelle 7");
     expect(doc.responsable).toBe("Juan");
     expect(doc.observaciones).toBe("Entregar en portería");
     expect(doc.fechaOrden).toBe("2026-08-11");

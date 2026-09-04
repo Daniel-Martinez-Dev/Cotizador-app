@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatCOP } from "../inventario/inventarioUtils";
-import { Aviso, Campo, Card, Input, InputNumero, KPI, Modal, Money, Seccion, Select, Tabla, Td, Th, Tr } from "./ui";
+import { Aviso, Campo, Card, Input, InputDinero, KPI, Modal, Money, Seccion, Select, Tabla, Td, Th, Tr } from "./ui";
 import {
   BANCOS_POR_DEFECTO,
   DESTINO_DOCUMENTO,
@@ -226,13 +226,7 @@ export default function PagosModal({ documento, config, onCerrar, onCambio }) {
                 <Input type="date" value={form.fecha} onChange={(e) => editar("fecha", e.target.value)} />
               </Campo>
               <Campo label="Valor">
-                <InputNumero
-                  step="0.01"
-                  min="0"
-                  value={form.valor}
-                  onChange={(e) => editar("valor", e.target.value)}
-                  placeholder="0"
-                />
+                <InputDinero value={form.valor} onChange={(v) => editar("valor", v)} />
               </Campo>
               <Campo label="Banco">
                 <Select value={form.bancoCodigo} onChange={(e) => elegirBanco(e.target.value)}>

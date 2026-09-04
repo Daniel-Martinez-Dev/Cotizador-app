@@ -90,3 +90,18 @@ describe("tablero de órdenes", () => {
     expect(html).toContain("Sin cliente");
   });
 });
+
+describe("detalle de la ficha en la tarjeta", () => {
+  // Dos órdenes del mismo cliente con la misma medida solo se distinguen por
+  // aquí; por eso el detalle va resaltado y no escondido en el detalle.
+  it("resalta el detalle cuando la ficha lo lleva", () => {
+    const html = pintar([orden({ nombreFicha: "Muelle 7" })]);
+    expect(html).toContain("Muelle 7");
+  });
+
+  it("no deja hueco en la tarjeta de la ficha que no lo lleva", () => {
+    const html = pintar([orden({ nombreFicha: "" })]);
+    expect(html).toContain("Alpina");
+    expect(html).not.toContain("bg-gray-900 dark:bg-white");
+  });
+});

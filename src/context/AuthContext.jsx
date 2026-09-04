@@ -17,6 +17,7 @@ import {
   getUserProfileForUid,
   upsertUserProfile,
 } from "../utils/firebaseUsers";
+import { olvidarListasVinculo } from "../utils/listasVinculo";
 
 const AuthContext = createContext(null);
 
@@ -145,6 +146,10 @@ export function AuthProvider({ children }) {
   };
 
   const signOutUser = async () => {
+    // Las listas cacheadas de los selectores de vínculo se leyeron con los
+    // permisos de esta cuenta: en el computador compartido de la oficina, la
+    // siguiente persona no puede heredarlas (ver utils/listasVinculo.js).
+    olvidarListasVinculo();
     await signOut(auth);
   };
 

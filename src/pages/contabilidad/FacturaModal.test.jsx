@@ -78,6 +78,40 @@ describe("FacturaModal", () => {
     expect(html).toContain("Editar nota débito");
     expect(html).toContain("suma</strong> a la cartera");
   });
+
+  // Vínculos con el resto del negocio (ver utils/documentoVinculo.js). Son
+  // opcionales: lo que se cuida es que la sección esté sin exigir nada, y que
+  // lo ya vinculado se lea al abrir el documento.
+  it("ofrece vincular cotización y fichas, diciendo que es opcional", () => {
+    const html = pintar();
+    expect(html).toContain("Vínculos");
+    expect(html).toContain("la factura se guarda igual sin ellos");
+    expect(html).toContain("Fichas de fabricación");
+  });
+
+  it("muestra la cotización y las fichas que el documento ya tenía", () => {
+    const html = pintar({
+      documento: documento({
+        cotizacionId: "cot1",
+        cotizacionNumero: "4821",
+        fichas: [
+          { tipo: "sello", id: "f1", codigo: "SA1203260147", ordenProduccion: 147, nombre: "Muelle 7", cliente: "AXIONLOG" },
+          { tipo: "division", id: "f2", codigo: "DT1203260148", ordenProduccion: 148, nombre: "", cliente: "AXIONLOG" },
+        ],
+      }),
+    });
+    expect(html).toContain("Cotización N.º 4821");
+    expect(html).toContain("SA1203260147");
+    expect(html).toContain("DT1203260148");
+    expect(html).toContain("2 fichas");
+  });
+
+  // El libro viejo se importó sin nada de esto y tiene que seguir abriéndose.
+  it("un documento migrado sin vínculos abre sin romperse", () => {
+    const html = pintar({ documento: documento({ origen: "migracion" }) });
+    expect(html).toContain("Vínculos");
+    expect(html).not.toContain("Cotización N.º");
+  });
 });
 
 // El formulario también se llena desde Android. Lo que se cuida aquí es que en

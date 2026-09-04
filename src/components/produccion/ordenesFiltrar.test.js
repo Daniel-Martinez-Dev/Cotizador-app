@@ -97,6 +97,25 @@ describe("filtros", () => {
   });
 });
 
+describe("detalle de la ficha", () => {
+  // Es el dato con el que se pide una orden de viva voz en planta, así que el
+  // buscador tiene que encontrarla por él.
+  const fichas = indexar([
+    ficha({ id: "a", nombreFicha: "Muelle 7" }),
+    ficha({ id: "b", nombreFicha: "Zona Norte" }),
+  ]);
+
+  it("encuentra la ficha por su detalle", () => {
+    const hallada = filtrar(fichas, { ...FILTROS_INICIALES, texto: "muelle" }, HOY);
+    expect(hallada.map((f) => f.id)).toEqual(["a"]);
+  });
+
+  it("busca sin tildes ni mayúsculas, como el resto del campo", () => {
+    const hallada = filtrar(fichas, { ...FILTROS_INICIALES, texto: "ZONA" }, HOY);
+    expect(hallada.map((f) => f.id)).toEqual(["b"]);
+  });
+});
+
 describe("orden y agrupación", () => {
   const lista = [
     ficha({ id: "a", ordenProduccion: 3, cliente: "Zeta",  fechaEntrega: "2026-09-30" }),

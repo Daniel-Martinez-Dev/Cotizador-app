@@ -133,6 +133,15 @@ export default function EmpleadoFichaDetalle() {
             <div className="text-gray-400">Fecha entrega</div>
             <div className="font-medium">{fmtFecha(ficha.fechaEntrega)}</div>
           </div>
+          {/* Detalle de la ficha ("Zona 3", "Muelle 7"): opcional, pero cuando
+              está es con lo que se identifica la orden en la mesa, así que va a
+              lo ancho y resaltado. */}
+          {ficha.nombreFicha && (
+            <div className="col-span-2">
+              <div className="text-gray-400">Detalle</div>
+              <div className="font-bold uppercase break-words">{ficha.nombreFicha}</div>
+            </div>
+          )}
           {/* Va a lo ancho y solo si existe: es la referencia del cliente, no
               un dato que toda ficha tenga. */}
           {ficha.numeroOrdenCompra && (

@@ -8,6 +8,8 @@ import EstadoControl from "./fichas/EstadoControl";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { cotizacionDeFicha } from "../utils/documentoVinculo";
+import { conPrefillOrden } from "./fichas/prefillOrden";
 import Combobox from "./ui/Combobox";
 import { useQuote } from "../context/QuoteContext";
 import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
@@ -38,6 +40,9 @@ const itemVacio = () => ({
 const INITIAL_FORM = {
   codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
   numeroOrdenCompra: "",
+  // Detalle libre para distinguir esta ficha de otra igual del mismo
+  // pedido: "Zona 3", "Muelle 7". Opcional, ver fichas/IdentificacionFicha.
+  nombreFicha:       "",
   cliente:           "",
   // Vínculo con la base de clientes del cotizador (empresas/{id}).
   // Ver utils/clienteVinculo.js.
@@ -46,6 +51,10 @@ const INITIAL_FORM = {
   clienteCiudad:     "",
   clienteAlias:      "",
   usarAlias:         false,
+  // Cotización de la que salió el pedido. Opcional y solo de la oficina:
+  // planta no ve cotizaciones. Ver utils/documentoVinculo.js.
+  cotizacionId:      null,
+  cotizacionNumero:  "",
   responsable:       "",
   fechaOrden:        hoy(),
   fechaEntrega:      "",
@@ -70,6 +79,8 @@ export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardad
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
   const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
+  // El selector devuelve id + número juntos, o los dos vacíos al desvincular.
+  const setCotizacion = (datos) => setForm((p) => ({ ...p, ...datos }));
 
   const setItem = (idx, campo, valor) =>
     setForm((p) => ({
@@ -121,7 +132,9 @@ export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardad
     setForm({
       codigoFicha:       codigoDeFicha(f, "general"),
       numeroOrdenCompra: f.numeroOrdenCompra || "",
+      nombreFicha:       f.nombreFicha || "",
       ...clienteDeFicha(f),
+      ...cotizacionDeFicha(f),
       responsable:       f.responsable || "",
       fechaOrden:        f.fechaOrden || hoy(),
       fechaEntrega:      f.fechaEntrega || "",
@@ -132,10 +145,15 @@ export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardad
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const cancelarEdicion = () => {
+  // Formulario en blanco. `prefill` llega cuando la ficha se crea desde un
+  // pedido ya existente: hereda la orden de compra, el cliente y las fechas
+  // para que caiga sola dentro del mismo grupo (ver prefillOrden.js).
+  const nuevaFicha = (prefill) => {
     setEditingId(null);
-    setForm(INITIAL_FORM);
+    setForm(conPrefillOrden(INITIAL_FORM, prefill));
   };
+
+  const cancelarEdicion = () => nuevaFicha();
 
   // Órdenes es la lista de producción; desde allí se pide crear o editar una
   // ficha de este producto y ProduccionPage cambia de pestaña dejando el
@@ -143,9 +161,9 @@ export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardad
   React.useEffect(() => {
     if (!encargo) return;
     if (encargo.accion === "editar" && encargo.ficha) handleEditar(encargo.ficha);
-    else cancelarEdicion();
+    else nuevaFicha(encargo.prefill);
     onEncargoAtendido?.();
-    // Lo que dispara esto es el encargo; handleEditar y cancelarEdicion se
+    // Lo que dispara esto es el encargo; handleEditar y nuevaFicha se
     // rehacen en cada render y meterlos aquí lo dispararía en bucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encargo]);
@@ -174,8 +192,12 @@ export default function FichaBasicaFicha({ encargo, onEncargoAtendido, onGuardad
             codigo={form.codigoFicha}
             ordenCompra={form.numeroOrdenCompra}
             onOrdenCompraChange={set("numeroOrdenCompra")}
+            nombre={form.nombreFicha}
+            onNombreChange={set("nombreFicha")}
             inputCls={inputCls}
             labelCls={labelCls}
+            cotizacion={form}
+            onCotizacionChange={setCotizacion}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

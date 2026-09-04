@@ -1,5 +1,5 @@
 import React from "react";
-import { FaExclamationTriangle, FaRegClock, FaFileAlt } from "react-icons/fa";
+import { FaExclamationTriangle, FaRegClock, FaFileAlt, FaTag } from "react-icons/fa";
 import EstadoBadge from "../fichas/EstadoBadge";
 import { resumenCorto } from "../fichas/detallePorTipo";
 import { productoDe } from "./productosFicha";
@@ -62,6 +62,21 @@ export default function OrdenCard({ ficha: f, hoy, onAbrir, onCambiarEstado, onV
       <div className="mt-1 font-semibold text-sm text-gray-900 dark:text-white truncate" title={f.cliente || ""}>
         {f.cliente || "Sin cliente"}
       </div>
+
+      {/* El detalle de la ficha va en pleno y justo bajo el cliente: es lo
+          único que separa dos sellos de la misma medida del mismo pedido, así
+          que tiene que verse antes que las medidas. Solo aparece si la ficha lo
+          tiene — es opcional, y una tira negra vacía en cada tarjeta llenaría
+          el tablero de ruido. */}
+      {f.nombreFicha && (
+        <div
+          title={f.nombreFicha}
+          className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md bg-gray-900 dark:bg-white px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white dark:text-gray-900"
+        >
+          <FaTag className="text-[9px] shrink-0 opacity-70" />
+          <span className="truncate min-w-0">{f.nombreFicha}</span>
+        </div>
+      )}
 
       <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 min-w-0">
         {Icon && <Icon className={`shrink-0 ${producto.tono}`} />}

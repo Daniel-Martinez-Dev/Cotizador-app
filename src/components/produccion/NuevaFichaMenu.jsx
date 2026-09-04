@@ -5,7 +5,10 @@ import { PRODUCTOS } from "./productosFicha";
 // "Nueva ficha" no puede ser un botón a secas: cada producto tiene su propio
 // formulario, así que primero hay que elegir cuál. El menú los lista con su
 // ícono para reconocerlos sin leer.
-export default function NuevaFichaMenu({ onElegir }) {
+//
+// `arriba` lo despliega hacia arriba: en el pie del pedido (OrdenCompraPanel)
+// el menú caía fuera de la pantalla.
+export default function NuevaFichaMenu({ onElegir, label = "Nueva ficha", arriba = false }) {
   const [abierto, setAbierto] = React.useState(false);
   const ref = React.useRef(null);
 
@@ -31,14 +34,16 @@ export default function NuevaFichaMenu({ onElegir }) {
         className="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-trafico/60"
       >
         <FaPlus className="text-xs" />
-        Nueva ficha
+        {label}
         <FaChevronDown className={`text-[9px] opacity-80 transition-transform ${abierto ? "rotate-180" : ""}`} />
       </button>
 
       {abierto && (
         <div
           role="menu"
-          className="absolute right-0 z-40 mt-2 w-64 rounded-xl border border-gray-200 dark:border-gris-600 bg-white dark:bg-gris-800 shadow-xl overflow-hidden animate-fade-in"
+          className={`absolute right-0 z-40 w-64 rounded-xl border border-gray-200 dark:border-gris-600 bg-white dark:bg-gris-800 shadow-xl overflow-hidden animate-fade-in ${
+            arriba ? "bottom-full mb-2" : "mt-2"
+          }`}
         >
           <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gris-700">
             ¿De qué producto?

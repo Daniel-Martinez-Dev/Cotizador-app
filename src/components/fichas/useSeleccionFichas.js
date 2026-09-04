@@ -33,6 +33,20 @@ export default function useSeleccionFichas(visibles, { modoInicial = false } = {
     });
   }, []);
 
+  // Marcar de una vez todas las fichas de una orden de compra. Es todo o nada
+  // a propósito: media orden marcada es la forma de despachar media orden.
+  const alternarVarias = React.useCallback((fichas) => {
+    const lista = fichas || [];
+    if (lista.length === 0) return;
+    setClaves((prev) => {
+      const llaves = lista.map(claveFicha);
+      const siguiente = new Set(prev);
+      if (llaves.every((k) => prev.has(k))) llaves.forEach((k) => siguiente.delete(k));
+      else llaves.forEach((k) => siguiente.add(k));
+      return siguiente;
+    });
+  }, []);
+
   const limpiar = React.useCallback(() => setClaves(new Set()), []);
 
   const todas = React.useCallback(() => {
@@ -56,5 +70,14 @@ export default function useSeleccionFichas(visibles, { modoInicial = false } = {
     if (!valor) setClaves(new Set());
   }, []);
 
-  return { modo, setModo: cambiarModo, seleccionadas, estaSeleccionada, alternar, limpiar, todas };
+  // Un grupo cuenta como seleccionado solo cuando lo están todas sus fichas.
+  const estanSeleccionadas = React.useCallback(
+    (fichas) => (fichas || []).length > 0 && fichas.every((f) => claves.has(claveFicha(f))),
+    [claves]
+  );
+
+  return {
+    modo, setModo: cambiarModo, seleccionadas, estaSeleccionada, estanSeleccionadas,
+    alternar, alternarVarias, limpiar, todas,
+  };
 }

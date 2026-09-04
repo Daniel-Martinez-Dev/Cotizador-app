@@ -341,6 +341,7 @@ export default function FichaImpresionPuertaSeccional({ ficha, numero, onClose }
         <Membrete
           logoSrc={logoPng}
           tituloFicha="Ficha de Fabricación — Puerta Seccional"
+          nombre={f.nombreFicha}
           numero={codigo}
           numeroLabel="N.° ficha de producción"
           subtitulo="Todas las dimensiones en milímetros"

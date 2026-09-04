@@ -6,6 +6,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import { formatCOP } from "../inventario/inventarioUtils";
 import {
   Aviso,
+  BotonIcono,
   Buscador,
   Card,
   Casilla,
@@ -20,6 +21,8 @@ import {
   TiraTotales,
   Tr,
 } from "./ui";
+import { IconoAbono, IconoAlerta, IconoAnular, IconoEditar, IconoReactivar } from "./iconos";
+import FacturaDetalle from "./FacturaDetalle";
 import {
   ESTADOS_PAGO,
   TIPOS_DOCUMENTO,
@@ -74,11 +77,12 @@ function AnularDialog({ documento, motivo, onMotivo, onCancelar, onConfirmar }) 
   );
 }
 
-export default function FacturasTab({ liquidados, cargando, anio, recargar, onEditar, onVerPagos, onNueva }) {
+export default function FacturasTab({ liquidados, empresas, cargando, anio, recargar, onEditar, onVerPagos, onNueva }) {
   const [filtros, setFiltros] = React.useState(FILTROS_INICIALES);
   const [porAnular, setPorAnular] = React.useState(null);
   const [motivo, setMotivo] = React.useState("");
   const [filtrosAbiertos, setFiltrosAbiertos] = React.useState(false);
+  const [verDetalle, setVerDetalle] = React.useState(null);
 
   const filtrados = React.useMemo(() => filtrarDocumentos(liquidados, filtros), [liquidados, filtros]);
   const totales = React.useMemo(() => totalesDocumentos(filtrados), [filtrados]);
@@ -89,6 +93,16 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
     () => Object.keys(FILTROS_INICIALES).some((k) => filtros[k] !== FILTROS_INICIALES[k]),
     [filtros]
   );
+
+  // El detalle se queda abierto entre recargas, así que hay que releer el
+  // documento de la lista recién liquidada: si no, tras registrar un abono
+  // seguiría enseñando el saldo viejo.
+  const detalle = React.useMemo(
+    () => (verDetalle ? liquidados.find((d) => d.id === verDetalle.id) || verDetalle : null),
+    [liquidados, verDetalle]
+  );
+
+  const pedirAnulacion = (doc) => { setPorAnular(doc); setMotivo(""); };
 
   const confirmarAnulacion = async () => {
     try {
@@ -114,24 +128,57 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
     }
   };
 
-  // `repartidas` estira los botones a lo ancho de la tarjeta del teléfono. En
-  // la tabla van compactos y a la derecha, que es donde cabe la columna.
-  const acciones = (doc, { repartidas = false } = {}) => (
-    <div className={`flex flex-wrap gap-1.5 justify-end ${repartidas ? "[&>button]:flex-1" : ""}`}>
-      <Button size="sm" variant="secondary" onClick={() => onEditar(doc)}>Editar</Button>
-      {/* Una nota crédito no se cobra, así que no tiene abonos que ver. Solo
-          aparece el botón si arrastra alguno mal aplicado, para poder quitarlo. */}
+  // Las acciones van en símbolos y al comienzo de la fila: escritas ocupaban la
+  // mitad del ancho de una tabla de doce columnas, y estaban al final, donde
+  // hay que barrer la fila entera con la vista para llegar. El nombre de cada
+  // una sigue en el `title` y en el `aria-label` (ver BotonIcono).
+  const acciones = (doc) => (
+    <div className="flex items-center gap-1">
       {!esNotaCredito(doc) ? (
-        <Button size="sm" variant="accent" onClick={() => onVerPagos(doc)}>Abonos</Button>
+        <BotonIcono titulo="Abonos" tono="bueno" onClick={() => onVerPagos(doc)}>
+          <IconoAbono />
+        </BotonIcono>
       ) : doc.resumen?.abonosIndebidos ? (
-        <Button size="sm" variant="danger" onClick={() => onVerPagos(doc)}>Abonos mal aplicados</Button>
-      ) : null}
-      {doc.anulado ? (
-        <Button size="sm" variant="secondary" onClick={() => reactivar(doc)}>Reactivar</Button>
+        <BotonIcono titulo="Abonos mal aplicados" tono="malo" onClick={() => onVerPagos(doc)}>
+          <IconoAlerta />
+        </BotonIcono>
       ) : (
-        <Button size="sm" variant="danger" onClick={() => { setPorAnular(doc); setMotivo(""); }}>Anular</Button>
+        // Hueco del mismo ancho: sin él, el lápiz y el aspa de una nota
+        // crédito se corren a la izquierda y dejan de coincidir con los de las
+        // filas de arriba.
+        <span className="inline-block h-9 w-9 sm:h-8 sm:w-8" aria-hidden="true" />
+      )}
+      <BotonIcono titulo="Editar" onClick={() => onEditar(doc)}>
+        <IconoEditar />
+      </BotonIcono>
+      {doc.anulado ? (
+        <BotonIcono titulo="Reactivar" onClick={() => reactivar(doc)}>
+          <IconoReactivar />
+        </BotonIcono>
+      ) : (
+        <BotonIcono titulo="Anular" tono="malo" onClick={() => pedirAnulacion(doc)}>
+          <IconoAnular />
+        </BotonIcono>
       )}
     </div>
+  );
+
+  // Pulsar la fila en cualquier parte abre el detalle. Es una comodidad del
+  // ratón y del dedo, no la única forma de llegar: la fila sigue siendo una
+  // fila —ponerle role="button" le quita a un lector de pantalla la cuenta de
+  // filas de la tabla— y el camino con teclado es el nombre del cliente, que
+  // va como botón de verdad y abre lo mismo.
+  const alPulsarFila = (doc) => ({ onClick: () => setVerDetalle(doc) });
+
+  const botonDetalle = (doc, className) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setVerDetalle(doc); }}
+      title={doc.clienteNombre}
+      className={`text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-trafico rounded ${className}`}
+    >
+      {doc.clienteNombre || "—"}
+    </button>
   );
 
   return (
@@ -211,8 +258,9 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
             </Button>
           )}
         </div>
-        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 md:text-right">
-          {filtrados.length} de {liquidados.length} documentos de {anio}
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>Pulsa una fila para ver el detalle completo.</span>
+          <span>{filtrados.length} de {liquidados.length} documentos de {anio}</span>
         </div>
       </Card>
 
@@ -236,6 +284,7 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
           <Tabla className="hidden lg:block max-h-[70vh] overflow-y-auto">
             <thead>
               <tr>
+                <Th className="w-[8.5rem]"><span className="sr-only">Acciones</span></Th>
                 <Th>Fecha</Th>
                 <Th>Documento</Th>
                 <Th>Cliente</Th>
@@ -247,7 +296,6 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                 <Th align="right">Saldo</Th>
                 <Th>Estado</Th>
                 <Th>Vence</Th>
-                <Th align="right">Acciones</Th>
               </tr>
             </thead>
             <tbody>
@@ -256,7 +304,13 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                 const insignia = INSIGNIA_TIPO[doc.tipo];
                 const conceptos = (doc.items || []).map((i) => i.producto).filter(Boolean).join(", ");
                 return (
-                  <Tr key={doc.id} apagada={doc.anulado}>
+                  <Tr
+                    key={doc.id}
+                    apagada={doc.anulado}
+                    className="cursor-pointer"
+                    {...alPulsarFila(doc)}
+                  >
+                    <Td className="py-1.5">{acciones(doc)}</Td>
                     <Td className="whitespace-nowrap text-gray-500 dark:text-gray-400">{fechaCorta(doc.fecha)}</Td>
                     <Td>
                       <div className="flex items-center gap-1.5">
@@ -265,14 +319,7 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                       </div>
                     </Td>
                     <Td>
-                      <button
-                        type="button"
-                        onClick={() => onEditar(doc)}
-                        className="text-left font-medium max-w-[22ch] truncate hover:underline focus:outline-none focus:underline"
-                        title={doc.clienteNombre}
-                      >
-                        {doc.clienteNombre || "—"}
-                      </button>
+                      {botonDetalle(doc, "block font-medium max-w-[22ch] truncate")}
                       {!doc.empresaId && (
                         <div className="text-[10px] text-amber-600 dark:text-amber-400">Sin vincular</div>
                       )}
@@ -294,7 +341,6 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                         <div className="text-[10px] font-medium text-red-600 dark:text-red-400">{resumen.diasMora} d</div>
                       )}
                     </Td>
-                    <Td align="right">{acciones(doc)}</Td>
                   </Tr>
                 );
               })}
@@ -303,31 +349,33 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
 
           {/* Tarjetas en pantallas angostas: la tabla de doce columnas no cabe.
               El saldo manda —es lo que se viene a mirar— y por eso va grande y
-              solo; el neto y lo abonado quedan de contexto debajo. */}
+              solo; el neto y lo abonado quedan de contexto debajo. Las acciones
+              van arriba, en el mismo sitio que en la tabla. */}
           <div className="lg:hidden grid gap-2">
             {filtrados.map((doc) => {
               const { resumen } = doc;
               const insignia = INSIGNIA_TIPO[doc.tipo];
               return (
-                <Card key={doc.id} padding="p-3" className={doc.anulado ? "opacity-50" : ""}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => onEditar(doc)}
-                        className="text-left font-semibold text-[15px] leading-snug break-words w-full"
-                      >
-                        {doc.clienteNombre || "—"}
-                      </button>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                        {insignia && <Badge tone={insignia.tono}>{insignia.texto}</Badge>}
-                        {doc.numero || "sin número"} · {doc.fecha || "sin fecha"}
-                      </div>
-                      {!doc.empresaId && (
-                        <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">Sin cliente vinculado</div>
-                      )}
-                    </div>
+                <Card
+                  key={doc.id}
+                  padding="p-3"
+                  className={`cursor-pointer ${doc.anulado ? "opacity-50" : ""}`}
+                  {...alPulsarFila(doc)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    {acciones(doc)}
                     <Badge tone={tonoEstado(resumen.estado)}>{etiquetaEstado(resumen.estado)}</Badge>
+                  </div>
+
+                  <div className="mt-2 min-w-0">
+                    {botonDetalle(doc, "block w-full font-semibold text-[15px] leading-snug break-words")}
+                    <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                      {insignia && <Badge tone={insignia.tono}>{insignia.texto}</Badge>}
+                      {doc.numero || "sin número"} · {doc.fecha || "sin fecha"}
+                    </div>
+                    {!doc.empresaId && (
+                      <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">Sin cliente vinculado</div>
+                    )}
                   </div>
 
                   <div className="mt-2.5 flex items-end justify-between gap-3 border-t border-gray-100 dark:border-gris-700/60 pt-2.5">
@@ -351,7 +399,6 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
                       Vencida hace {resumen.diasMora} días ({resumen.vencimiento})
                     </div>
                   )}
-                  <div className="mt-2.5">{acciones(doc, { repartidas: true })}</div>
                 </Card>
               );
             })}
@@ -362,6 +409,19 @@ export default function FacturasTab({ liquidados, cargando, anio, recargar, onEd
             <strong className="text-gray-900 dark:text-white">{formatCOP(totales.saldo)}</strong> por cobrar
           </div>
         </>
+      )}
+
+      {detalle && (
+        <FacturaDetalle
+          documento={detalle}
+          documentos={liquidados}
+          empresas={empresas}
+          onCerrar={() => setVerDetalle(null)}
+          onEditar={(doc) => { setVerDetalle(null); onEditar(doc); }}
+          onVerPagos={(doc) => { setVerDetalle(null); onVerPagos(doc); }}
+          onAnular={(doc) => { setVerDetalle(null); pedirAnulacion(doc); }}
+          onReactivar={(doc) => { setVerDetalle(null); reactivar(doc); }}
+        />
       )}
 
       {porAnular && (

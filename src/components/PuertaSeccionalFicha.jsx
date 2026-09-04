@@ -25,6 +25,8 @@ import { codigoFicha as codigoDeFicha } from "../utils/codigoFicha";
 import IdentificacionFicha from "./fichas/IdentificacionFicha";
 import ClienteSelector from "./fichas/ClienteSelector";
 import { clienteDeFicha } from "../utils/clienteVinculo";
+import { camposCotizacionFicha, cotizacionDeFicha } from "../utils/documentoVinculo";
+import { conPrefillOrden } from "./fichas/prefillOrden";
 import { valorNumerico, conDefectosNumericos } from "../utils/campoNumero";
 
 const OPCIONES = {
@@ -37,6 +39,9 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 const INITIAL_FORM = {
   codigoFicha:       "", // solo lectura: lo asigna el sistema al guardar
   numeroOrdenCompra: "",
+  // Detalle libre para distinguir esta ficha de otra igual del mismo
+  // pedido: "Zona 3", "Muelle 7". Opcional, ver fichas/IdentificacionFicha.
+  nombreFicha:       "",
   cliente:           "",
   // Vínculo con la base de clientes del cotizador (empresas/{id}).
   // Ver utils/clienteVinculo.js.
@@ -45,6 +50,10 @@ const INITIAL_FORM = {
   clienteCiudad:     "",
   clienteAlias:      "",
   usarAlias:         false,
+  // Cotización de la que salió el pedido. Opcional y solo de la oficina:
+  // planta no ve cotizaciones. Ver utils/documentoVinculo.js.
+  cotizacionId:      null,
+  cotizacionNumero:  "",
   cantidad:          1,
   fechaOrden:        hoy(),
   anchoVano:         "",
@@ -155,6 +164,8 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
   // El selector devuelve nombre + id + NIT + ciudad juntos: la ficha no puede
   // quedar con el id de un cliente y el nombre de otro.
   const setCliente = (datos) => setForm((p) => ({ ...p, ...datos }));
+  // El selector devuelve id + número juntos, o los dos vacíos al desvincular.
+  const setCotizacion = (datos) => setForm((p) => ({ ...p, ...datos }));
   const setNum = (field) => (e) => setForm((p) => ({ ...p, [field]: valorNumerico(e.target.value) }));
 
   const handleSubmit = async (e) => {
@@ -178,6 +189,9 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
         }));
       const datos = {
         ...conDefectos(form),
+        // El vínculo con la cotización va normalizado también al editar: el
+        // formulario lo manda dentro de este objeto y de aquí sale a Firestore.
+        ...camposCotizacionFicha(form),
         anchoVano: Number(form.anchoVano),
         altoVano:  Number(form.altoVano),
         fechaEntrega,
@@ -210,7 +224,9 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
     setForm({
       codigoFicha:       codigoDeFicha(f, "puertaseccional"),
       numeroOrdenCompra: f.numeroOrdenCompra || "",
+      nombreFicha:       f.nombreFicha || "",
       ...clienteDeFicha(f),
+      ...cotizacionDeFicha(f),
       cantidad:          f.cantidad ?? 1,
       fechaOrden:        f.fechaOrden || hoy(),
       anchoVano:         f.anchoVano ?? "",
@@ -233,12 +249,17 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const cancelarEdicion = () => {
+  // Formulario en blanco. `prefill` llega cuando la ficha se crea desde un
+  // pedido ya existente: hereda la orden de compra, el cliente y las fechas
+  // para que caiga sola dentro del mismo grupo (ver prefillOrden.js).
+  const nuevaFicha = (prefill) => {
     setEditingId(null);
-    setForm(INITIAL_FORM);
+    setForm(conPrefillOrden(INITIAL_FORM, prefill));
     setEmpaque([]);
     empaqueManual.current = false;
   };
+
+  const cancelarEdicion = () => nuevaFicha();
 
   // Órdenes es la lista de producción; desde allí se pide crear o editar una
   // ficha de este producto y ProduccionPage cambia de pestaña dejando el
@@ -246,9 +267,9 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
   React.useEffect(() => {
     if (!encargo) return;
     if (encargo.accion === "editar" && encargo.ficha) handleEditar(encargo.ficha);
-    else cancelarEdicion();
+    else nuevaFicha(encargo.prefill);
     onEncargoAtendido?.();
-    // Lo que dispara esto es el encargo; handleEditar y cancelarEdicion se
+    // Lo que dispara esto es el encargo; handleEditar y nuevaFicha se
     // rehacen en cada render y meterlos aquí lo dispararía en bucle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encargo]);
@@ -276,8 +297,12 @@ export default function PuertaSeccionalFicha({ encargo, onEncargoAtendido, onGua
               codigo={form.codigoFicha}
               ordenCompra={form.numeroOrdenCompra}
               onOrdenCompraChange={set("numeroOrdenCompra")}
+              nombre={form.nombreFicha}
+              onNombreChange={set("nombreFicha")}
               inputCls={inputCls}
               labelCls={labelCls}
+              cotizacion={form}
+              onCotizacionChange={setCotizacion}
             />
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">

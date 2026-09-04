@@ -180,6 +180,38 @@ export async function cambiarEstadoFicha(tipo, id, { estado, estadoAnterior, not
   return entrada;
 }
 
+// Escribe la orden de compra del cliente en la ficha. Es lo que junta varias
+// órdenes en un mismo pedido: el grupo se arma por este campo (ver
+// produccion/ordenesAgrupar.js), así que darles a todas el mismo número es la
+// forma de decir que van juntas — y de que no salga media orden en el camión.
+//
+// Queda en el historial como cualquier otro cambio: es el número con el que
+// llama el cliente y con el que se factura, y moverlo sin dejar rastro sería
+// perder de vista con qué pedido se despachó la ficha.
+//
+// Solo producción/admin: las reglas de Firestore no dejan que la planta toque
+// nada fuera de notas, estado, firmas y entrega (ver fichaUpdateEmpleadoOk).
+export async function asignarOrdenCompraFicha(tipo, id, {
+  numeroOrdenCompra, anterior, autorNombre, autorUid,
+}) {
+  const cfg = getFichaTipoConfig(tipo);
+  const numero = (numeroOrdenCompra || "").toString().trim();
+  if (!numero) throw new Error("Indica el número de la orden de compra");
+  const previa = (anterior || "").toString().trim();
+  const entrada = construirNota({
+    texto: previa ? `Orden de compra: ${previa} → ${numero}` : `Orden de compra: ${numero}`,
+    autorNombre,
+    autorUid,
+  });
+  await waitForAuth();
+  await updateDoc(doc(db, cfg.col, id), {
+    numeroOrdenCompra: numero,
+    notas: arrayUnion(entrada),
+    updatedAt: serverTimestamp(),
+  });
+  return { numeroOrdenCompra: numero, nota: entrada };
+}
+
 // Un bloque de firma tal como se guarda en `firmas.<etapa>`: quién firmó, la
 // fecha que sale impresa en la ficha y el registro fotográfico de respaldo.
 // Ver firmasFicha.js para el modelo y para cómo se leen las fichas viejas.

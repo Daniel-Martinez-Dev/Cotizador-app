@@ -156,17 +156,29 @@ service cloud.firestore {
     }
 
     // ─── Cotizaciones ──────────────────────────────────────────────────────────
+    // Planta no entra, y esto es una regla del servidor y no de la interfaz:
+    // desde que la ficha guarda de qué cotización salió (`cotizacionId`, ver
+    // utils/documentoVinculo.js), el operario tiene a la vista el id de un
+    // documento con precios. Ese id no le sirve de nada porque aquí se le
+    // niega la lectura — antes no, porque `isActiveStaff()` lo incluía y las
+    // cotizaciones viejas no traen `uid`. El veto exceptúa al admin
+    // porque el `hasRole` de las reglas es literal —no le da paso libre como
+    // el de la app— y hay quien es admin y además tiene rol de planta.
+    //
+    // La oficina sigue como estaba: cada quien ve las suyas y el admin las ve
+    // todas. Un vínculo hacia una cotización ajena se muestra por el número
+    // que la ficha guardó, pero abrirla sigue pidiendo permiso.
     match /cotizaciones/{cotId} {
-      allow read: if isActiveStaff() && (
+      allow read: if isActiveStaff() && (isAdmin() || !isPlantaRole()) && (
         isAdmin() ||
         ('uid' in resource.data && resource.data.uid == request.auth.uid) ||
         !('uid' in resource.data)
       );
-      allow create: if isActiveStaff() && (
+      allow create: if isActiveStaff() && (isAdmin() || !isPlantaRole()) && (
         !('uid' in request.resource.data) ||
         request.resource.data.uid == request.auth.uid
       );
-      allow update, delete: if isActiveStaff() && (
+      allow update, delete: if isActiveStaff() && (isAdmin() || !isPlantaRole()) && (
         isAdmin() ||
         ('uid' in resource.data && resource.data.uid == request.auth.uid)
       );
@@ -231,32 +243,38 @@ service cloud.firestore {
     // Rápidas, Puertas Seccionales): "produccion"/admin tienen acceso total;
     // "empleado" (planta) solo puede leer y actualizar notas/estado/firmas, y
     // lo que firma queda cerrado para él (ver fichaUpdateEmpleadoOk).
+    //
+    // Contabilidad las LEE, y nada más: es lo que necesita el selector con el
+    // que una factura dice qué fichas cubre (ver utils/documentoVinculo.js).
+    // Leer una ficha no muestra un solo peso — medidas, materiales y estado—,
+    // así que el muro entre planta y cartera sigue en pie: es la factura la
+    // que apunta a la ficha, nunca al revés.
     match /division_fichas/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_sellos/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_abrigo_retractil/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_puertas_rapidas/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
 
     match /fichas_puertas_seccionales/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }
@@ -264,7 +282,7 @@ service cloud.firestore {
     // Fichas básicas: órdenes sin ficha de fabricación (repuestos, semáforos,
     // lámparas, topes, rampas…). Mismos permisos que las demás fichas.
     match /fichas_generales/{docId} {
-      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole();
+      allow read: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || isPlantaRole() || isContabilidadStaff();
       allow create, delete: if isAdmin() || (isActiveStaff() && hasRole('produccion'));
       allow update: if isAdmin() || (isActiveStaff() && hasRole('produccion')) || (isPlantaRole() && fichaUpdateEmpleadoOk());
     }

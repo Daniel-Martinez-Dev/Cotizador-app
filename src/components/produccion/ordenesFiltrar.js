@@ -79,6 +79,7 @@ export function textoBuscable(f) {
     codigoFichaOFallback(f, f.tipo),
     f.cliente,
     f.numeroOrdenCompra,
+    f.nombreFicha,
     f.numeroFicha,
     f.ordenProduccion,
     f.tipoLabel,

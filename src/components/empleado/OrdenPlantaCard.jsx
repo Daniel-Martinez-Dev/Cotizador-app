@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   FaChevronRight, FaRulerCombined, FaLayerGroup, FaCalendarAlt,
-  FaExclamationCircle, FaCheck, FaFileAlt,
+  FaExclamationCircle, FaCheck, FaFileAlt, FaTag,
 } from "react-icons/fa";
 import EstadoBadge from "../fichas/EstadoBadge";
 import { codigoFichaOFallback } from "../../utils/codigoFicha";
@@ -51,6 +51,17 @@ export default function OrdenPlantaCard({
       {/* Cliente y medida juntos: cuando un mismo cliente tiene varias órdenes
           abiertas, la medida es lo que las distingue en planta. */}
       <div className="font-semibold text-base leading-snug break-words mt-0.5">{cliente}</div>
+
+      {/* Y cuando ni la medida las distingue —seis sellos iguales del mismo
+          pedido— lo hace el detalle de la ficha. En la mesa es el dato con el
+          que se habla ("el del muelle 7"), así que se imprime tan grande como
+          la medida. */}
+      {ficha.nombreFicha && (
+        <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md bg-gray-900 dark:bg-white px-2.5 py-1 text-sm font-bold uppercase leading-none tracking-wide text-white dark:text-gray-900">
+          <FaTag className="text-[10px] shrink-0 opacity-70" aria-hidden="true" />
+          <span className="break-words min-w-0">{ficha.nombreFicha}</span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap mt-1.5">
         {medida ? (

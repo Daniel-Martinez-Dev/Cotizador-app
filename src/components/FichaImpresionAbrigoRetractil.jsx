@@ -157,6 +157,7 @@ export default function FichaImpresionAbrigoRetractil({ ficha, numero, onClose }
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — Abrigo Retráctil"
+            nombre={f.nombreFicha}
             numero={codigo}
             numeroLabel="N.° ficha de producción"
             subtitulo="Todas las dimensiones en milímetros"

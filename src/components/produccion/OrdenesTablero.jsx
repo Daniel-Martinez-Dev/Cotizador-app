@@ -1,6 +1,8 @@
 import React from "react";
 import OrdenCard from "./OrdenCard";
+import OrdenCompraCard from "./OrdenCompraCard";
 import { agruparPorEstado } from "./ordenesFiltrar";
+import { claveEntrada } from "./ordenesAgrupar";
 import { ESTADOS_FICHA, ESTADO_LABEL, ESTADO_DOT } from "../fichas/estadoFicha";
 
 // Tablero por estado: cuatro columnas fijas, en el orden del flujo. Responde de
@@ -9,6 +11,10 @@ import { ESTADOS_FICHA, ESTADO_LABEL, ESTADO_DOT } from "../fichas/estadoFicha";
 //
 // Las columnas se dibujan siempre, incluso vacías: una columna que desaparece
 // esconde que no hay nada en ese estado, que es justo lo que hay que ver.
+//
+// `ordenes` trae fichas sueltas y pedidos completos mezclados (ver
+// ordenesAgrupar.js). Un pedido se coloca en la columna de su ficha más
+// atrasada: la orden de compra no está terminada hasta que lo estén todas.
 export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado, onVerFicha, estaSeleccionada, onSeleccionar }) {
   const grupos = React.useMemo(() => agruparPorEstado(ordenes), [ordenes]);
 
@@ -37,9 +43,18 @@ export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado,
                   Nada aquí
                 </p>
               ) : (
-                fichas.map((f) => (
+                fichas.map((f) => (f.esGrupo ? (
+                  <OrdenCompraCard
+                    key={claveEntrada(f)}
+                    grupo={f}
+                    hoy={hoy}
+                    onAbrir={onAbrir}
+                    seleccionada={estaSeleccionada?.(f)}
+                    onSeleccionar={onSeleccionar}
+                  />
+                ) : (
                   <OrdenCard
-                    key={`${f.tipo}-${f.id}`}
+                    key={claveEntrada(f)}
                     ficha={f}
                     hoy={hoy}
                     onAbrir={onAbrir}
@@ -48,7 +63,7 @@ export default function OrdenesTablero({ ordenes, hoy, onAbrir, onCambiarEstado,
                     seleccionada={estaSeleccionada?.(f)}
                     onSeleccionar={onSeleccionar}
                   />
-                ))
+                )))
               )}
             </div>
           </section>

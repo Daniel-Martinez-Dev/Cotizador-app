@@ -1,5 +1,6 @@
 import { UNIDAD_POR_DEFECTO } from "./catalogos";
 import { camposClienteFicha } from "../../../utils/clienteVinculo";
+import { camposCotizacionFicha } from "../../../utils/documentoVinculo";
 
 // Normalización de la ficha básica. Es el equivalente al `calcular.js` de las
 // demás líneas: aquí no hay medidas que derivar, pero sí una lista de ítems que
@@ -42,9 +43,15 @@ export function construirFichaGeneral(input = {}) {
   const items = normalizarItems(input.items);
   return {
     numeroOrdenCompra: (input.numeroOrdenCompra || "").trim(),
+    // Detalle libre de la ficha ("Zona 3", "Muelle 7"): lo que distingue dos
+    // fichas iguales del mismo pedido. Ver fichas/IdentificacionFicha.
+    nombreFicha:       (input.nombreFicha || "").trim(),
     // Cliente: nombre + vínculo a `empresas/{id}` (la misma base del
     // cotizador). Ver utils/clienteVinculo.js.
     ...camposClienteFicha(input),
+    // Cotización de la que salió el pedido, cuando la hay. Opcional: la ficha
+    // se guarda igual sin ella. Ver utils/documentoVinculo.js.
+    ...camposCotizacionFicha(input),
     responsable:       (input.responsable || "").trim(),
     fechaOrden:        toIso(input.fechaOrden),
     fechaEntrega:      toIso(input.fechaEntrega),

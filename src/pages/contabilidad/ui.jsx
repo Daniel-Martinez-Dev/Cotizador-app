@@ -1,5 +1,14 @@
 import React from "react";
 import { formatCOP } from "../inventario/inventarioUtils";
+import {
+  MILES,
+  agruparMiles,
+  cifrasTrasCursor,
+  cursorTrasCifras,
+  limpiarDinero,
+  numeroDeDinero,
+  textoDeDinero,
+} from "../../utils/dineroTexto";
 
 // Piezas de la sección contable.
 //
@@ -41,11 +50,39 @@ export const Input = React.forwardRef(function Input({ className = "", ...props 
   return <input ref={ref} className={`${claseControl} ${className}`} {...props} />;
 });
 
+// El desplegable nativo hereda del control el color del texto pero no siempre
+// el fondo: en Android y en el Electron de Windows salía texto claro sobre
+// fondo claro y las opciones no se leían. Se le fija el par a cada <option>.
+const claseOpciones =
+  "[&>option]:bg-white [&>option]:text-gray-900 dark:[&>option]:bg-gris-700 dark:[&>option]:text-gray-100 " +
+  "[&>optgroup]:bg-white [&>optgroup]:text-gray-900 dark:[&>optgroup]:bg-gris-700 dark:[&>optgroup]:text-gray-100";
+
+/**
+ * Lista desplegable. La flecha es nuestra y no la del sistema (`appearance-none`)
+ * porque la nativa cambia de tamaño y de color en cada plataforma, y en oscuro
+ * se perdía contra el fondo del campo.
+ *
+ * `className` va al contenedor: es lo que las rejillas usan para colocarlo
+ * (`col-span-2`, `hidden md:block`), y puesto en el <select> el ancho w-full no
+ * dejaba que se aplicara.
+ */
 export const Select = React.forwardRef(function Select({ className = "", children, ...props }, ref) {
   return (
-    <select ref={ref} className={`${claseControl} pr-8 ${className}`} {...props}>
-      {children}
-    </select>
+    <div className={`relative ${className}`}>
+      <select
+        ref={ref}
+        className={`${claseControl} ${claseOpciones} appearance-none pr-9 cursor-pointer`}
+        {...props}
+      >
+        {children}
+      </select>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-500 dark:text-gray-400"
+      >
+        ▼
+      </span>
+    </div>
   );
 });
 
@@ -60,6 +97,95 @@ export const InputNumero = React.forwardRef(function InputNumero({ className = "
       className={`${claseControl} text-right tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${className}`}
       {...props}
     />
+  );
+});
+
+/**
+ * Campo de dinero: va poniendo los puntos de miles a medida que se escribe.
+ *
+ * Un valor unitario de 1750000 en una caja sin separadores hay que contarlo
+ * con el dedo en la pantalla, y un cero de más en una factura son diez veces
+ * el valor. Escribe hacia el estado el número (o "" si se vació el campo), lo
+ * mismo que hacía InputNumero, así que el resto del formulario no cambia.
+ *
+ * Es `type="text"`: un `type="number"` no admite los puntos, y el teclado
+ * numérico del teléfono lo pone `inputMode`.
+ */
+export const InputDinero = React.forwardRef(function InputDinero(
+  { value, onChange, className = "", placeholder = "0", ...props },
+  refExterna
+) {
+  // El campo se guarda siempre aquí —hace falta para reponer el cursor— y de
+  // paso se le pasa a quien haya pedido la ref, venga como objeto o como
+  // función.
+  const campo = React.useRef(null);
+  const asignarRef = (el) => {
+    campo.current = el;
+    if (typeof refExterna === "function") refExterna(el);
+    else if (refExterna) refExterna.current = el;
+  };
+  const [texto, setTexto] = React.useState(() => textoDeDinero(value));
+  // Cuántas cifras tenían que quedar a la derecha del cursor tras reformatear.
+  const cursorPendiente = React.useRef(null);
+
+  const valorNumero = value === "" || value === null || value === undefined ? "" : Number(value);
+
+  // El valor también llega de fuera ("Abonar el saldo", abrir otra factura).
+  // Mientras coincida con lo que hay tecleado manda el texto: reescribirlo
+  // borraría la coma o el cero a medio escribir.
+  React.useEffect(() => {
+    setTexto((actual) => (numeroDeDinero(actual) === valorNumero ? actual : textoDeDinero(valorNumero)));
+  }, [valorNumero]);
+
+  React.useLayoutEffect(() => {
+    const cifras = cursorPendiente.current;
+    cursorPendiente.current = null;
+    const el = campo.current;
+    if (cifras === null || !el || document.activeElement !== el) return;
+    const pos = cursorTrasCifras(el.value, cifras);
+    el.setSelectionRange(pos, pos);
+  }, [texto]);
+
+  const aplicar = (bruto, cursor) => {
+    cursorPendiente.current = cifrasTrasCursor(bruto, cursor);
+    const formateado = agruparMiles(limpiarDinero(bruto));
+    setTexto(formateado);
+    onChange?.(numeroDeDinero(formateado));
+  };
+
+  const alTeclear = (e) => {
+    props.onKeyDown?.(e);
+    if (e.key !== "Backspace" || e.defaultPrevented) return;
+    const el = e.target;
+    const { selectionStart: ini, selectionEnd: fin } = el;
+    // El punto lo pone el formato: borrarlo no quitaría nada y el campo se
+    // quedaba trabado. Se borra el dígito que tiene delante.
+    if (ini !== fin || ini < 2 || el.value[ini - 1] !== MILES) return;
+    e.preventDefault();
+    aplicar(el.value.slice(0, ini - 2) + el.value.slice(ini), ini - 2);
+  };
+
+  return (
+    <div className="relative">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500"
+      >
+        $
+      </span>
+      <input
+        {...props}
+        ref={asignarRef}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={texto}
+        placeholder={placeholder}
+        onChange={(e) => aplicar(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+        onKeyDown={alTeclear}
+        className={`${claseControl} pl-7 text-right tabular-nums ${className}`}
+      />
+    </div>
   );
 });
 
@@ -101,23 +227,76 @@ export function Casilla({ checked, onChange, children, className = "" }) {
   );
 }
 
+// ─── Acciones de una fila ───────────────────────────────────────────────────
+
+const TONOS_ICONO = {
+  neutral:
+    "border-gray-300 dark:border-gris-600 bg-white dark:bg-gris-700 text-gray-600 dark:text-gray-300 " +
+    "hover:bg-gray-100 dark:hover:bg-gris-600 hover:text-gray-900 dark:hover:text-white",
+  bueno:
+    "border-emerald-300 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-900/25 text-emerald-700 dark:text-emerald-300 " +
+    "hover:bg-emerald-100 dark:hover:bg-emerald-900/50",
+  malo:
+    "border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/25 text-red-700 dark:text-red-300 " +
+    "hover:bg-red-100 dark:hover:bg-red-900/50",
+};
+
+/**
+ * Acción de una fila, en símbolo.
+ *
+ * En una tabla de doce columnas, tres botones con su palabra —"Editar",
+ * "Abonos", "Anular"— se comían el ancho que le hace falta al nombre del
+ * cliente y a las cifras, que es a lo que se viene. El nombre sigue estando en
+ * el `title` y en el `aria-label`, así que ni el lector de pantalla ni el
+ * puntero se quedan sin él.
+ *
+ * `onClick` corta la propagación: la fila entera abre el detalle, y pulsar una
+ * acción no puede abrirlo además de hacer lo suyo.
+ */
+export function BotonIcono({ titulo, onClick, tono = "neutral", disabled = false, children, className = "" }) {
+  return (
+    <button
+      type="button"
+      title={titulo}
+      aria-label={titulo}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
+      className={
+        "inline-flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-md border shadow-sm " +
+        "transition-colors focus:outline-none focus:ring-2 focus:ring-trafico/60 " +
+        `disabled:opacity-40 disabled:cursor-not-allowed ${TONOS_ICONO[tono] || TONOS_ICONO.neutral} ${className}`
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
 // ─── Contenedores ───────────────────────────────────────────────────────────
 
-export function Card({ children, className = "", padding = "p-4" }) {
+export function Card({ children, className = "", padding = "p-4", ...props }) {
   return (
     <div
       className={`rounded-xl border border-gray-200 dark:border-gris-700 bg-white dark:bg-gris-800 shadow-sm ${padding} ${className}`}
+      {...props}
     >
       {children}
     </div>
   );
 }
 
-/** Bloque con título dentro de un formulario largo: da dónde apoyar la vista. */
+/**
+ * Bloque con título dentro de un formulario largo: da dónde apoyar la vista.
+ *
+ * Sin `overflow-hidden`, a propósito: recortaba en el borde de la sección la
+ * lista del autocompletar de cliente y la de producto, y las opciones salían a
+ * medias o no salían. Las esquinas de arriba las redondea la cabecera (11 px,
+ * que es el radio de la sección menos el píxel del borde).
+ */
 export function Seccion({ titulo, descripcion, acciones, children, className = "" }) {
   return (
-    <section className={`rounded-xl border border-gray-200 dark:border-gris-700 overflow-hidden ${className}`}>
-      <header className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-gray-50 dark:bg-gris-900/60 border-b border-gray-200 dark:border-gris-700">
+    <section className={`rounded-xl border border-gray-200 dark:border-gris-700 ${className}`}>
+      <header className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 rounded-t-[11px] bg-gray-50 dark:bg-gris-900/60 border-b border-gray-200 dark:border-gris-700">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{titulo}</h3>
           {descripcion && <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{descripcion}</p>}

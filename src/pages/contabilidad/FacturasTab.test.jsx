@@ -86,6 +86,39 @@ describe("FacturasTab", () => {
     expect(texto).toContain("$ 0 por cobrar");
   });
 
+  // Las acciones pasaron de tres palabras al final de la fila a tres símbolos
+  // al comienzo: en una tabla de doce columnas, "Editar Abonos Anular" se comía
+  // el ancho del cliente y de las cifras, y estaba donde hay que barrer la fila
+  // entera con la vista para llegar.
+  it("las acciones son símbolos, no palabras", () => {
+    const html = pintar();
+    for (const accion of ["Abonos", "Editar", "Anular"]) {
+      expect(html, `${accion} debería ir como símbolo`).toContain(`aria-label="${accion}"`);
+      expect(html, `${accion} no debería ir escrita`).not.toContain(`>${accion}<`);
+    }
+  });
+
+  it("las acciones van al comienzo de la fila y no al final", () => {
+    const html = pintar();
+    // La celda del cliente es la que lleva el nombre en `title`; el aria-label
+    // de la fila también lo nombra, y por eso no sirve buscar el nombre suelto.
+    expect(html.indexOf('aria-label="Editar"')).toBeLessThan(
+      html.indexOf('title="AXIONLOG COLOMBIA S.A.S."')
+    );
+  });
+
+  // Antes había que abrir el formulario de edición para mirar una factura, con
+  // el riesgo de guardar algo sin querer.
+  it("la fila abre el detalle, y con teclado lo abre el nombre del cliente", () => {
+    const html = pintar();
+    expect(html).toContain("cursor-pointer");
+    // La fila sigue siendo una fila: el camino accesible es un botón de verdad
+    // dentro de ella, no un role="button" encima que descuadre la tabla.
+    expect(html).not.toContain('role="button"');
+    expect(html).toContain('title="AXIONLOG COLOMBIA S.A.S."');
+    expect(html).toContain("Pulsa una fila para ver el detalle completo.");
+  });
+
   it("sin facturas invita a crear la primera en vez de dejar la pantalla vacía", () => {
     const html = pintar([]);
     expect(html).toContain("Sin facturas en 2026");

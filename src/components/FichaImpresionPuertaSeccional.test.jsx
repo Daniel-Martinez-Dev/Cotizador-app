@@ -139,3 +139,13 @@ describe("pendientes de la ficha", () => {
       .toContain("1 · 5,5 mm · 1200 mm");
   });
 });
+
+describe("detalle de la ficha", () => {
+  it("sale impreso cuando la ficha lo lleva", () => {
+    expect(render({ nombreFicha: "Muelle 7" })).toContain("Muelle 7");
+  });
+
+  it("no ocupa el encabezado cuando la ficha no lo lleva", () => {
+    expect(html).not.toContain("Detalle");
+  });
+});

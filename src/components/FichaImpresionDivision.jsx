@@ -266,6 +266,7 @@ export default function FichaImpresionDivision({ ficha, numero, onClose }) {
           <Membrete
             logoSrc={logoPng}
             tituloFicha="Ficha de Fabricación — División Térmica"
+            nombre={f.nombreFicha}
             numero={codigo}
             numeroLabel="N.° ficha de producción"
           />

@@ -41,6 +41,7 @@ export default function FichaImpresionGeneral({ ficha, numero, onClose }) {
         <Membrete
           logoSrc={logoPng}
           tituloFicha="Orden de Producción — Ficha Básica"
+          nombre={f.nombreFicha}
           numero={codigo}
           numeroLabel="N.° ficha de producción"
           subtitulo="Repuestos y productos sin ficha de fabricación"

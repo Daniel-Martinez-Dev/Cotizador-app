@@ -30,10 +30,14 @@ export default function ProduccionPage() {
   // Encargo que Órdenes le hace a una pestaña de producto: "abre el formulario
   // en blanco" o "carga esta ficha para editarla". Se guarda aquí porque quien
   // cambia de pestaña es esta página, y la pestaña destino lo consume y avisa.
+  //
+  // `prefill` es el caso de sumar una línea a un pedido que ya existe: el
+  // formulario abre con la orden de compra y el cliente de ese pedido puestos
+  // (ver fichas/prefillOrden.js).
   const [encargo, setEncargo] = React.useState(null);
 
-  const encargar = (tipo, accion, ficha) => {
-    setEncargo({ tipo, accion, ficha, id: Date.now() });
+  const encargar = (tipo, accion, { ficha, prefill } = {}) => {
+    setEncargo({ tipo, accion, ficha, prefill, id: Date.now() });
     setTab(tabDeTipo(tipo));
   };
 
@@ -58,8 +62,8 @@ export default function ProduccionPage() {
       <div className="mt-5">
         {tab === "ordenes" && (
           <OrdenesProduccionList
-            onNuevaFicha={(tipo) => encargar(tipo, "nueva")}
-            onEditarFicha={(ficha) => encargar(ficha.tipo, "editar", ficha)}
+            onNuevaFicha={(tipo, prefill) => encargar(tipo, "nueva", { prefill })}
+            onEditarFicha={(ficha) => encargar(ficha.tipo, "editar", { ficha })}
           />
         )}
         {tab === "division"        && <DivisionTermicaFicha {...props("division")} />}

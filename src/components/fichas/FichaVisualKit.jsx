@@ -117,7 +117,12 @@ export function MedidaHero({ label, ancho, alto, unidadAncho = "Ancho mm", unida
 }
 
 // Membrete (logo + título + N.° de ficha/orden) — idéntico en las tres fichas.
-export function Membrete({ logoSrc, tituloFicha, numero, numeroLabel = "N.° ficha de producción", subtitulo = "Todas las dimensiones en milímetros" }) {
+// `nombre` es el detalle libre de la ficha ("Zona 3", "Muelle 7"). Va pegado al
+// consecutivo y no debajo: es lo primero que se busca al levantar la hoja de la
+// mesa, y en horizontal no le cuesta alto a la hoja (la ficha entra en una sola
+// carta, ver utils/hojaImpresion.js). Marco negro y letra negra sobre blanco —
+// en papel no se imprimen fondos de color.
+export function Membrete({ logoSrc, tituloFicha, numero, nombre, numeroLabel = "N.° ficha de producción", subtitulo = "Todas las dimensiones en milímetros" }) {
   return (
     <div style={{
       background: "white", padding: "10px 20px 8px", borderBottom: "3px solid #1a3f8f",
@@ -137,18 +142,41 @@ export function Membrete({ logoSrc, tituloFicha, numero, numeroLabel = "N.° fic
           </div>
         </div>
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: "9px", color: "#000000", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "bold" }}>
-          {numeroLabel}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", flexShrink: 0 }}>
+        {nombre && <DetalleFicha nombre={nombre} />}
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: "9px", color: "#000000", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: "bold" }}>
+            {numeroLabel}
+          </div>
+          <div style={{
+            background: "linear-gradient(135deg, #1a3f8f 0%, #0b4a7d 100%)",
+            color: "white", fontSize: "21px", fontWeight: "bold", lineHeight: 1,
+            fontFamily: "monospace", padding: "6px 14px", borderRadius: "8px",
+            letterSpacing: "0.5px", marginTop: "3px", whiteSpace: "nowrap",
+          }}>
+            {numero ?? "—"}
+          </div>
         </div>
-        <div style={{
-          background: "linear-gradient(135deg, #1a3f8f 0%, #0b4a7d 100%)",
-          color: "white", fontSize: "21px", fontWeight: "bold", lineHeight: 1,
-          fontFamily: "monospace", padding: "6px 14px", borderRadius: "8px",
-          letterSpacing: "0.5px", marginTop: "3px", whiteSpace: "nowrap",
-        }}>
-          {numero ?? "—"}
-        </div>
+      </div>
+    </div>
+  );
+}
+
+// Rótulo del detalle de la ficha, para el membrete y para las fichas que arman
+// su encabezado a mano (Sello de Andén). Solo se pinta si la ficha lo tiene: es
+// un campo opcional y una etiqueta vacía en la hoja no dice nada.
+export function DetalleFicha({ nombre }) {
+  if (!nombre) return null;
+  return (
+    <div style={{
+      border: "2px solid #000000", borderRadius: "8px", padding: "4px 12px",
+      background: "#ffffff", maxWidth: "230px", textAlign: "right",
+    }}>
+      <div style={{ fontSize: "8.5px", color: "#000000", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: "bold" }}>
+        Detalle
+      </div>
+      <div style={{ fontSize: "17px", color: "#000000", fontWeight: "bold", lineHeight: 1.15, wordBreak: "break-word" }}>
+        {nombre}
       </div>
     </div>
   );

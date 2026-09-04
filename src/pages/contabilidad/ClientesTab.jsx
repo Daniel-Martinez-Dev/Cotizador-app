@@ -3,7 +3,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import EmptyState from "../../components/ui/EmptyState";
 import { formatCOP } from "../inventario/inventarioUtils";
-import { Aviso, Buscador, Campo, Card, Casilla, InputNumero, KPI, Money, Select, Tabla, Td, Th, TiraTotales, Tr } from "./ui";
+import { Aviso, Buscador, Campo, Card, Casilla, InputDinero, InputNumero, KPI, Money, Select, Tabla, Td, Th, TiraTotales, Tr } from "./ui";
 import { Anillo, BarrasMes, BarrasRanking, Medidor } from "./graficas";
 import ClienteDetalle from "./ClienteDetalle";
 import VincularClientes from "./VincularClientes";
@@ -109,7 +109,7 @@ function PanelDistribuidor({ clientes, productos, producto, onProducto, metas, o
       {ajustando && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-lg bg-gray-50 dark:bg-gris-900/50 p-2.5">
           <Campo label="Compras del producto">
-            <InputNumero value={metas.valor} step={1_000_000} onChange={(e) => cambiarMeta("valor", e.target.value)} />
+            <InputDinero value={metas.valor} onChange={(v) => cambiarMeta("valor", v)} />
           </Campo>
           <Campo label="Facturas del producto">
             <InputNumero value={metas.facturas} onChange={(e) => cambiarMeta("facturas", e.target.value)} />

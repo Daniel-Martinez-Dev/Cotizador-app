@@ -341,6 +341,7 @@ export default function FichaImpresionPuertaRapida({ ficha, numero, onClose }) {
         <Membrete
           logoSrc={logoPng}
           tituloFicha="Ficha de Fabricación — Puerta Rápida"
+          nombre={f.nombreFicha}
           numero={codigo}
           numeroLabel="N.° ficha de producción"
           subtitulo="Todas las dimensiones en milímetros"

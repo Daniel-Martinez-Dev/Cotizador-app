@@ -3,7 +3,7 @@ import FichaImpresionShell from "./fichas/FichaImpresionShell";
 import { fmtMm, fmtM2, fmtN, fmtDate } from "../utils/fichaFormat";
 import logoPng from "../assets/imagenes/logo.png";
 import { FaUserTie, FaRegCalendarAlt } from "react-icons/fa";
-import { MedidaCard, InfoChip, AcabadoCard, Firmas, FichaFooter } from "./fichas/FichaVisualKit";
+import { MedidaCard, InfoChip, AcabadoCard, Firmas, FichaFooter, DetalleFicha } from "./fichas/FichaVisualKit";
 import { codigoFichaOFallback } from "../utils/codigoFicha";
 import planoSelloAnden from "../assets/imagenes/SelloDeAnden/Plano.png";
 import { nombreClienteImpreso } from "../utils/clienteVinculo";
@@ -143,10 +143,13 @@ export default function FichaImpresionSello({ ficha, numero, onClose }) {
               <InfoBadge icon={<FaRegCalendarAlt />} label="Fecha:" value={fmtDate(new Date().toISOString())} />
               <InfoBadge label="Versión:" value="1.0" />
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "9px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1.5px" }}>N.° Ficha de producción</div>
-              <div style={{ background: "linear-gradient(135deg, #1a3f8f 0%, #0b4a7d 100%)", color: "#fff", fontSize: "21px", fontWeight: "bold", fontFamily: "monospace", letterSpacing: "0.5px", whiteSpace: "nowrap", padding: "7px 16px", borderRadius: "8px", marginTop: "4px" }}>
-                {codigo}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: "10px" }}>
+              <DetalleFicha nombre={f.nombreFicha} />
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "9px", color: "#000000", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1.5px" }}>N.° Ficha de producción</div>
+                <div style={{ background: "linear-gradient(135deg, #1a3f8f 0%, #0b4a7d 100%)", color: "#fff", fontSize: "21px", fontWeight: "bold", fontFamily: "monospace", letterSpacing: "0.5px", whiteSpace: "nowrap", padding: "7px 16px", borderRadius: "8px", marginTop: "4px" }}>
+                  {codigo}
+                </div>
               </div>
             </div>
           </div>

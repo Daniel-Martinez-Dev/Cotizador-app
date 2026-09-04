@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Firmas } from "./FichaVisualKit";
+import { Firmas, Membrete } from "./FichaVisualKit";
 
 // El pie de firmas es la parte legal de la ficha: si los nombres no salen
 // impresos, la orden que llega a planta no sirve como constancia. Estas
@@ -87,5 +87,32 @@ describe("bloque de firmas de la ficha impresa", () => {
     expect(html).toContain("Fecha y hora de despacho");
     // Alto contraste para la impresión: los textos del bloque van en negro.
     expect(html).not.toMatch(/color:#(6b7280|9ca3af|d1d5db)/i);
+  });
+});
+
+// El detalle de la ficha ("Zona 3", "Muelle 7") es lo único que distingue dos
+// órdenes iguales del mismo pedido. En papel tiene que verse; y cuando no lo
+// diligenciaron, no debe quedar un rótulo vacío ocupando el encabezado.
+const membrete = (nombre) => renderToStaticMarkup(
+  <Membrete logoSrc="logo.png" tituloFicha="Ficha de Fabricación" numero="SA100826001" nombre={nombre} />
+);
+
+describe("detalle de la ficha en el membrete impreso", () => {
+  it("imprime el detalle junto al consecutivo", () => {
+    const html = membrete("Muelle 7");
+    expect(html).toContain("Muelle 7");
+    expect(html).toContain("Detalle");
+    expect(html).toContain("SA100826001");
+  });
+
+  it("no deja rótulo vacío en la ficha que no lo lleva", () => {
+    const html = membrete("");
+    expect(html).not.toContain("Detalle");
+    expect(html).toContain("SA100826001");
+  });
+
+  // En papel no se imprimen fondos de color: marco y letra negros sobre blanco.
+  it("sale en alto contraste, sin fondo de color", () => {
+    expect(membrete("Zona 3")).toContain("2px solid #000000");
   });
 });

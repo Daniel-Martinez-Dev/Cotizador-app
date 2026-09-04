@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { collection, getDocs, query, orderBy, limit, deleteDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, waitForAuth, getAuthError } from "../firebase";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuote } from "../context/QuoteContext";
 import { FaSortUp, FaSortDown, FaEdit, FaTrash, FaEye, FaRegCommentDots, FaFileInvoiceDollar } from "react-icons/fa";
 import DatePicker from "react-datepicker";
@@ -31,7 +31,11 @@ export default function HistorialPage() {
   const [cargandoHistorialCompleto, setCargandoHistorialCompleto] = useState(false);
 
   const [filtroCliente, setFiltroCliente] = useState("");
-  const [filtroNumero, setFiltroNumero] = useState("");
+  // Producción abre esta pantalla desde la ficha vinculada ("ver la cotización
+  // N.º 4821"): llega el número por el state de la navegación y el historial
+  // abre con ese filtro puesto. Ver utils/documentoVinculo.js.
+  const location = useLocation();
+  const [filtroNumero, setFiltroNumero] = useState(location.state?.numeroCotizacion || "");
   const [filtroProducto, setFiltroProducto] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [rangoFecha, setRangoFecha] = useState([null, null]);

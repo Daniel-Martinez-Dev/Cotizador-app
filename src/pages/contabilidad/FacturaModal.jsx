@@ -10,6 +10,7 @@ import {
   Campo,
   Casilla,
   Input,
+  InputDinero,
   InputNumero,
   Modal,
   Money,
@@ -41,6 +42,7 @@ import { actualizarDocumento, buscarPorNumero, crearDocumento } from "../../util
 import { buscarPosiblesDuplicados, resolverEmpresa } from "../../utils/empresaIdentidad";
 import { resolverOCrearEmpresa } from "../../utils/firebaseCompanies";
 import { valorNumerico, numeroODefecto } from "../../utils/campoNumero";
+import VinculosSeccion, { FichasBadge } from "./VinculosSeccion";
 
 const itemVacio = () => ({ producto: "", descripcion: "", cantidad: 1, unidad: UNIDAD_POR_DEFECTO, valorUnitario: 0 });
 
@@ -63,6 +65,12 @@ function estadoInicial(documento, config) {
     retenciones: [],
     docAfectadoId: "",
     observaciones: "",
+    // Vínculos con el resto del negocio: de qué cotización salió y qué fichas
+    // cubre. Opcionales, y ausentes en todo lo que se importó del Excel — por
+    // eso van con valor por defecto (ver utils/documentoVinculo.js).
+    cotizacionId: "",
+    cotizacionNumero: "",
+    fichas: [],
   };
   if (!documento) return base;
   return {
@@ -71,10 +79,66 @@ function estadoInicial(documento, config) {
     periodoContable: documento.periodoContable || anioDe(documento.fecha) || base.periodoContable,
     items: documento.items?.length ? documento.items.map((i) => ({ ...i })) : [itemVacio()],
     retenciones: (documento.retenciones || []).map((r) => ({ ...r })),
+    fichas: (documento.fichas || []).map((f) => ({ ...f })),
   };
 }
 
 const esNota = (tipo) => tipo === TIPO_NOTA_CREDITO || tipo === TIPO_NOTA_DEBITO;
+
+/**
+ * Rótulo de un bloque que no es un solo control (y por eso no puede ser un
+ * <label>, que enfocaría al primero de ellos).
+ */
+function Rotulo({ texto, children, className = "" }) {
+  return (
+    <div className={`grid gap-1 min-w-0 ${className}`}>
+      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {texto}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Tipo de documento en pastillas y no en desplegable.
+ *
+ * Son tres opciones y es el campo que decide todo lo demás —si hay factura que
+ * corregir, si el valor suma o resta—. En una lista había que abrirla para
+ * saber cuál estaba puesta; aquí se ve sin tocar nada, y cambiarla es un solo
+ * toque en vez de tres.
+ */
+function SelectorTipo({ valor, onCambio }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Tipo de documento"
+      className="grid grid-cols-3 gap-1 rounded-lg bg-gray-100 dark:bg-gris-900/60 p-1"
+    >
+      {TIPOS_DOCUMENTO.map((t) => {
+        const puesto = valor === t.valor;
+        return (
+          <button
+            key={t.valor}
+            type="button"
+            role="radio"
+            aria-checked={puesto}
+            onClick={() => onCambio(t.valor)}
+            className={
+              "h-10 sm:h-8 px-2 rounded-md text-xs font-medium transition-colors focus:outline-none " +
+              "focus-visible:ring-2 focus-visible:ring-trafico/60 " +
+              (puesto
+                ? "bg-white dark:bg-gris-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gris-700/50")
+            }
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * Campo de la rejilla de conceptos con su nombre encima, pero solo mientras la
@@ -323,6 +387,7 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
       insignia={
         <>
           {form.cotizacionNumero && <Badge tone="info">Cotización {form.cotizacionNumero}</Badge>}
+          <FichasBadge documento={form} />
           {importado && <Badge tone="neutral">Migrado del Excel</Badge>}
           {form.anulado && <Badge tone="danger">Anulado</Badge>}
         </>
@@ -405,12 +470,11 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
         {/* ── Documento ──────────────────────────────────────────────────── */}
         <Seccion titulo="Documento">
           <div className="grid gap-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Campo label="Tipo">
-                <Select value={form.tipo} onChange={(e) => editar("tipo", e.target.value)}>
-                  {TIPOS_DOCUMENTO.map((t) => <option key={t.valor} value={t.valor}>{t.label}</option>)}
-                </Select>
-              </Campo>
+            <Rotulo texto="Tipo de documento">
+              <SelectorTipo valor={form.tipo} onCambio={(v) => editar("tipo", v)} />
+            </Rotulo>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <Campo label="Número" hint="El de la resolución DIAN">
                 <Input value={form.numero} onChange={(e) => editar("numero", e.target.value)} onBlur={revisarNumero} placeholder="J-1024" />
               </Campo>
@@ -546,11 +610,9 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                   </Select>
                 </RotuloMovil>
                 <RotuloMovil texto="Valor unitario">
-                  <InputNumero
-                    step="0.01"
+                  <InputDinero
                     value={item.valorUnitario}
-                    onChange={(e) => cambiarItem(idx, "valorUnitario", valorNumerico(e.target.value))}
-                    placeholder="0"
+                    onChange={(v) => cambiarItem(idx, "valorUnitario", v)}
                     aria-label={`Valor unitario del concepto ${idx + 1}`}
                   />
                 </RotuloMovil>
@@ -571,6 +633,28 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
               </div>
             ))}
             {errores.items && <div className="text-[11px] text-red-600 dark:text-red-400">{errores.items}</div>}
+
+            {/* El otro "+ Concepto" está en la cabecera de la sección, y con
+                cuatro o cinco líneas escritas queda fuera de la vista: había
+                que subir a buscarlo cada vez que se agregaba una. Aquí queda
+                justo debajo de la última línea, que es donde se acaba de
+                escribir, con el subtotal al lado para no tener que bajar hasta
+                la liquidación a comprobarlo. */}
+            <div className="mt-1 flex flex-col-reverse sm:flex-row sm:items-center gap-2">
+              <button
+                type="button"
+                onClick={agregarItem}
+                className="flex-1 h-11 sm:h-9 rounded-lg border border-dashed border-gray-300 dark:border-gris-600 text-sm font-medium text-gray-600 dark:text-gray-300 hover:border-trafico hover:text-gray-900 dark:hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-trafico/50"
+              >
+                + Agregar concepto
+              </button>
+              <div className="text-sm text-right sm:shrink-0 text-gray-600 dark:text-gray-300">
+                Subtotal{" "}
+                <strong className="text-gray-900 dark:text-white tabular-nums">
+                  <Money valor={liquidacion.subtotal} cero="0" />
+                </strong>
+              </div>
+            </div>
           </div>
         </Seccion>
 
@@ -610,11 +694,9 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
                       // El ancho va en el contenedor: la w-full del control
                       // gana a una w-32 en la misma especificidad.
                       <div className="w-full sm:w-32 shrink-0">
-                        <InputNumero
-                          step="0.01"
+                        <InputDinero
                           value={puesta.valor ?? ""}
-                          onChange={(e) => cambiarValorRetencion(ret.codigo, e.target.value)}
-                          placeholder="0"
+                          onChange={(v) => cambiarValorRetencion(ret.codigo, v)}
                           aria-label={`Valor de ${ret.nombre}`}
                         />
                       </div>
@@ -689,6 +771,9 @@ export default function FacturaModal({ modo, documento, empresas, documentos, co
             </div>
           </Seccion>
         </div>
+
+        {/* ── Vínculos ───────────────────────────────────────────────────── */}
+        <VinculosSeccion form={form} onCambio={(campos) => setForm((p) => ({ ...p, ...campos }))} />
 
         <Campo label="Observaciones">
           <Input
