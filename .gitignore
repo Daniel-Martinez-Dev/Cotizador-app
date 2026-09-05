@@ -159,3 +159,6 @@ android/.idea/
 android/keystore.properties
 android/app/*.jks
 android/app/*.keystore
+
+# Log del emulador de Firestore (npm run test:rules)
+firestore-debug.log

@@ -176,6 +176,44 @@ export async function actualizarRoles(uid, roles) {
 
 // ─── Login: asegura perfil al iniciar sesión ─────────────────────────────────
 
+// Copia al perfil propio los roles que un admin dejó pre-cargados en
+// `usuarios_email` para este correo. Es la única vía por la que alguien se
+// asigna roles a sí mismo, y por eso las reglas la validan entera: mandamos la
+// clave del pre-registro en `preRegistroKey` y el servidor comprueba que ese
+// documento —que solo un admin pudo escribir— esté a nombre del email del
+// token y que los roles y el status que reclamamos sean literalmente los suyos.
+//
+// Devuelve null si no hay nada que reclamar, y también si el servidor lo
+// rechaza: quedarse con el perfil que ya se tiene es preferible a romper el
+// inicio de sesión.
+async function reclamarPreRegistro(uid, email, perfilActual = {}) {
+  const byEmail = await getUserProfileForEmail(email);
+  if (!byEmail) return null;
+
+  // Sin roles o sin status no hay nada que reclamar, y además la comparación de
+  // las reglas no cuadraría.
+  const roles = Array.isArray(byEmail.roles) ? byEmail.roles : null;
+  const status = byEmail.status;
+  if (!roles || !status) return null;
+
+  try {
+    return await upsertUserProfile(uid, {
+      email,
+      displayName: perfilActual.displayName || byEmail.displayName || "",
+      roles,
+      status,
+      source: perfilActual.source || "email-mapping",
+      preRegistroKey: encodeEmailDocId(email),
+      // Reclamar el pre-registro no es un alta: si ya había perfil, su fecha de
+      // creación es la buena (upsertUserProfile pondría una nueva).
+      ...(perfilActual.createdAt ? { createdAt: perfilActual.createdAt } : {}),
+    });
+  } catch (e) {
+    console.error("No se pudo aplicar el pre-registro por email:", e);
+    return null;
+  }
+}
+
 export async function ensureUserProfileForLogin(firebaseUser) {
   if (!firebaseUser?.uid) return null;
 
@@ -209,31 +247,15 @@ export async function ensureUserProfileForLogin(firebaseUser) {
       });
     }
 
-    // Sincronizar con pre-registro por email si existe
-    if (email) {
-      const byEmail = await getUserProfileForEmail(email);
-      if (byEmail) {
-        const incomingRoles = Array.isArray(byEmail.roles) ? byEmail.roles : [];
-        const mergedRoles = Array.from(new Set([...existingRoles, ...incomingRoles]));
-        const nextStatus = byEmail.status || byUid.status || "active";
-        const nextDisplayName = firebaseUser.displayName || byUid.displayName || byEmail.displayName || "";
-
-        const shouldUpdate =
-          mergedRoles.length !== existingRoles.length ||
-          (byUid.status || "") !== nextStatus ||
-          (!byUid.email && email) ||
-          (!byUid.displayName && nextDisplayName);
-
-        if (shouldUpdate) {
-          return await upsertUserProfile(uid, {
-            email: byUid.email || email,
-            displayName: nextDisplayName,
-            roles: mergedRoles,
-            status: nextStatus,
-            source: byUid.source || "email-mapping-update",
-          });
-        }
-      }
+    // Reclamar el pre-registro por email, si lo hay.
+    //
+    // Solo la primera vez, mientras la persona no tenga ningún rol: pasado ese
+    // punto manda `usuarios/{uid}`, y un pre-registro viejo no puede devolver
+    // un rol que un admin acaba de quitar. Las reglas exigen exactamente esto,
+    // así que la condición de aquí y la de allá tienen que seguir coincidiendo.
+    if (email && existingRoles.length === 0) {
+      const reclamado = await reclamarPreRegistro(uid, email, byUid);
+      if (reclamado) return reclamado;
     }
 
     return byUid;
@@ -252,16 +274,10 @@ export async function ensureUserProfileForLogin(firebaseUser) {
 
   // 3) Nuevo usuario — pre-registro por email existe
   if (email) {
-    const byEmail = await getUserProfileForEmail(email);
-    if (byEmail) {
-      return await upsertUserProfile(uid, {
-        email,
-        displayName: firebaseUser.displayName || byEmail.displayName || "",
-        roles: Array.isArray(byEmail.roles) ? byEmail.roles : [],
-        status: byEmail.status || "active",
-        source: "email-mapping",
-      });
-    }
+    const reclamado = await reclamarPreRegistro(uid, email, {
+      displayName: firebaseUser.displayName || "",
+    });
+    if (reclamado) return reclamado;
   }
 
   // 4) Nuevo usuario desconocido — pendiente de aprobación

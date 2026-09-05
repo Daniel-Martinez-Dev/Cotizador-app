@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -100,5 +101,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['buffer'],
+  },
+  test: {
+    // Las pruebas de reglas necesitan el emulador de Firestore, así que no
+    // corren con `npm test`: van aparte, en `npm run test:rules`.
+    exclude: [...configDefaults.exclude, 'tests/rules/**'],
   },
 })

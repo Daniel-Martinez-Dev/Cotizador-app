@@ -185,20 +185,100 @@ service cloud.firestore {
     }
 
     // ─── Perfiles de usuario ───────────────────────────────────────────────────
+    //
+    // `usuarios/{uid}` es el documento que decide qué puede hacer cada persona:
+    // aquí viven `roles` y `status`, y de aquí los leen isAdmin() y hasRole().
+    // Por eso el dueño del documento NO puede escribirlos. Si pudiera, y como el
+    // registro está abierto (ver signUpWithEmail), cualquiera en internet se
+    // crearía una cuenta, se pondría `roles: ['admin']` y tendría el sistema
+    // entero: cotizaciones, inventario, producción y cartera.
+    //
+    // Los roles los asigna un admin, con una sola excepción controlada: el
+    // pre-registro por email (ver preRegistroCoincide).
+
+    // Lo único que una persona puede cambiarse a sí misma desde "Mi perfil".
+    // Espejo de CAMPOS_PERFIL_PROPIO en src/utils/firebaseUsers.js: si cambia
+    // allá, tiene que cambiar aquí — el cliente propone y esta lista dispone.
+    function camposPerfilPropio() {
+      return ['displayName', 'firstName', 'lastName', 'fotoURL', 'fotoPath',
+              'firmaDataUrl', 'updatedAt'];
+    }
+
+    function soloTocaSuPerfil() {
+      return request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly(camposPerfilPropio());
+    }
+
+    // Un alta normal: sin roles y pendiente de aprobación. Es lo que escriben
+    // signUpWithEmail() y el caso "usuario desconocido" de
+    // ensureUserProfileForLogin().
+    function altaPendiente() {
+      return request.resource.data.get('roles', []) == []
+          && request.resource.data.get('status', '') == 'pending';
+    }
+
+    // El pre-registro por email: un admin deja preparado en
+    // `usuarios_email/{clave}` con qué roles entrará alguien que todavía no se
+    // ha registrado, y esa persona se los copia a su perfil la primera vez que
+    // entra (así no hay que aprobarla a mano).
+    //
+    // Es la única vía por la que alguien se asigna roles a sí mismo, así que se
+    // valida entera contra el servidor. La clave la manda el cliente, pero eso
+    // da igual: lo que se compara es el CONTENIDO del documento pre-registrado
+    // —que solo un admin pudo escribir— contra el email del token, que el
+    // cliente no puede falsificar. Para reclamar unos roles hay que exhibir un
+    // pre-registro hecho a nombre del correo con el que se inició sesión.
+    function preRegistroRef(clave) {
+      return /databases/$(database)/documents/usuarios_email/$(clave);
+    }
+
+    function preRegistroCoincide() {
+      return claveDePreRegistroValida(request.resource.data.get('preRegistroKey', ''));
+    }
+
+    function claveDePreRegistroValida(clave) {
+      return clave is string
+          && clave.matches('[^/]+')
+          && exists(preRegistroRef(clave))
+          && get(preRegistroRef(clave)).data.get('email', '') == request.auth.token.email
+          && request.resource.data.get('roles', []) == get(preRegistroRef(clave)).data.get('roles', [])
+          && request.resource.data.get('status', '') == get(preRegistroRef(clave)).data.get('status', '');
+    }
+
     match /usuarios/{uid} {
       // Lectura: el propio usuario puede ver su perfil (para saber si está pendiente);
       // cualquier staff activo puede listar el directorio (necesario para el
       // selector de firmas de fichas de producción).
-      allow read: if isStaff() && (request.auth.uid == uid || isAdmin() || isActiveStaff());
-      allow create: if isStaff() && (request.auth.uid == uid || isAdmin());
-      allow update: if isStaff() && (request.auth.uid == uid || isAdmin());
+      allow read: if isStaff() && (request.auth.uid == uid || isActiveStaff());
+
+      allow create: if isAdmin()
+                    || (isStaff() && request.auth.uid == uid
+                        && (altaPendiente() || preRegistroCoincide()));
+
+      // El pre-registro solo vale la primera vez, cuando la persona todavía no
+      // tiene roles. Después manda `usuarios/{uid}`: si un admin le quita un
+      // rol, un pre-registro viejo no puede devolvérselo al siguiente login.
+      allow update: if isAdmin()
+                    || (isStaff() && request.auth.uid == uid
+                        && (soloTocaSuPerfil()
+                            || (resource.data.get('roles', []) == []
+                                && preRegistroCoincide())));
+
       allow delete: if isAdmin();
     }
 
-    // Índice por email
+    // Índice por email. Escribir aquí es repartir permisos —es lo que decide con
+    // qué roles entra alguien la primera vez—, así que es cosa de admin. Antes
+    // era `allow write: if isStaff()`, que dejaba a cualquier registrado
+    // pre-registrarse a sí mismo como admin y promoverse al volver a entrar:
+    // la misma escalada que cierra el bloque de arriba, por la puerta de al lado.
     match /usuarios_email/{emailKey} {
-      allow read: if isStaff();
-      allow write: if isStaff();
+      // `get` por clave exacta lo necesita cualquiera al iniciar sesión, para
+      // leer su propio pre-registro. Listar la colección entera —el directorio
+      // de correos y sus roles— es solo de admin.
+      allow get: if isStaff();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // ─── Empresas y Contactos ──────────────────────────────────────────────────
@@ -215,19 +295,72 @@ service cloud.firestore {
     }
 
     // ─── Contadores de numeración ──────────────────────────────────────────────
-    match /counters/{counterId} {
-      allow read: if isActiveStaff();
-      allow write: if isActiveStaff();
+    //
+    // De aquí salen los números que acaban impresos y en manos de otra gente: el
+    // de cotización, el de orden de producción y el SKU/código de barras de cada
+    // material. Un número ya emitido está en un PDF que el cliente guarda y en
+    // una etiqueta pegada a un rollo.
+    //
+    // Por eso la regla que de verdad importa aquí no es quién escribe, sino que
+    // el contador SOLO PUEDA SUBIR. Si alguien lo devuelve a cero —por error o a
+    // propósito— la app vuelve a repartir números ya usados, y acabas con dos
+    // cotizaciones distintas con el mismo número y dos fichas con la misma orden
+    // de producción. Eso no lo arregla ningún rol: el almacenista que reinicia el
+    // contador tiene permiso legítimo para tocarlo.
+    //
+    // El reparto ya se hace con runTransaction() para que dos personas a la vez
+    // no se lleven el mismo número (ver firebaseConsecutivos.js). Esto es la otra
+    // mitad, la que faltaba del lado del servidor.
+    //
+    // (Aquí había también /counters y /quoteCounters abiertos a cualquier staff.
+    // Se fueron: ningún commit de la historia los ha usado nunca.)
+
+    function contadorNace() {
+      return request.resource.data.numero is int
+          && request.resource.data.numero > 0;
     }
 
-    match /quoteCounters/{docId} {
-      allow read: if isActiveStaff();
-      allow write: if isActiveStaff();
+    function contadorAvanza() {
+      return request.resource.data.numero is int
+          && request.resource.data.numero > resource.data.get('numero', 0);
+    }
+
+    // Cada contador es de quien emite ese documento: cotizar lo hace cualquiera
+    // de oficina, numerar materiales es del cuarto de almacén y las órdenes de
+    // producción son de producción. Un docId que no esté en la lista solo lo
+    // toca un admin — así un contador nuevo entra a mano y no por accidente.
+    function esContadorDeProduccion(docId) {
+      return docId == 'orden_produccion_global'
+          || docId == 'orden_produccion_division';
+    }
+
+    function puedeNumerar(docId) {
+      return isAdmin()
+          || (docId == 'cotizacion' && isActiveStaff())
+          || (docId == 'inventario_material' && isAlmacenStaff())
+          || (esContadorDeProduccion(docId) && isActiveStaff() && hasRole('produccion'));
     }
 
     match /consecutivos/{docId} {
+      // Leer lo necesita más gente que escribir: la vista previa enseña el
+      // próximo número de cotización sin reservarlo (peekNextQuoteNumber), y la
+      // transacción del contador global consulta el consecutivo legado de
+      // División para no repetir números ya impresos en fichas viejas.
       allow read: if isActiveStaff();
-      allow write: if isActiveStaff();
+
+      allow create: if puedeNumerar(docId) && contadorNace();
+      allow update: if puedeNumerar(docId) && contadorAvanza();
+
+      // Borrar un contador es reiniciar la numeración por la puerta de atrás:
+      // el siguiente en pedir número recibiría el 1.
+      //
+      // Ojo con el alcance: el catch-all del final de este archivo le concede
+      // todo al admin, y en Firestore los permisos SUMAN —ninguna regla puede
+      // quitar lo que otra concede—, así que esto ata a todo el mundo menos al
+      // admin. Que es justo el reparto que se busca: lo que hay que impedir es
+      // que un almacenista o un comercial reinicien la numeración con el permiso
+      // legítimo que tienen para tocarla.
+      allow delete: if false;
     }
 
     // ─── Producción: admin o usuario con rol "produccion" ──────────────────────
